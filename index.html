@@ -150,71 +150,71 @@ button.cell{cursor:pointer}
   .firmas div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:12px;text-align:center}
   th,td{padding:4px 6px}
 }
-#cert-root h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;text-transform:uppercase;letter-spacing:.02em}
-#cert-root h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
-#cert-root .sub{color:var(--muted);font-size:14px}
-#cert-root .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-#cert-root .between{justify-content:space-between}
-#cert-root .btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:9px 14px;font-weight:600}
-#cert-root .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-#cert-root .btn.ghost{background:transparent}
-#cert-root .btn.sm{padding:5px 10px;font-size:13px}
-#cert-root .btn:disabled{opacity:.45;cursor:not-allowed}
-#cert-root input,#cert-root select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
-#cert-root .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
-#cert-root .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}
-#cert-root .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
-#cert-root .kpi small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
-#cert-root .kpi b{font-family:var(--f-num);font-size:20px}
-#cert-root .kpi em{font-style:normal;font-size:13px;color:var(--muted)}
-#cert-root .kpi.ok{border:2px solid var(--ok)}
-#cert-root .kpi.ok b{color:var(--ok)}
-#cert-root .kpi.bad{border:2px solid var(--bad)}
-#cert-root .kpi.bad b{color:var(--bad)}
-#cert-root .dot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
-#cert-root .dot.rojo{background:var(--bad)}
-#cert-root .dot.amarillo{background:var(--accent)}
-#cert-root .dot.verde{background:var(--ok)}
-#cert-root .alerta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 14px;border-top:1px solid var(--line)}
-#cert-root .alerta:first-child{border-top:0}
-#cert-root .alerta .dot{margin-top:6px}
-#cert-root .tw{overflow-x:auto}
-#cert-root table{border-collapse:collapse;width:100%}
-#cert-root th,#cert-root td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
-#cert-root th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
-#cert-root th.grp{text-align:center;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink)}
-#cert-root td.n,#cert-root th.n{text-align:right}
-#cert-root td.desc{white-space:normal;min-width:220px;max-width:380px}
-#cert-root tr.rubro td{background:var(--chip);font-weight:600;font-family:var(--f-display);font-size:16px;letter-spacing:.02em}
-#cert-root tr.sector td{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:10px}
-#cert-root tr.subt td{font-weight:600;border-bottom:2px solid var(--line)}
-#cert-root tr.over td{background:var(--bad-bg)}
-#cert-root tr.has td.pres{background:var(--edit)}
-#cert-root tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
-#cert-root td.pres input{width:90px;text-align:right;font-family:var(--f-num);padding:5px 6px}
-#cert-root .track{height:8px;background:var(--bar);border-radius:99px;position:relative;overflow:hidden;min-width:80px}
-#cert-root .track i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--ok)}
-#cert-root .track i.rojo{background:var(--bad)}
-#cert-root .mini{display:flex;align-items:center;gap:8px}
-#cert-root .mini .pct{font-family:var(--f-num);font-size:12px;width:48px;text-align:right}
-#cert-root .totales{position:sticky;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 -6px 18px rgba(0,0,0,.06);align-items:center}
-@media (max-width:760px){#cert-root .totales{bottom:calc(64px + env(safe-area-inset-bottom,0px))}}
-#cert-root .totales div small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-#cert-root .totales div b{font-family:var(--f-num);font-size:18px}
-#cert-root .letras{grid-column:1/-1;font-size:13px;color:var(--muted)}
-#cert-root .hint{font-size:13px;padding:8px 10px;border-radius:8px}
-#cert-root .hint.rojo{background:var(--bad-bg);color:var(--bad)}
-#cert-root .hint.verde{background:var(--ok-bg);color:var(--ok)}
-#cert-root .hint.amarillo{background:var(--warn-bg);color:var(--warn)}
-#cert-root .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;align-items:end}
-#cert-root .form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
-#cert-root .form .wide{grid-column:span 2}
-@media (max-width:520px){#cert-root .form .wide{grid-column:1/-1}}
-#cert-root .chips{display:flex;gap:6px;flex-wrap:wrap}
-#cert-root .chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:5px 12px;font-weight:600;font-size:14px}
-#cert-root .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-#cert-root .chip.nuevo{border-style:dashed}
-#cert-root{display:flex;flex-direction:column;gap:16px}
+#cert-root h2,#pres-root h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;text-transform:uppercase;letter-spacing:.02em}
+#cert-root h3,#pres-root h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
+#cert-root .sub,#pres-root .sub{color:var(--muted);font-size:14px}
+#cert-root .bar,#pres-root .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#cert-root .between,#pres-root .between{justify-content:space-between}
+#cert-root .btn,#pres-root .btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:9px 14px;font-weight:600}
+#cert-root .btn.primary,#pres-root .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#cert-root .btn.ghost,#pres-root .btn.ghost{background:transparent}
+#cert-root .btn.sm,#pres-root .btn.sm{padding:5px 10px;font-size:13px}
+#cert-root .btn:disabled,#pres-root .btn:disabled{opacity:.45;cursor:not-allowed}
+#cert-root input,#pres-root input,#cert-root select,#pres-root select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+#cert-root .panel,#pres-root .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#cert-root .kpis,#pres-root .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}
+#cert-root .kpi,#pres-root .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+#cert-root .kpi small,#pres-root .kpi small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+#cert-root .kpi b,#pres-root .kpi b{font-family:var(--f-num);font-size:20px}
+#cert-root .kpi em,#pres-root .kpi em{font-style:normal;font-size:13px;color:var(--muted)}
+#cert-root .kpi.ok,#pres-root .kpi.ok{border:2px solid var(--ok)}
+#cert-root .kpi.ok b,#pres-root .kpi.ok b{color:var(--ok)}
+#cert-root .kpi.bad,#pres-root .kpi.bad{border:2px solid var(--bad)}
+#cert-root .kpi.bad b,#pres-root .kpi.bad b{color:var(--bad)}
+#cert-root .dot,#pres-root .dot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
+#cert-root .dot.rojo,#pres-root .dot.rojo{background:var(--bad)}
+#cert-root .dot.amarillo,#pres-root .dot.amarillo{background:var(--accent)}
+#cert-root .dot.verde,#pres-root .dot.verde{background:var(--ok)}
+#cert-root .alerta,#pres-root .alerta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 14px;border-top:1px solid var(--line)}
+#cert-root .alerta:first-child,#pres-root .alerta:first-child{border-top:0}
+#cert-root .alerta .dot,#pres-root .alerta .dot{margin-top:6px}
+#cert-root .tw,#pres-root .tw{overflow-x:auto}
+#cert-root table,#pres-root table{border-collapse:collapse;width:100%}
+#cert-root th,#pres-root th,#cert-root td,#pres-root td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+#cert-root th,#pres-root th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+#cert-root th.grp,#pres-root th.grp{text-align:center;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink)}
+#cert-root td.n,#pres-root td.n,#cert-root th.n,#pres-root th.n{text-align:right}
+#cert-root td.desc,#pres-root td.desc{white-space:normal;min-width:220px;max-width:380px}
+#cert-root tr.rubro td,#pres-root tr.rubro td{background:var(--chip);font-weight:600;font-family:var(--f-display);font-size:16px;letter-spacing:.02em}
+#cert-root tr.sector td,#pres-root tr.sector td{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:10px}
+#cert-root tr.subt td,#pres-root tr.subt td{font-weight:600;border-bottom:2px solid var(--line)}
+#cert-root tr.over td,#pres-root tr.over td{background:var(--bad-bg)}
+#cert-root tr.has td.pres,#pres-root tr.has td.pres{background:var(--edit)}
+#cert-root tfoot td,#pres-root tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
+#cert-root td.pres input,#pres-root td.pres input{width:90px;text-align:right;font-family:var(--f-num);padding:5px 6px}
+#cert-root .track,#pres-root .track{height:8px;background:var(--bar);border-radius:99px;position:relative;overflow:hidden;min-width:80px}
+#cert-root .track i,#pres-root .track i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--ok)}
+#cert-root .track i.rojo,#pres-root .track i.rojo{background:var(--bad)}
+#cert-root .mini,#pres-root .mini{display:flex;align-items:center;gap:8px}
+#cert-root .mini .pct,#pres-root .mini .pct{font-family:var(--f-num);font-size:12px;width:48px;text-align:right}
+#cert-root .totales,#pres-root .totales{position:sticky;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 -6px 18px rgba(0,0,0,.06);align-items:center}
+@media (max-width:760px){#cert-root .totales,#pres-root .totales{bottom:calc(64px + env(safe-area-inset-bottom,0px))}}
+#cert-root .totales div small,#pres-root .totales div small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#cert-root .totales div b,#pres-root .totales div b{font-family:var(--f-num);font-size:18px}
+#cert-root .letras,#pres-root .letras{grid-column:1/-1;font-size:13px;color:var(--muted)}
+#cert-root .hint,#pres-root .hint{font-size:13px;padding:8px 10px;border-radius:8px}
+#cert-root .hint.rojo,#pres-root .hint.rojo{background:var(--bad-bg);color:var(--bad)}
+#cert-root .hint.verde,#pres-root .hint.verde{background:var(--ok-bg);color:var(--ok)}
+#cert-root .hint.amarillo,#pres-root .hint.amarillo{background:var(--warn-bg);color:var(--warn)}
+#cert-root .form,#pres-root .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;align-items:end}
+#cert-root .form label,#pres-root .form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#cert-root .form .wide,#pres-root .form .wide{grid-column:span 2}
+@media (max-width:520px){#cert-root .form .wide,#pres-root .form .wide{grid-column:1/-1}}
+#cert-root .chips,#pres-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+#cert-root .chip,#pres-root .chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:5px 12px;font-weight:600;font-size:14px}
+#cert-root .chip[aria-pressed="true"],#pres-root .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#cert-root .chip.nuevo,#pres-root .chip.nuevo{border-style:dashed}
+#cert-root,#pres-root{display:flex;flex-direction:column;gap:16px}
 #cert-root .subnav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 #cert-root .subnav select{max-width:100%}
 #cert-root .totales{bottom:0}
@@ -368,6 +368,10 @@ function backendLocal(){
         d.contratistas=SEMILLA_CONTRATISTAS.map(c=>({...JSON.parse(JSON.stringify(c)),id:uid(),obra_id:o?o.id:null}));save()}
       return d.contratistas.filter(c=>c.obra_id===oid).map(c=>JSON.parse(JSON.stringify(c)))},
     async saveContratista(c){const v=JSON.parse(JSON.stringify(c));const i=d.contratistas.findIndex(x=>x.id===c.id);if(i>=0)d.contratistas[i]=v;else d.contratistas.push(v);save()},
+    async presupuesto(oid){if(!d.presupuestos){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.presupuestos=[];
+        if(SEMILLA_PRES&&o)d.presupuestos.push({...JSON.parse(JSON.stringify(SEMILLA_PRES)),obra_id:o.id});save()}
+      const p=d.presupuestos.find(x=>x.obra_id===oid);return p?JSON.parse(JSON.stringify(p)):null},
+    async savePresupuesto(p){const v=JSON.parse(JSON.stringify(p));const i=d.presupuestos.findIndex(x=>x.obra_id===p.obra_id);if(i>=0)d.presupuestos[i]=v;else d.presupuestos.push(v);save()},
   };
 }
 function backendNube(sb){
@@ -395,6 +399,9 @@ function backendNube(sb){
     async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
     async contratistas(oid){if(!oid)return[];return ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'))},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
+    async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
+      return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
+    async savePresupuesto(p){ok(await sb.from('presupuestos').upsert({obra_id:p.obra_id,items:p.items,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},base_hasta:p.baseHasta||null,m2:p.m2||null,usd:p.usd||null,indice:p.indice||1},{onConflict:'obra_id'}))},
   };
 }
 
@@ -528,8 +535,8 @@ function navPeriodo(){
 }
 const membrete=t=>{const{a,b}=rango();return `<div class="membrete"><div><b>${esc(S.aj.empresa)}</b><br>Obra: ${esc(nombreObra())}</div><div style="text-align:right"><b>${t}</b><br>Período ${dm(a)} al ${dm(b)}/${parse(b).getFullYear()}</div></div>`};
 const botonesSalida=()=>EN_MARCO
-  ?`<span class="sub no-print">Imprimir y Excel funcionan en tu página publicada.</span>`
-  :`<button class="btn no-print" data-act="excel">Descargar Excel</button><button class="btn primary no-print" data-act="imprimir">Imprimir / PDF</button>`;
+  ?`<span class="sub no-print">PDF, Excel e impresión funcionan en tu página publicada.</span>`
+  :`<button class="btn primary no-print" data-act="pdf">Descargar PDF</button><button class="btn no-print" data-act="excel">Descargar Excel</button><button class="btn ghost no-print" data-act="imprimir">Imprimir</button>`;
 
 function vPlanilla(){
   const{dias,filas}=datosPeriodo();
@@ -607,6 +614,78 @@ function vLiquidacion(){
   ${tarjetas||'<div class="panel liq sub">Sin asistencias en este período.</div>'}`;
 }
 
+
+/* ---------- PDF con membrete de Avaroga (compartido) ---------- */
+const PDFK={
+  ok(){if(EN_MARCO){toast('El PDF se descarga desde tu página publicada');return false}if(!window.jspdf?.jsPDF||!window.jspdf.jsPDF.API.autoTable){toast('No se pudo cargar el generador de PDF');return false}return true},
+  nuevo(orient){const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:orient||'portrait'});doc.__o=orient||'portrait';return doc},
+  dims(doc){return doc.__o==='landscape'?{W:297,H:210}:{W:210,H:297}},
+  TOP:40,ML:14,MR:14,
+  titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);doc.text(t,this.ML,y);y+=6;doc.setFontSize(10);
+    (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{doc.setFont('times','bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(String(v),this.ML+kw,y);y+=4.8});return y+2},
+  tabla(doc,opts){const base={margin:{left:this.ML,right:this.MR,top:this.TOP,bottom:18},theme:'grid',
+      styles:{font:'times',fontSize:8.5,cellPadding:1.4,textColor:0,lineColor:[150,150,150],lineWidth:0.15,valign:'middle'},
+      headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold'},footStyles:{fillColor:[240,240,240],textColor:0,fontStyle:'bold'}};
+    doc.autoTable(Object.assign(base,opts,{styles:Object.assign(base.styles,opts.styles||{})}));return doc.lastAutoTable.finalY},
+  firmas(doc,y,lista){const{W,H}=this.dims(doc);if(y>H-45){doc.addPage();y=this.TOP+10}y+=22;const n=lista.length,ancho=(W-this.ML-this.MR)/n;
+    doc.setFont('times','normal');doc.setFontSize(9.5);lista.forEach((l,i)=>{const x=this.ML+ancho*i+8,w=ancho-16;doc.setLineWidth(0.3);doc.line(x,y,x+w,y);
+      String(l).split('\n').forEach((t,j)=>doc.text(t,x+w/2,y+4.5+j*4.2,{align:'center'}))});return y+14},
+  cerrar(doc,nombre){const{W,H}=this.dims(doc);const emp=S.aj.empresa||AJ_DEF.empresa;const n=doc.getNumberOfPages();
+    for(let i=1;i<=n;i++){doc.setPage(i);if(typeof AVAROGA_LOGO!=='undefined'&&AVAROGA_LOGO)doc.addImage(AVAROGA_LOGO,'PNG',this.ML,10,11.8,12);
+      doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(0);doc.text(emp,this.ML,28);
+      doc.setFont('helvetica','normal');doc.setFontSize(7.5);const x=W-this.MR;
+      doc.text('Tel: +595 987 179275',x,12,{align:'right'});doc.text('Juan L. Mallorquín Nro. 1220 c/ Cerro Corá – 3er Piso',x,15.5,{align:'right'});
+      doc.text('avarogaarq@gmail.com',x,19,{align:'right'});doc.text('Encarnación, Paraguay',x,22.5,{align:'right'});
+      doc.setLineWidth(0.3);doc.line(this.ML,31,W-this.MR,31);
+      doc.setFontSize(7.5);doc.text('©'+new Date().getFullYear()+' | '+emp,this.ML,H-8);doc.text('Pág. '+i+' de '+n,W-this.MR,H-8,{align:'right'})}
+    doc.save(nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf');toast('PDF descargado')}
+};
+window.PDFK=PDFK;
+const obraTxt=()=>{const o=obraAct();return o?o.nombre:'—'};
+function pdfPlanilla(){
+  if(!PDFK.ok())return;const{per,dias,filas}=datosPeriodo();const vis=filas.filter(f=>f.horas>0);const o=obraAct();
+  const doc=PDFK.nuevo('landscape');const largo=dias.length>16;
+  let y=PDFK.titulo(doc,'PLANILLA DE PERSONAL EN OBRA',[['Obra:',obraTxt()],['Cliente:',o?.cliente],['Ubicación:',o?.ubicacion],['Período:',`${DIAS[parse(per.a).getDay()]} ${dm(per.a)}/${parse(per.a).getFullYear()} al ${DIAS[parse(per.b).getDay()].toLowerCase()} ${dm(per.b)}/${parse(per.b).getFullYear()}`]]);
+  const head=['N°','Nombre','Categoría',...(largo?[]:dias.map(f=>DC[parse(f).getDay()]+'\n'+dm(f))),'Días','Horas','Jornada Gs','Total Gs'];
+  const body=vis.map(x=>[x.p.numero??'',x.p.nombre,x.p.categoria||'',...(largo?[]:x.regs.map(r=>r?fmtH(r.horas):'—')),x.dias.toFixed(2).replace('.',','),fmtH(x.horas),gs(x.p.jornada),gs(x.bruto)]);
+  const tH=vis.reduce((s,x)=>s+x.horas,0),tG=vis.reduce((s,x)=>s+x.bruto,0);
+  const foot=[['','Total','',...(largo?[]:dias.map((f,i)=>String(vis.filter(x=>x.regs[i]).length))),'',fmtH(Math.round(tH*100)/100),'',gs(tG)]];
+  const nd=largo?0:dias.length;const cs={0:{halign:'right',cellWidth:8}};for(let i=3;i<3+nd;i++)cs[i]={halign:'center'};[3+nd,4+nd,5+nd,6+nd].forEach(i=>cs[i]={halign:'right'});
+  y=PDFK.tabla(doc,{startY:y,head:[head],body:body.length?body:[[{content:'Sin asistencias en el período.',colSpan:head.length}]],foot,columnStyles:cs,styles:{fontSize:largo?8.5:8}});
+  if(largo){doc.setFont('times','italic');doc.setFontSize(8.5);doc.text(`Período de ${dias.length} días: se muestran los totales por persona. El detalle diario está en la planilla Excel.`,PDFK.ML,y+5);y+=5}
+  doc.setFont('times','normal');doc.setFontSize(8.5);doc.text('Fila de totales: cantidad de personas presentes por día.',PDFK.ML,y+5);
+  y=PDFK.firmas(doc,y+4,['Dirección de Obra\n'+(S.aj.empresa||AJ_DEF.empresa)]);
+  PDFK.cerrar(doc,`Planilla_${obraTxt()}_${per.a}_al_${per.b}`);
+}
+function pdfLiquidacion(){
+  if(!PDFK.ok())return;const{per,dias,filas}=datosPeriodo();const vis=filas.filter(f=>f.horas>0||f.desc.length);const o=obraAct();
+  const doc=PDFK.nuevo('portrait');
+  let y=PDFK.titulo(doc,S.rango?'LIQUIDACIÓN DE PERSONAL':'LIQUIDACIÓN SEMANAL DE PERSONAL',[['Obra:',obraTxt()],['Cliente:',o?.cliente],['Período:',`${dm(per.a)}/${parse(per.a).getFullYear()} al ${dm(per.b)}/${parse(per.b).getFullYear()}`]]);
+  const tB=vis.reduce((s,x)=>s+x.bruto,0),tD=vis.reduce((s,x)=>s+x.totDesc,0);
+  y=PDFK.tabla(doc,{startY:y,head:[['Nombre','Categoría','Horas','Bruto Gs','Descuentos Gs','Neto Gs']],body:vis.map(x=>[x.p.nombre,x.p.categoria||'',fmtH(x.horas),gs(x.bruto),x.totDesc?'− '+gs(x.totDesc):'—',gs(x.neto)]),
+    foot:[['Total','','',gs(tB),tD?'− '+gs(tD):'—',gs(tB-tD)]],columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right',fontStyle:'bold'}}});
+  vis.forEach(x=>{
+    doc.addPage();let yy=PDFK.titulo(doc,'RECIBO DE PAGO · '+x.p.nombre.toUpperCase(),[['Categoría:',x.p.categoria],['C.I.:',x.p.ci],['Obra:',obraTxt()],['Período:',`${dm(per.a)} al ${dm(per.b)}/${parse(per.b).getFullYear()}`],['Jornada:',gs(x.p.jornada)+' Gs · hora '+gs(x.ch)+' Gs']]);
+    const body=x.regs.map((r,i)=>r?[DIAS[parse(dias[i]).getDay()]+' '+dm(dias[i]),r.ent_am&&r.sal_am?t5(r.ent_am)+' – '+t5(r.sal_am):'—',r.ent_pm&&r.sal_pm?t5(r.ent_pm)+' – '+t5(r.sal_pm):'—',fmtH(r.horas),gs(r.horas*x.ch)]:null).filter(Boolean);
+    yy=PDFK.tabla(doc,{startY:yy,head:[['Día','Mañana','Tarde','Horas','Monto Gs']],body,foot:[['Subtotal ('+x.dias.toFixed(2).replace('.',',')+' jornadas)','','',fmtH(x.horas),gs(x.bruto)]],columnStyles:{3:{halign:'right'},4:{halign:'right'}}});
+    if(x.desc.length)yy=PDFK.tabla(doc,{startY:yy+4,head:[['Descuento','Fecha','Monto Gs']],body:x.desc.map(d=>[d.concepto,dm(d.fecha),'− '+gs(d.monto)]),columnStyles:{2:{halign:'right'}}});
+    doc.setFont('times','bold');doc.setFontSize(12);doc.text('NETO A PAGAR: Gs. '+gs(x.neto),PDFK.ML,yy+9);
+    doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('Son guaraníes: '+letrasGs(x.neto),PDFK.ML,yy+15);
+    PDFK.firmas(doc,yy+16,['Recibí conforme\n'+x.p.nombre+(x.p.ci?'\nC.I. '+x.p.ci:''),'Entregado por\n'+(S.aj.empresa||AJ_DEF.empresa)]);
+  });
+  PDFK.cerrar(doc,`Liquidacion_${obraTxt()}_${per.a}_al_${per.b}`);
+}
+function letrasGs(n){
+  n=Math.round(n);if(n<=0)return 'cero';
+  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const Dd=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const c999=x=>{if(x===100)return 'cien';const c=Math.floor(x/100),r=x%100;let s=C[c];if(r){s+=(s?' ':'')+(r<30?U[r]:Dd[Math.floor(r/10)]+(r%10?' y '+U[r%10]:''))}return s};
+  const p=[];const mm=Math.floor(n/1e6),mi=Math.floor((n%1e6)/1000),re=n%1000;
+  if(mm)p.push(mm===1?'un millón':c999(mm).replace(/uno$/,'un')+' millones');if(mi)p.push(mi===1?'mil':c999(mi).replace(/uno$/,'un')+' mil');if(re)p.push(c999(re));
+  const s=p.join(' ').replace(/veintiun\b/g,'veintiún');return s.charAt(0).toUpperCase()+s.slice(1);
+}
+window.letrasGs=letrasGs;
 /* ---------- libro de lluvias (por obra) ---------- */
 const AFL={total:'Obra parada',parcial:'Parcial',sin:'Sin afectar'};
 const ACTS_LL=['Excavación','Fundaciones','Hormigonado','Mampostería','Reboque exterior','Contrapiso','Techo / cubierta','Pintura exterior','Instalaciones','Limpieza / acopio'];
@@ -846,17 +925,19 @@ function vLogin(err=''){
 }
 
 const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['personal','Personal'],['ajustes','Ajustes']];
-const MODS=[['personal-obra','Personal en obra'],['contratistas','Contratistas']];
+const MODS=[['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto']];
+const esP=t=>t!=='contratistas'&&t!=='presupuesto';
 function render(){
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b>Gestión <i>de</i> Obra</b>
     ${S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    <nav class="tabs">${MODS.map(([k,t])=>{const act=k==='contratistas'?S.tab==='contratistas':S.tab!=='contratistas';return `<button data-tab="${k==='contratistas'?k:(S.lastP||'cargar')}" aria-current="${act}">${t}</button>`}).join('')}</nav></header>
-  ${NUBE?'':'<div class="demo">Prueba integrada: asistencia, lluvias y contratistas con tus planillas · se guarda solo en este dispositivo</div>'}
-  <main>${S.tab!=='contratistas'?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
+    <nav class="tabs">${MODS.map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}">${t}</button>`}).join('')}</nav></header>
+  ${NUBE?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas y presupuesto con tus planillas · se guarda solo en este dispositivo</div>'}
+  <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
+  if(S.tab==='presupuesto'&&window.PRES)window.PRES.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
 }
 
@@ -870,7 +951,7 @@ async function guardarAsis(pid,campos){
 }
 document.addEventListener('click',async ev=>{
   const t=ev.target.closest('[data-tab],[data-act]');if(!t)return;
-  if(t.dataset.tab){S.tab=t.dataset.tab;if(S.tab!=='contratistas')S.lastP=S.tab;S.edit=null;render();return refrescar()}
+  if(t.dataset.tab){S.tab=t.dataset.tab;if(esP(S.tab))S.lastP=S.tab;S.edit=null;render();return refrescar()}
   const a=t.dataset.act;
   if(a==='dia'){S.dia=addD(S.dia,+t.dataset.n);S.abierto=null;return refrescar()}
   if(a==='hoy'){S.dia=hoy;return refrescar()}
@@ -913,6 +994,7 @@ document.addEventListener('click',async ev=>{
   if(a==='llpdf'){return descargarConstancia()}
   if(a==='imprimir'){return window.print()}
   if(a==='excel'){return exportarExcel()}
+  if(a==='pdf'){return S.tab==='liquidacion'?pdfLiquidacion():pdfPlanilla()}
   if(a==='salir'){await SB.auth.signOut();location.reload()}
 });
 let deb={};
@@ -996,6 +1078,8 @@ function exportarExcel(){
 /* ---------- puentes con el módulo de contratistas ---------- */
 window.ASIS_OBRA=()=>obraAct();
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
+window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
+const SEMILLA_PRES=null;
 const SEMILLA_CONTRATISTAS=[];
 window.ASIS_FIN=a=>addD(a,6);
 window.ASIS_SEMANA_PAGO=f=>periodo(addD(f,-1)).a;
@@ -1102,7 +1186,7 @@ function controles(R){
   R.over.forEach(x=>al.push(['rojo',`<b>${esc(x.i.n)} ${esc(x.i.desc)}</b><div class="sub">Certificado ${qf(x.q)} de ${qf(x.i.cant)} ${esc(x.i.unidad)} contratados: ${gs((x.q-x.i.cant)*x.i.pu)} Gs por encima del contrato.</div>`]));
   if(Math.abs(dif)>1000)al.push([dif>0?'rojo':'amarillo',`<b>${dif>0?'Se pagó más de lo certificado':'Hay certificado pendiente de pago'}</b><div class="sub">Desembolsado ${gs(R.desO+R.desA)} · certificado acumulado ${gs(R.certO+R.certA)} · diferencia ${gs(dif)}</div>`]);
   if(R.orig&&R.adic/R.orig>0.05)al.push(['amarillo',`<b>Adicionales por encima del 5% del contrato</b><div class="sub">${pct(R.adic/R.orig)} sobre el original</div>`]);
-  D.items.filter(i=>i.ref_cant!=null&&(i.cant>i.ref_cant+1e-9||i.pu>i.ref_pu+0.5)).forEach(i=>al.push(['amarillo',`<b>${esc(i.n)} ${esc(i.desc)}</b><div class="sub">Contratado ${qf(i.cant)} ${esc(i.unidad)} a ${gs(i.pu)}; al cliente presupuestaste ${qf(i.ref_cant)} a ${gs(i.ref_pu)} de mano de obra. Diferencia ${gs(i.cant*i.pu-i.ref_cant*i.ref_pu)} Gs que salen de tu margen.</div>`]));
+  D.items.filter(i=>i.ref_cant!=null&&(i.cant>i.ref_cant+1e-9||i.pu>i.ref_pu+0.5)).forEach(i=>al.push(['amarillo',`<b>${esc(i.n)} ${esc(i.desc)}</b><div class="sub">Contratado ${qf(i.cant)} ${esc(i.unidad)} a ${gs(i.pu)}; en el presupuesto del cliente figuran ${qf(i.ref_cant)} a ${gs(i.ref_pu)} de mano de obra. Diferencia ${gs(i.cant*i.pu-i.ref_cant*i.ref_pu)} Gs por encima de lo presupuestado al cliente.</div>`]));
   const conPrecio=new Set(D.items.filter(i=>i.pu>0).map(i=>i.rubro));const sinPrecio=D.items.filter(i=>i.sec==='ORIG'&&!i.pu&&conPrecio.has(i.rubro));
   if(sinPrecio.length)al.push(['amarillo',`<b>${sinPrecio.length} ítem${sinPrecio.length>1?'s':''} sin precio en el contrato</b><div class="sub">${sinPrecio.map(i=>esc(i.n+' '+i.desc.slice(0,36))).join(' · ')}. Si los va a hacer este contratista, conviene fijar el precio antes de empezar.</div>`]);
   return al;
@@ -1156,7 +1240,7 @@ async function cruceHTML(){
   <div class="kpis" style="padding:12px 14px">
     <div class="kpi"><small>Certificado por cada Gs 1 de cuadrilla</small><b>${R==null?'—':n2(R)}</b><em>semanas con asistencia y certificado</em></div>
     <div class="kpi"><small>Costo de la cuadrilla</small><b>${mill(T.costo)}</b><em>${n2(T.h)} jornadas según asistencia</em></div>
-    <div class="kpi"><small>Certificado al contratista</small><b>${mill(T.cert)}</b><em>margen estimado ${mill(T.certCon-T.costoCon)}</em></div>
+    <div class="kpi"><small>Certificado al contratista</small><b>${mill(T.cert)}</b><em>margen estimado del contratista ${mill(T.certCon-T.costoCon)}</em></div>
   </div>
   <div class="alerta" style="border-top:1px solid var(--line)"><i class="dot ${est(R)||'verde'}"></i><div>${msg}</div></div>
   <div class="tw"><table><thead><tr><th>Semana</th><th class="n">Días perdidos<br><span class="sub">por lluvia</span></th><th class="n">Jornadas<br><span class="sub">cuadrilla</span></th><th class="n">Costo cuadrilla<br><span class="sub">según asistencia</span></th><th class="n">Certificado</th><th class="n">Diferencia</th><th class="n">Cert. ÷ cuadrilla</th></tr></thead>
@@ -1174,7 +1258,7 @@ function vContratistas(){
       <td class="n">${gs(R.orig)}</td><td class="n">${gs(R.adic)}</td><td class="n">${R.ult}</td><td class="n">${gs(ce)}</td><td>${barra(R.orig?R.certO/R.orig:0)}</td><td class="n">${gs(pa)}</td><td class="n">${gs(R.orig+R.adic-pa)}</td>
       <td><button class="btn sm" data-cact="abrir" data-i="${i}">Abrir</button></td></tr>`}).join('');
   return `
-  <div><h2>Contratistas</h2><div class="sub">${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)}</div></div>
+  <div class="bar between"><div><h2>Contratistas</h2><div class="sub">${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)}</div></div>${ALL.contratistas.length?`<button class="btn primary" data-cact="pdfres">Descargar PDF</button>`:''}</div>
   <div class="kpis">
     <div class="kpi"><small>Contratado (con adicionales)</small><b>${mill(T.o+T.a)}</b><em>${ALL.contratistas.length} contratistas</em></div>
     <div class="kpi"><small>Certificado</small><b>${mill(T.ce)}</b><em>${pct(T.ce/(T.o+T.a))} del total contratado</em></div>
@@ -1185,8 +1269,6 @@ function vContratistas(){
     <tbody>${filas}</tbody>
     <tfoot><tr><td></td><td>Total</td><td class="n">${gs(T.o)}</td><td class="n">${gs(T.a)}</td><td></td><td class="n">${gs(T.ce)}</td><td></td><td class="n">${gs(T.pa)}</td><td class="n">${gs(T.o+T.a-T.pa)}</td><td></td></tr></tfoot>
   </table></div>
-  <div class="panel" id="cruce"></div>
-  <div class="panel" id="mo-total"><p class="sub" style="padding:12px 14px">Calculando la mano de obra de la obra…</p></div>
   <form class="panel form" id="f-nuevo">
     <h3 style="grid-column:1/-1">Agregar contratista</h3>
     <label>Nombre<input id="n-nom" name="nombre" required></label>
@@ -1280,7 +1362,7 @@ function vCertificado(){
     <div><small>Total adicional</small><b>${gs(tA)}</b></div>
     <div><small>Total a pagar Gs</small><b>${gs(total)}</b></div>
     <div><small>Acumulado contrato</small><b>${pct(aO/(resumen().orig||1))}</b></div>
-    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
+    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-cact="pdfcert" data-n="${c.n}">Descargar PDF</button><button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
     <div class="letras">En letras: ${total?letras(total)+' guaraníes':'—'}</div>
     ${over.length?`<div class="hint rojo letras">No se puede emitir: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
   </div>`;
@@ -1292,7 +1374,7 @@ function vDesembolsos(){
   const filas=D.des.map((d,i)=>{aO+=d.orig;aA+=d.adic;const cc=D.certs.find(x=>x.n===d.cert);return `<tr><td class="n">${i+1}</td><td class="num">${fdm(d.fecha)}</td><td>${cc?`N°${cc.n}${cc.desde?` <span class="sub">${ddm(cc.desde)} al ${ddm(cc.hasta)}</span>`:''}`:'—'}</td><td class="n">${gs(d.orig)}</td><td class="n">${gs(d.adic)}</td><td class="n">${gs(d.orig+d.adic)}</td><td class="n">${gs(aO+aA)}</td><td class="n">${gs(R.orig+R.adic-aO-aA)}</td><td>${barra((aO+aA)/(R.orig+R.adic))}</td></tr>`}).join('');
   const dO=R.desO-R.certO,dA=R.desA-R.certA;
   return `
-  <div><h2>Control de desembolsos</h2><div class="sub">Siempre conciliado contra el último certificado emitido (N°${R.ult})</div></div>
+  <div class="bar between"><div><h2>Control de desembolsos</h2><div class="sub">Siempre conciliado contra el último certificado emitido (N°${R.ult})</div></div><button class="btn primary" data-cact="pdfdes">Descargar PDF</button></div>
   <div class="panel tw"><table>
     <thead><tr><th></th><th class="n">Original</th><th class="n">Adicional</th><th class="n">Total</th></tr></thead>
     <tbody>
@@ -1317,7 +1399,7 @@ function vContrato(){
     xs.map(i=>{const a=R.ac[i.id]||0;return `<tr class="${a>i.cant+1e-9?'over':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${qf(i.cant)}</td><td class="n">${i.pu?gs(i.pu):'<span class="sub">sin precio</span>'}</td><td class="n">${gs(i.cant*i.pu)}</td><td class="n">${qf(a)}</td><td>${i.cant?barra(a/i.cant,a>i.cant+1e-9):''}</td></tr>`}).join('')}).join('');
   return `
   <div class="bar between"><div><h2>Contrato original</h2><div class="sub">${esc(D.nombre)} · ${esc(D.tipo)} · los precios quedan fijos desde el primer certificado</div></div>
-    <label class="bar sub"><input type="checkbox" id="contrato-todo" ${S.contratoTodo?'checked':''}> Mostrar ítems sin precio</label></div>
+    <div class="bar"><label class="bar sub"><input type="checkbox" id="contrato-todo" ${S.contratoTodo?'checked':''}> Mostrar ítems sin precio</label><button class="btn primary" data-cact="pdfcontrato">Descargar PDF</button></div></div>
   <div class="kpis">
     <div class="kpi"><small>Monto del contrato</small><b>${mill(R.orig)}</b><em>${its.filter(i=>i.pu>0).length} ítems con precio</em></div>
     <div class="kpi"><small>Certificado</small><b>${mill(R.certO)}</b><em>avance ${pct(R.orig?R.certO/R.orig:0)}</em></div>
@@ -1350,7 +1432,7 @@ function vAdicionales(){
   const certA=ad.reduce((s,i)=>s+(R.ac[i.id]||0)*i.pu,0);
   const pctA=R.orig?R.adic/R.orig:0;
   return `
-  <div><h2>Adicionales</h2><div class="sub">${esc(D.nombre)} · obra extra fuera del contrato original, con su propio control y pago</div></div>
+  <div class="bar between"><div><h2>Adicionales</h2><div class="sub">${esc(D.nombre)} · obra extra fuera del contrato original, con su propio control y pago</div></div><button class="btn primary" data-cact="pdfadic">Descargar PDF</button></div>
   <div class="kpis">
     <div class="kpi ${pctA>0.05?'bad':''}"><small>Total adicionales</small><b>${mill(R.adic)}</b><em>${pct(pctA)} sobre el contrato original${pctA>0.05?' · supera el 5%':''}</em></div>
     <div class="kpi"><small>Certificado</small><b>${mill(certA)}</b><em>${pct(R.adic?certA/R.adic:0)} de los adicionales</em></div>
@@ -1372,6 +1454,94 @@ function vAdicionales(){
     <button class="btn primary">Agregar adicional</button>
   </form>
   <p class="sub">Los adicionales aparecen en cada certificado debajo del contrato original, en su propio rubro, y se suman aparte como "Total adicional".</p>`;
+}
+
+
+/* ---------- PDF ---------- */
+const PK=()=>window.PDFK;
+const enLetras=n=>(window.letrasGs?window.letrasGs(n):letras(n));
+function pdfCertificado(n){
+  const P=PK();if(!P||!P.ok())return;const c=D.certs.find(x=>x.n===n);if(!c)return;
+  const ant=acumHasta(n-1);const doc=P.nuevo('landscape');
+  let y=P.titulo(doc,'CERTIFICADO N°'+n+' · '+(D.tipo||'').toUpperCase(),[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Dirección:',OBRA.direccion],['Contratista:',D.nombre],['Período:',c.desde?`${ddm(c.desde)}/${c.desde.slice(0,4)} al ${ddm(c.hasta)}/${c.hasta.slice(0,4)}`:'']]);
+  const body=[];let tO=0,tA=0,lastR=null,sub=null;
+  const cierra=()=>{if(sub&&(sub.t||sub.ma||sub.mp)){body.push([{content:'Subtotal',colSpan:5,styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.t),styles:{fontStyle:'bold',halign:'right'}},'','','','',{content:gs(sub.ma),styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.mp),styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.mac),styles:{fontStyle:'bold',halign:'right'}}])}};
+  for(const it of D.items){
+    const a=ant[it.id]||0,p=Number(c.pres[it.id]||0),ac=a+p;
+    if(!(it.pu>0||ac>0))continue;
+    if(it.rubro!==lastR){cierra();sub={t:0,ma:0,mp:0,mac:0};body.push([{content:it.rubro||'',colSpan:13,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=it.rubro}
+    const mA=a*it.pu,mP=p*it.pu,mAc=ac*it.pu;sub.t+=it.cant*it.pu;sub.ma+=mA;sub.mp+=mP;sub.mac+=mAc;
+    if(it.sec==='ADIC')tA+=mP;else tO+=mP;
+    body.push([it.n,it.desc,it.unidad,qf(it.cant),gs(it.pu),gs(it.cant*it.pu),qf(a),p?qf(p):'',qf(ac),it.cant?pct(ac/it.cant):'',gs(mA),p?gs(mP):'',gs(mAc)]);
+  }
+  cierra();
+  const R=(()=>{const s0=resumen();return s0})();
+  y=P.tabla(doc,{startY:y,head:[[{content:'N°'},{content:'Rubro'},{content:'Unid.'},{content:'Cant.'},{content:'P. unit.'},{content:'P. total'},{content:'Anterior'},{content:'Presente'},{content:'Acumulado'},{content:'% av.'},{content:'Monto anterior'},{content:'Monto presente'},{content:'Monto acumulado'}]],
+    body,styles:{fontSize:7.2,cellPadding:1},columnStyles:{0:{cellWidth:10},1:{cellWidth:72},2:{cellWidth:11},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right',fontStyle:'bold'},8:{halign:'right'},9:{halign:'right'},10:{halign:'right'},11:{halign:'right',fontStyle:'bold'},12:{halign:'right'}}});
+  const total=tO+tA;
+  if(y>150){doc.addPage();y=P.TOP}
+  y=P.tabla(doc,{startY:y+5,theme:'plain',tableWidth:110,margin:{left:297-P.MR-110,right:P.MR,top:P.TOP},body:[['TOTAL CERTIFICADO',gs(tO)],['TOTAL ADICIONAL',gs(tA)],['TOTAL A PAGAR EN GS.',gs(total)]],
+    styles:{fontSize:10,fontStyle:'bold'},columnStyles:{1:{halign:'right'}},didParseCell:d=>{if(d.row.index===2){d.cell.styles.lineWidth={top:0.4};d.cell.styles.lineColor=0}}});
+  doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('En letras: '+enLetras(total)+' guaraníes.',P.ML,y+6);
+  P.firmas(doc,y+6,['Profesional Avaroga Arquitectura S.A\n'+(OBRA.firma||'Arq. Hugo Gaona'),'Contratista\n'+D.nombre]);
+  P.cerrar(doc,`Certificado_${n}_${D.nombre}_${c.desde||hoy}`);
+}
+function pdfDesembolsos(){
+  const P=PK();if(!P||!P.ok())return;const R=resumen();const doc=P.nuevo('portrait');
+  let y=P.titulo(doc,'CONTROL DE DESEMBOLSOS',[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Contratista:',D.nombre+' · '+D.tipo],['Fecha:',fdm(hoy)]]);
+  y=P.tabla(doc,{startY:y,head:[['','Original','Adicional','Total']],body:[
+    ['Presupuesto de obra',gs(R.orig),gs(R.adic),gs(R.orig+R.adic)],['Certificado acumulado (N°'+R.ult+')',gs(R.certO),gs(R.certA),gs(R.certO+R.certA)],
+    ['Desembolsado',gs(R.desO),gs(R.desA),gs(R.desO+R.desA)],['Diferencia (desembolsado − certificado)',gs(R.desO-R.certO),gs(R.desA-R.certA),gs(R.desO+R.desA-R.certO-R.certA)],
+    ['Saldo pendiente',gs(R.orig-R.desO),gs(R.adic-R.desA),gs(R.orig+R.adic-R.desO-R.desA)]],columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'}}});
+  let aT=0;const body=D.des.map((d,i)=>{aT+=d.orig+d.adic;const cc=D.certs.find(x=>x.n===d.cert);return[String(i+1),fdm(d.fecha),cc?('N°'+cc.n+(cc.desde?' · '+ddm(cc.desde)+' al '+ddm(cc.hasta):'')):'—',gs(d.orig),gs(d.adic),gs(d.orig+d.adic),gs(aT),pct(aT/((R.orig+R.adic)||1))]});
+  y=P.tabla(doc,{startY:y+6,head:[['Sem.','Pagado el','Certificado · período','Original','Adicional','Total','Acumulado','% pagado']],body:body.length?body:[[{content:'Sin pagos registrados.',colSpan:8}]],
+    styles:{fontSize:8},columnStyles:{3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'}}});
+  P.firmas(doc,y,['Aprobación cliente\n'+(OBRA.cliente||''),'Aprobación Avaroga Arquitectura S.A\n'+(OBRA.firma||'Arq. Hugo Gaona')]);
+  P.cerrar(doc,`Desembolsos_${D.nombre}_${hoy}`);
+}
+
+function pdfContrato(){
+  const P=PK();if(!P||!P.ok())return;const R=resumen();const doc=P.nuevo('landscape');
+  let y=P.titulo(doc,'CONTRATO · '+(D.tipo||'').toUpperCase(),[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Dirección:',OBRA.direccion],['Contratista:',D.nombre],['Fecha:',fdm(hoy)]]);
+  const body=[];let lastR=null,sub=null;
+  const cierra=()=>{if(sub)body.push([{content:'Subtotal',colSpan:5,styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.t),styles:{fontStyle:'bold',halign:'right'}},'',{content:gs(sub.c),styles:{fontStyle:'bold',halign:'right'}},{content:pct(sub.t?sub.c/sub.t:0),styles:{fontStyle:'bold',halign:'right'}}])};
+  D.items.filter(i=>i.sec==='ORIG'&&(i.pu>0||(R.ac[i.id]||0)>0)).forEach(i=>{
+    if(i.rubro!==lastR){cierra();sub={t:0,c:0};body.push([{content:i.rubro||'',colSpan:9,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=i.rubro}
+    const a=R.ac[i.id]||0;sub.t+=i.cant*i.pu;sub.c+=a*i.pu;
+    body.push([i.n,i.desc,i.unidad,qf(i.cant),gs(i.pu),gs(i.cant*i.pu),qf(a),gs(a*i.pu),i.cant?pct(a/i.cant):'']);
+  });cierra();
+  y=P.tabla(doc,{startY:y,head:[['N°','Ítem','Unid.','Cant.','P. unit.','P. total','Cant. certificada','Monto certificado','% avance']],body:body.length?body:[[{content:'Sin ítems en el contrato.',colSpan:9}]],
+    foot:[[{content:'TOTAL CONTRATO ORIGINAL',colSpan:5},{content:gs(R.orig),styles:{halign:'right'}},'',{content:gs(R.certO),styles:{halign:'right'}},{content:pct(R.orig?R.certO/R.orig:0),styles:{halign:'right'}}]],
+    styles:{fontSize:7.6,cellPadding:1.1},columnStyles:{0:{cellWidth:11},1:{cellWidth:95},2:{cellWidth:12},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'}}});
+  doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('Monto del contrato original en letras: '+enLetras(R.orig)+' guaraníes.',P.ML,y+6);
+  if(R.adic)doc.text('Adicionales aprobados: '+gs(R.adic)+' Gs ('+pct(R.adic/R.orig)+' sobre el original), detallados en su planilla aparte.',P.ML,y+11);
+  P.firmas(doc,y+10,['Profesional Avaroga Arquitectura S.A\n'+(OBRA.firma||'Arq. Hugo Gaona'),'Contratista\n'+D.nombre]);
+  P.cerrar(doc,`Contrato_${D.nombre}_${hoy}`);
+}
+function pdfAdicionales(){
+  const P=PK();if(!P||!P.ok())return;const R=resumen();const ad=D.items.filter(i=>i.sec==='ADIC');const doc=P.nuevo('landscape');
+  let y=P.titulo(doc,'ADICIONALES (OBRA EXTRA) · '+(D.tipo||'').toUpperCase(),[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Contratista:',D.nombre],['Fecha:',fdm(hoy)]]);
+  let tc=0;const body=ad.map(i=>{const a=R.ac[i.id]||0;tc+=a*i.pu;return[i.n,i.desc+(i.motivo?'\nMotivo: '+i.motivo:''),i.aprobado?fdm(i.aprobado):'—',i.unidad,qf(i.cant),gs(i.pu),gs(i.cant*i.pu),qf(a),gs(a*i.pu),i.cant?pct(a/i.cant):'']});
+  y=P.tabla(doc,{startY:y,head:[['N°','Adicional','Aprobado','Unid.','Cant.','P. unit.','Total','Cant. certificada','Monto certificado','% avance']],body:body.length?body:[[{content:'Sin adicionales.',colSpan:10}]],
+    foot:[[{content:'TOTAL ADICIONALES',colSpan:6},{content:gs(R.adic),styles:{halign:'right'}},'',{content:gs(tc),styles:{halign:'right'}},'']],
+    styles:{fontSize:8},columnStyles:{0:{cellWidth:11},1:{cellWidth:95},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'},9:{halign:'right'}}});
+  y=P.tabla(doc,{startY:y+5,theme:'plain',tableWidth:120,body:[['Contrato original',gs(R.orig)],['Adicionales',gs(R.adic)+'  ('+pct(R.orig?R.adic/R.orig:0)+')'],['Total contratado',gs(R.orig+R.adic)],['Adicionales pagados',gs(R.desA)],['Saldo de adicionales',gs(R.adic-R.desA)]],
+    styles:{fontSize:9.5},columnStyles:{1:{halign:'right',fontStyle:'bold'}}});
+  doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('Total adicionales en letras: '+enLetras(R.adic)+' guaraníes.',P.ML,y+6);
+  P.firmas(doc,y+6,['Aprobación cliente\n'+(OBRA.cliente||''),'Profesional Avaroga Arquitectura S.A\n'+(OBRA.firma||'Arq. Hugo Gaona'),'Contratista\n'+D.nombre]);
+  P.cerrar(doc,`Adicionales_${D.nombre}_${hoy}`);
+}
+function pdfResumen(){
+  const P=PK();if(!P||!P.ok())return;const doc=P.nuevo('landscape');
+  let y=P.titulo(doc,'RESUMEN DE CONTRATISTAS',[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Ubicación:',OBRA.direccion],['Fecha:',fdm(hoy)]]);
+  let T={o:0,a:0,ce:0,pa:0};
+  const body=ALL.contratistas.map(c=>{const R=conR(c);const ce=R.certO+R.certA,pa=R.desO+R.desA;T.o+=R.orig;T.a+=R.adic;T.ce+=ce;T.pa+=pa;
+    return[c.nombre,c.tipo,gs(R.orig),gs(R.adic),String(R.ult),gs(ce),pct(R.orig?R.certO/R.orig:0),gs(pa),gs(R.orig+R.adic-pa),R.alertas.length?R.alertas.map(a=>a[1].replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().split('.')[0]).join(' · '):'En regla']});
+  y=P.tabla(doc,{startY:y,head:[['Contratista','Trabajo','Contrato','Adicionales','Cert.','Certificado','Avance','Pagado','Saldo','Controles']],body,
+    foot:[['Total','',gs(T.o),gs(T.a),'',gs(T.ce),'',gs(T.pa),gs(T.o+T.a-T.pa),'']],styles:{fontSize:8},
+    columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'},9:{cellWidth:70}}});
+  P.firmas(doc,y,['Dirección de Obra\nAvaroga Arquitectura S.A']);
+  P.cerrar(doc,`Resumen_contratistas_${hoy}`);
 }
 
 const TABS=[['contratistas','Todos'],['resumen','Resumen'],['certificado','Certificados'],['desembolsos','Desembolsos'],['contrato','Contrato'],['adicionales','Adicionales']];
@@ -1397,6 +1567,11 @@ document.addEventListener('click',e=>{
   if(t.dataset.ctab){S.tab=t.dataset.ctab;render();return}
   const a=t.dataset.cact;
   if(a==='abrir'){usar(+t.dataset.i);S.tab='resumen';render();window.scrollTo(0,0);return}
+  if(a==='pdfcert'){return pdfCertificado(+t.dataset.n)}
+  if(a==='pdfdes'){return pdfDesembolsos()}
+  if(a==='pdfres'){return pdfResumen()}
+  if(a==='pdfcontrato'){return pdfContrato()}
+  if(a==='pdfadic'){return pdfAdicionales()}
   if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;return render()}
   if(a==='emitir'){const ult=D.certs.length?D.certs[D.certs.length-1].n:0;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
     D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.per=null;S.cert=ult+1;guardar();render();return toast(`Certificado N°${ult+1} emitido`)}
@@ -1419,6 +1594,295 @@ document.addEventListener('submit',e=>{
     D.items.push({id:'a'+Date.now(),sec:'ADIC',rubro:'ADICIONALES',sector:'',n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant:Number(fd.cant),pu:Number(fd.pu)});guardar();render();toast('Adicional '+n+' agregado')}
 });
 
+})();
+
+(function(){
+/* ============ Módulo Presupuesto de obra ============ */
+const pc=x=>isFinite(x)?(Math.round(x*1000)/10).toString().replace('.',',')+'%':'—';
+const q2=x=>x?(Math.round(x*100)/100).toString().replace('.',','):'';
+const ml=n=>{const a=Math.abs(n||0);if(a<1e6)return (n<0?'−':'')+gs(a);const[e,d]=(a/1e6).toFixed(1).split('.');return (n<0?'−':'')+gs(Number(e))+','+d+' M'};
+const sab=s=>{const d=parse(s);d.setDate(d.getDate()-((d.getDay()+1)%7));return iso(d)};
+const ddm=s=>s?`${DC[parse(s).getDay()]} ${dm(s)}`:'';
+const ES={tab:'resumen',doc:null,oid:undefined,cargando:false,con:[],buscar:'',cert:null,borr:{},per:null};
+const precio=i=>(i.mat+i.mo)*(ES.doc.indice||1);
+const rnum=r=>String(r||'').split('.')[0].trim();
+
+async function cargar(oid){
+  if(ES.cargando)return;ES.cargando=true;
+  try{ES.doc=await window.PDB.get(oid)}catch(e){ES.doc=null;toast('No se pudo leer el presupuesto')}
+  try{ES.con=window.CDB?await window.CDB.list(oid):[]}catch(e){ES.con=[]}
+  ES.oid=oid;ES.cargando=false;ES.cert=null;ES.borr={};ES.per=null;render();
+}
+const guardar=()=>{if(ES.doc&&window.PDB)window.PDB.save(ES.doc).catch(()=>toast('No se pudo guardar en la base. Revisá la conexión.'))};
+
+
+/* ---------- vínculo contratistas → presupuesto ---------- */
+const nz=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+function mapa(){
+  const byDesc={},byCant={};
+  for(const i of ES.doc.items){const k=rnum(i.rubro)+'|'+nz(i.desc);(byDesc[k]=byDesc[k]||[]).push(i);const k2=rnum(i.rubro)+'|'+nz(i.unidad)+'|'+i.cant;(byCant[k2]=byCant[k2]||[]).push(i)}
+  const V=ES.doc.vinculos||{};const M={};
+  for(const c of ES.con)for(const it of c.items||[]){
+    if(it.sec!=='ORIG')continue;const key=c.id+'|'+it.id;
+    if(V[key]){M[key]=V[key]==='-'?null:V[key];continue}
+    let m=byDesc[rnum(it.rubro)+'|'+nz(it.desc)];
+    if(m&&m.length>1)m=m.filter(x=>Math.abs(x.cant-it.cant)<1e-6);
+    if(!m||m.length!==1)m=byCant[rnum(it.rubro)+'|'+nz(it.unidad)+'|'+it.cant];
+    M[key]=m&&m.length===1?m[0].id:undefined;
+  }
+  return M;
+}
+const ultHasta=()=>{const cs=(ES.doc.certs||[]).filter(c=>c.hasta);const h=cs.length?cs[cs.length-1].hasta:'';return [h,ES.doc.baseHasta||''].sort().pop()};
+function certsSemana(desde){return ES.con.map(c=>{const x=(c.certs||[]).find(k=>k.desde===desde);if(!x)return null;
+  let m=0;for(const[k,v]of Object.entries(x.pres)){const it=c.items.find(i=>i.id===k);if(it)m+=v*it.pu}
+  const pago=(c.des||[]).find(d=>d.cert===x.n);return{c,x,monto:m,pago}}).filter(Boolean)}
+function semanasPendientes(){const h=ultHasta();const w=new Set();ES.con.forEach(c=>(c.certs||[]).forEach(x=>{if(x.desde&&x.desde>h)w.add(x.desde)}));return[...w].sort()}
+function avanceDesde(lista){const M=mapa();const pres={},sin=[];
+  for(const{c,x}of lista)for(const[k,v]of Object.entries(x.pres)){const it=c.items.find(i=>i.id===k);if(!it||it.sec!=='ORIG')continue;const pid=M[c.id+'|'+k];
+    if(pid)pres[pid]=(pres[pid]||0)+v;else if(pid!==null)sin.push({c,it,q:v})}
+  return{pres,sin};
+}
+
+/* avance acumulado hasta el certificado n (incluye la base de la planilla) */
+function acum(n){const a={...(ES.doc.base||{})};for(const c of ES.doc.certs||[]){if(c.n>n)continue;for(const[k,v]of Object.entries(c.pres))a[k]=(a[k]||0)+v}return a}
+function totales(){
+  const its=ES.doc.items;const mat=its.reduce((s,i)=>s+i.cant*i.mat*(ES.doc.indice||1),0),mo=its.reduce((s,i)=>s+i.cant*i.mo*(ES.doc.indice||1),0);
+  const ult=(ES.doc.certs||[]).length?ES.doc.certs[ES.doc.certs.length-1].n:0;const ac=acum(ult);
+  const av=its.reduce((s,i)=>s+(ac[i.id]||0)*precio(i),0);
+  return{mat,mo,tot:mat+mo,ult,ac,av};
+}
+function porRubro(){
+  const T=totales();const R={};
+  for(const i of ES.doc.items){const k=rnum(i.rubro);const r=R[k]=R[k]||{k,nombre:i.rubro,mat:0,mo:0,tot:0,av:0,con:0,cert:0,quien:new Set()};
+    r.mat+=i.cant*i.mat*(ES.doc.indice||1);r.mo+=i.cant*i.mo*(ES.doc.indice||1);r.tot+=i.cant*precio(i);r.av+=(T.ac[i.id]||0)*precio(i)}
+  for(const c of ES.con){
+    const ac={};for(const x of c.certs||[])for(const[k,v]of Object.entries(x.pres))ac[k]=(ac[k]||0)+v;
+    for(const it of c.items||[]){if(it.sec!=='ORIG'||!it.pu)continue;const k=rnum(it.rubro);if(!R[k])continue;R[k].con+=it.cant*it.pu;R[k].cert+=(ac[it.id]||0)*it.pu;R[k].quien.add(c.nombre.split(' (')[0])}
+  }
+  return Object.values(R).sort((a,b)=>Number(a.k)-Number(b.k));
+}
+function estado(r){
+  if(r.con>r.tot+1)return['rojo','Contratado por encima del total del rubro'];
+  if(r.con>r.mo+1)return['amarillo',r.con>r.mo*3?'Contratado muy por encima de la mano de obra presupuestada: revisá si la mano de obra quedó dentro de materiales':'Contratado por encima de la mano de obra presupuestada'];
+  if(!r.con&&r.mo>0)return['gris','Sin contratar'];
+  return['verde','Dentro de lo presupuestado'];
+}
+const dot=e=>e==='gris'?'<i class="dot" style="background:var(--line)"></i>':`<i class="dot ${e}"></i>`;
+const barra=(f,rojo)=>`<div class="mini"><div class="track"><i class="${rojo?'rojo':''}" style="width:${Math.min(100,(f||0)*100)}%"></i></div><span class="pct">${pc(f||0)}</span></div>`;
+
+function vResumen(){
+  const T=totales();const rs=porRubro();const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;
+  let tc=0,tmo=0,pend=0;rs.forEach(r=>{tc+=r.con;tmo+=r.mo;if(!r.con)pend+=r.mo});
+  const al=[];
+  rs.forEach(r=>{const[e,t]=estado(r);if(e==='rojo'||e==='amarillo')al.push([e,`<b>${esc(r.nombre)}</b><div class="sub">${t}. Mano de obra presupuestada ${gs(r.mo)} · contratada ${gs(r.con)} (${esc([...r.quien].join(', '))}) · diferencia ${gs(r.con-r.mo)} Gs.</div>`])});
+  const pw=semanasPendientes();if(pw.length)al.unshift(['amarillo',`<b>Avance al cliente pendiente</b><div class="sub">Hay certificados de contratistas sin su avance al cliente en ${pw.length===1?'la semana del':'las semanas del'} ${pw.map(w=>ddm(w)).join(', ')}. Emitilo en Avance al cliente.</div>`]);
+  const sin=rs.filter(r=>!r.con&&r.mo>0);
+  if(sin.length)al.push(['gris',`<b>${sin.length} rubros sin contratista</b><div class="sub">${sin.map(r=>esc(r.nombre)).join(' · ')}. Mano de obra presupuestada pendiente de contratar: ${gs(pend)} Gs.</div>`]);
+  const igual=rs.filter(r=>r.con&&Math.abs(r.con-r.mo)<1);
+  if(igual.length)al.push(['gris',`<b>${igual.length} rubros contratados exactamente al valor presupuestado</b><div class="sub">${igual.map(r=>esc(r.nombre)).join(' · ')}. No tienen holgura: cualquier adicional en estos rubros supera el presupuesto del cliente.</div>`]);
+  return `
+  <div class="bar between"><div><h2>Presupuesto de obra</h2><div class="sub">${esc(OBRA_P().obra)} · ${esc(OBRA_P().cliente)} · ${esc(OBRA_P().ubicacion)}</div></div><button class="btn primary" data-pact="pdfres">Descargar PDF</button></div>
+  <div class="kpis">
+    <div class="kpi"><small>Precio de la obra</small><b>${ml(T.tot)}</b><em>${m2?gs(T.tot/m2)+' Gs/m² · ':''}${usd?'USD '+gs(T.tot/usd):''}</em></div>
+    <div class="kpi"><small>Materiales</small><b>${ml(T.mat)}</b><em>${pc(T.mat/T.tot)} del total</em></div>
+    <div class="kpi"><small>Mano de obra</small><b>${ml(T.mo)}</b><em>${pc(T.mo/T.tot)} del total</em></div>
+    <div class="kpi"><small>Mano de obra contratada</small><b>${ml(tc)}</b><em>${pc(tmo?tc/tmo:0)} de la presupuestada · faltan contratar ${ml(pend)}</em></div>
+    <div class="kpi"><small>Avance certificado al cliente</small><b>${ml(T.av)}</b><em>${pc(T.av/T.tot)} de la obra</em></div>
+  </div>
+  <div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Controles</h3><span class="sub">Presupuesto contra contratos de mano de obra</span></div>
+    ${al.map(([n,h])=>`<div class="alerta">${dot(n)}<div>${h}</div></div>`).join('')||'<div class="alerta"><i class="dot verde"></i><div>Todo dentro de lo presupuestado.</div></div>'}</div>
+  <div class="panel tw"><table>
+    <thead><tr><th></th><th>Rubro</th><th class="n">Materiales</th><th class="n">Mano de obra</th><th class="n">Total rubro</th><th class="n">Incid.</th><th class="n">M.O. contratada</th><th class="n">Diferencia</th><th>Contratista</th><th>Avance cliente</th></tr></thead>
+    <tbody>${rs.map(r=>{const[e,t]=estado(r);return `<tr title="${esc(t)}"><td>${dot(e)}</td><td>${esc(r.nombre)}</td><td class="n">${gs(r.mat)}</td><td class="n">${gs(r.mo)}</td><td class="n">${gs(r.tot)}</td><td class="n">${pc(r.tot/T.tot)}</td>
+      <td class="n">${r.con?gs(r.con):'—'}</td><td class="n ${r.con>r.mo+1?'up':''}">${r.con?gs(r.con-r.mo):'—'}</td><td>${esc([...r.quien].join(', '))||'<span class="sub">sin contratar</span>'}</td><td>${barra(r.tot?r.av/r.tot:0)}</td></tr>`}).join('')}</tbody>
+    <tfoot><tr><td></td><td>Total</td><td class="n">${gs(T.mat)}</td><td class="n">${gs(T.mo)}</td><td class="n">${gs(T.tot)}</td><td class="n">100%</td><td class="n">${gs(tc)}</td><td class="n">${gs(rs.reduce((s,r)=>s+(r.con?r.con-r.mo:0),0))}</td><td></td><td>${barra(T.av/T.tot)}</td></tr></tfoot>
+  </table></div>
+  <p class="sub">Diferencia = mano de obra contratada − presupuestada, solo en rubros con contrato. Verde: dentro; amarillo: por encima de la mano de obra presupuestada; rojo: por encima del total del rubro; gris: sin contratar.</p>`;
+}
+
+function vDetalle(){
+  const T=totales();const q=(ES.buscar||'').toLowerCase();const rows=[];let lastR=null,lastS=null;const sub={};
+  for(const i of ES.doc.items){const k=i.rubro;sub[k]=sub[k]||{m:0,o:0,t:0};sub[k].m+=i.cant*i.mat*(ES.doc.indice||1);sub[k].o+=i.cant*i.mo*(ES.doc.indice||1);sub[k].t+=i.cant*precio(i)}
+  for(const i of ES.doc.items){
+    if(q&&!(i.desc+' '+i.n+' '+i.rubro).toLowerCase().includes(q))continue;
+    if(i.rubro!==lastR){const s=sub[i.rubro];rows.push(`<tr class="rubro"><td colspan="6">${esc(i.rubro)}</td><td class="n">${gs(s.m)}</td><td class="n">${gs(s.o)}</td><td></td><td class="n">${gs(s.t)}</td></tr>`);lastR=i.rubro;lastS=null}
+    if(i.sector&&i.sector!==lastS){rows.push(`<tr class="sector"><td></td><td colspan="9">${esc(i.sector)}</td></tr>`);lastS=i.sector}
+    rows.push(`<tr><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(i.mat)}</td><td class="n">${gs(i.mo)}</td><td class="n">${gs(i.cant*i.mat*(ES.doc.indice||1))}</td><td class="n">${gs(i.cant*i.mo*(ES.doc.indice||1))}</td><td class="n">${gs(precio(i))}</td><td class="n">${gs(i.cant*precio(i))}</td></tr>`);
+  }
+  const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;
+  return `
+  <div class="bar between"><div><h2>Presupuesto detallado</h2><div class="sub">${ES.doc.items.length} ítems · índice aplicado ${q2(ES.doc.indice||1)||'1'}</div></div><button class="btn primary" data-pact="pdfdet">Descargar PDF</button></div>
+  <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">
+  <div class="panel tw"><table>
+    <thead><tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Costo material</th><th class="n">Costo M.O.</th><th class="n">Total material</th><th class="n">Total M.O.</th><th class="n">Precio unit.</th><th class="n">Precio total</th></tr></thead>
+    <tbody>${rows.join('')||'<tr><td colspan="10" class="sub">Ningún ítem coincide.</td></tr>'}</tbody>
+    <tfoot><tr><td></td><td>Total</td><td colspan="4"></td><td class="n">${gs(T.mat)}</td><td class="n">${gs(T.mo)}</td><td></td><td class="n">${gs(T.tot)}</td></tr>
+      ${m2?`<tr><td></td><td>Costo por m² (${q2(m2)} m²)</td><td colspan="7"></td><td class="n">${gs(T.tot/m2)}</td></tr>`:''}
+      ${usd?`<tr><td></td><td>Costo de obra en dólares (${gs(usd)} Gs/USD)</td><td colspan="7"></td><td class="n">USD ${gs(T.tot/usd)}</td></tr>`:''}</tfoot>
+  </table></div>
+  <form class="panel form" id="p-datos">
+    <h3 style="grid-column:1/-1">Datos del presupuesto</h3>
+    <label>Superficie a construir (m²)<input type="number" id="pd-m2" name="m2" step="0.01" value="${ES.doc.m2||''}"></label>
+    <label>Cotización del dólar (Gs)<input type="number" id="pd-usd" name="usd" step="1" value="${ES.doc.usd||''}"></label>
+    <label>Índice (1 = costo de obra)<input type="number" id="pd-ind" name="indice" step="0.01" value="${ES.doc.indice||1}"></label>
+    <button class="btn">Guardar</button>
+  </form>`;
+}
+
+function vAvance(){
+  const certs=ES.doc.certs||[];const ult=certs.length?certs[certs.length-1].n:0;
+  if(ES.cert==null)ES.cert=ult+1>1?ult:1;
+  const nuevo=ES.cert===ult+1;
+  if(nuevo&&!ES.per){const pend=semanasPendientes();const h=ultHasta();ES.per=pend[0]||(h?addD(h,1):addD(sab(hoy),-7))}
+  const sem=certsSemana(nuevo?ES.per:(certs.find(x=>x.n===ES.cert)||{}).desde);
+  if(nuevo&&!ES.cargado&&sem.length&&!Object.keys(ES.borr).length){Object.assign(ES.borr,avanceDesde(sem).pres);ES.cargado=ES.per}
+  const c=nuevo?{n:ult+1,pres:ES.borr,desde:ES.per,hasta:addD(ES.per,6)}:certs.find(x=>x.n===ES.cert);
+  const ant=acum(c.n-1);const q=(ES.buscar||'').toLowerCase();
+  let tP=0,tAc=0,over=[];const rows=[];let lastR=null;
+  for(const i of ES.doc.items){
+    const a=ant[i.id]||0,p=Number(c.pres[i.id]||0),ac=a+p,pu=precio(i);tP+=p*pu;tAc+=ac*pu;if(ac>i.cant+1e-9)over.push(i);
+    if(q&&!(i.desc+' '+i.n+' '+i.rubro).toLowerCase().includes(q))continue;
+    if(!nuevo&&!ac&&!p)continue;
+    if(i.rubro!==lastR){rows.push(`<tr class="rubro"><td colspan="11">${esc(i.rubro)}</td></tr>`);lastR=i.rubro}
+    rows.push(`<tr class="${ac>i.cant+1e-9?'over':''} ${p?'has':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(pu)}</td><td class="n">${q2(a)}</td>
+      <td class="n pres">${nuevo?`<input type="number" step="any" min="0" id="pp-${i.id}" data-pid="${i.id}" value="${p||''}">`:q2(p)}</td><td class="n">${q2(ac)}</td><td class="n">${pc(i.cant?ac/i.cant:0)}</td><td class="n">${gs(p*pu)}</td><td class="n">${gs(ac*pu)}</td></tr>`);
+  }
+  const T=totales();
+  const chips=certs.map(x=>`<button class="chip-p" data-pact="ver" data-n="${x.n}" aria-pressed="${x.n===ES.cert}">N°${x.n}</button>`).join('')+`<button class="chip-p" style="border-style:dashed" data-pact="ver" data-n="${ult+1}" aria-pressed="${nuevo}">+ Nuevo N°${ult+1}</button>`;
+  const solapa=nuevo&&certs.find(x=>x.desde&&!(addD(ES.per,6)<x.desde||ES.per>x.hasta));
+  return `
+  <div class="bar between"><div><h2>Avance al cliente · certificado N°${c.n}</h2><div class="sub">${esc(OBRA_P().cliente)} · período ${ddm(c.desde)} al ${ddm(c.hasta)}${Object.keys(ES.doc.base||{}).length?' · el anterior incluye el avance registrado en tu planilla':''}</div></div><div class="subnav-p">${chips}</div></div>
+  ${nuevo?`<div class="panel form"><label>Desde (sábado)<input type="date" id="pp-desde" value="${ES.per}"></label><label>Hasta (viernes)<input type="date" value="${addD(ES.per,6)}" disabled></label>
+    ${solapa?`<div class="hint rojo" style="grid-column:1/-1">Este período se superpone con el certificado N°${solapa.n}.</div>`:''}</div>
+    <div class="hint amarillo">Cargá en <b>Presente</b> lo ejecutado en la semana. Anterior y Acumulado se calculan solos.</div>`:''}
+  ${panelSemana(sem,nuevo,c)}
+  <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">
+  <div class="panel tw"><table>
+    <thead><tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Precio unit.</th><th class="n">Anterior</th><th class="n">Presente</th><th class="n">Acumulado</th><th class="n">% av.</th><th class="n">Monto presente</th><th class="n">Monto acumulado</th></tr></thead>
+    <tbody>${rows.join('')||'<tr><td colspan="11" class="sub">Sin avance en este certificado.</td></tr>'}</tbody>
+  </table></div>
+  <div class="totales">
+    <div><small>Monto de este certificado</small><b>${gs(tP)}</b></div>
+    <div><small>Acumulado al cliente</small><b>${gs(tAc)}</b></div>
+    <div><small>Avance de la obra</small><b>${pc(tAc/T.tot)}</b></div>
+    ${nuevo?`<button class="btn primary" data-pact="emitir" ${(!tP||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-pact="pdfav" data-n="${c.n}">Descargar PDF</button>`}
+    <div class="letras">En letras: ${tP?letrasGs(tP)+' guaraníes':'—'}</div>
+    ${over.length?`<div class="hint rojo letras">Supera lo presupuestado: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')}.</div>`:''}
+  </div>`;
+}
+
+
+function panelSemana(sem,nuevo,c){
+  const tot=sem.reduce((s,x)=>s+x.monto,0);const{pres,sin}=avanceDesde(sem);
+  const moPres=ES.doc.items.reduce((s,i)=>s+(Number(c.pres[i.id]||0))*i.mo*(ES.doc.indice||1),0);
+  const pend=semanasPendientes().filter(w=>w!==ES.per);
+  const its=ES.doc.items.filter(i=>sin.some(x=>rnum(x.it.rubro)===rnum(i.rubro)));
+  return `<div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Contratistas de la semana ${ddm(c.desde)} al ${ddm(c.hasta)}</h3>
+      ${nuevo&&sem.length?`<button class="btn" data-pact="traer">Volver a cargar desde los contratistas</button>`:''}</div>
+    ${sem.length?`<div class="tw"><table><thead><tr><th>Contratista</th><th>Certificado</th><th class="n">Monto</th><th>Pago</th></tr></thead><tbody>
+      ${sem.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])} <span class="sub">${esc((x.c.tipo||'').replace('Mano de obra · ',''))}</span></td><td>N°${x.x.n}</td><td class="n">${gs(x.monto)}</td><td>${x.pago?'pagado el '+ddm(x.pago.fecha):'<span class="sub">pendiente</span>'}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Total contratistas</td><td></td><td class="n">${gs(tot)}</td><td></td></tr></tfoot></table></div>
+      <div class="alerta">${moPres+1>=tot?'<i class="dot verde"></i>':'<i class="dot rojo"></i>'}<div><b>Mano de obra presupuestada en este avance: ${gs(moPres)}</b><div class="sub">${moPres+1>=tot?'Cubre lo que se paga a los contratistas esta semana.':`Se paga a los contratistas ${gs(tot-moPres)} más de lo que el presupuesto prevé de mano de obra para este avance.`}</div></div></div>`
+    :`<p class="sub" style="padding:12px 14px">No hay certificados de contratistas para esta semana. Emití primero los certificados de cada contratista (Contratistas → Certificados) para que el avance se cargue solo.</p>`}
+    ${nuevo&&sin.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>${sin.length} ítem${sin.length>1?'s':''} de contratistas sin vincular al presupuesto</b><div class="sub">Elegí a qué ítem del presupuesto corresponde cada uno. Queda guardado para las próximas semanas.</div>
+      <div class="tw"><table><tbody>${sin.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])}</td><td class="desc">${esc(x.it.n+' '+x.it.desc)} <span class="sub">(${q2(x.q)} ${esc(x.it.unidad)})</span></td>
+        <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${its.filter(i=>rnum(i.rubro)===rnum(x.it.rubro)).map(i=>`<option value="${i.id}">${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
+    ${nuevo&&pend.length?`<p class="sub" style="padding:0 14px 12px">También hay certificados de contratistas sin avance al cliente en: ${pend.map(w=>ddm(w)).join(', ')}.</p>`:''}
+  </div>`;
+}
+
+/* ---------- PDF ---------- */
+function pdfResumen(){
+  if(!PDFK.ok())return;const T=totales();const rs=porRubro();const doc=PDFK.nuevo('landscape');const o=OBRA_P();
+  let y=PDFK.titulo(doc,'RESUMEN DEL PRESUPUESTO DE OBRA',[['Obra:',o.obra],['Cliente:',o.cliente],['Ubicación:',o.ubicacion],['Fecha:',dm(hoy)+'/'+hoy.slice(0,4)]]);
+  y=PDFK.tabla(doc,{startY:y,head:[['Rubro','Materiales','Mano de obra','Total rubro','Incid.','M.O. contratada','Diferencia','Contratista','Avance cliente']],
+    body:rs.map(r=>[r.nombre,gs(r.mat),gs(r.mo),gs(r.tot),pc(r.tot/T.tot),r.con?gs(r.con):'—',r.con?gs(r.con-r.mo):'—',[...r.quien].join(', ')||'sin contratar',pc(r.tot?r.av/r.tot:0)]),
+    foot:[['Total',gs(T.mat),gs(T.mo),gs(T.tot),'100%',gs(rs.reduce((s,r)=>s+r.con,0)),'','',pc(T.av/T.tot)]],styles:{fontSize:8},
+    columnStyles:{1:{halign:'right'},2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},8:{halign:'right'}}});
+  const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;doc.setFont('times','normal');doc.setFontSize(9.5);
+  doc.text(`Precio total: ${gs(T.tot)} Gs${m2?' · '+gs(T.tot/m2)+' Gs/m²':''}${usd?' · USD '+gs(T.tot/usd):''}. En letras: ${letrasGs(T.tot)} guaraníes.`,PDFK.ML,y+6);
+  PDFK.firmas(doc,y+6,['Dirección de Obra\nAvaroga Arquitectura S.A']);
+  PDFK.cerrar(doc,`Resumen_presupuesto_${o.obra}_${hoy}`);
+}
+function pdfDetalle(){
+  if(!PDFK.ok())return;const T=totales();const doc=PDFK.nuevo('landscape');const o=OBRA_P();
+  let y=PDFK.titulo(doc,'PRESUPUESTO DE OBRA: '+(o.obra||'').toUpperCase(),[['Dirección:',o.ubicacion],['Cliente:',o.cliente],['Superficie a construir:',ES.doc.m2?q2(ES.doc.m2)+' m²':''],['Profesional:','Arq. Hugo Gaona · Avaroga Arquitectura S.A']]);
+  const body=[];let lastR=null,lastS=null,s=null;const cierra=()=>{if(s)body.push([{content:'Subtotal',colSpan:6,styles:{halign:'right',fontStyle:'bold'}},{content:gs(s.m),styles:{halign:'right',fontStyle:'bold'}},{content:gs(s.o),styles:{halign:'right',fontStyle:'bold'}},'',{content:gs(s.t),styles:{halign:'right',fontStyle:'bold'}}])};
+  for(const i of ES.doc.items){
+    if(i.rubro!==lastR){cierra();s={m:0,o:0,t:0};body.push([{content:i.rubro,colSpan:10,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=i.rubro;lastS=null}
+    if(i.sector&&i.sector!==lastS){body.push([{content:i.sector.toUpperCase(),colSpan:10,styles:{fontStyle:'italic'}}]);lastS=i.sector}
+    const tm=i.cant*i.mat*(ES.doc.indice||1),to=i.cant*i.mo*(ES.doc.indice||1);s.m+=tm;s.o+=to;s.t+=i.cant*precio(i);
+    body.push([i.n,i.desc,i.unidad,q2(i.cant),gs(i.mat),gs(i.mo),gs(tm),gs(to),gs(precio(i)),gs(i.cant*precio(i))]);
+  }cierra();
+  const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;
+  const foot=[[{content:'TOTAL',colSpan:6},{content:gs(T.mat),styles:{halign:'right'}},{content:gs(T.mo),styles:{halign:'right'}},'',{content:gs(T.tot),styles:{halign:'right'}}]];
+  if(m2)foot.push([{content:'COSTO POR M²',colSpan:9},{content:gs(T.tot/m2),styles:{halign:'right'}}]);
+  if(usd)foot.push([{content:`COSTO DE OBRA EN DÓLARES (${gs(usd)} Gs/USD)`,colSpan:9},{content:'USD '+gs(T.tot/usd),styles:{halign:'right'}}]);
+  y=PDFK.tabla(doc,{startY:y,head:[['N°','Rubros','Unid.','Cant.','Costo material','Costo M.O.','T. material','Total M.O.','Precio unit.','Precio total']],body,foot,
+    styles:{fontSize:7.4,cellPadding:1},columnStyles:{0:{cellWidth:11},1:{cellWidth:88},2:{cellWidth:12},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'},9:{halign:'right'}}});
+  doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('En letras: '+letrasGs(T.tot)+' guaraníes.',PDFK.ML,y+6);
+  PDFK.firmas(doc,y+6,['Propietario\n'+(o.cliente||''),'Profesional\nArq. Hugo Gaona']);
+  PDFK.cerrar(doc,`Presupuesto_${o.obra}_${hoy}`);
+}
+function pdfAvance(n){
+  if(!PDFK.ok())return;const c=(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return;const ant=acum(n-1);const T=totales();const o=OBRA_P();const doc=PDFK.nuevo('landscape');
+  let y=PDFK.titulo(doc,'CERTIFICADO DE AVANCE DE OBRA N°'+n,[['Obra:',o.obra],['Cliente:',o.cliente],['Dirección:',o.ubicacion],['Período:',c.desde?`${ddm(c.desde)}/${c.desde.slice(0,4)} al ${ddm(c.hasta)}/${c.hasta.slice(0,4)}`:'']]);
+  const body=[];let lastR=null,tP=0,tA=0,tAc=0;
+  for(const i of ES.doc.items){const a=ant[i.id]||0,p=Number(c.pres[i.id]||0),ac=a+p;if(!ac)continue;const pu=precio(i);tP+=p*pu;tA+=a*pu;tAc+=ac*pu;
+    if(i.rubro!==lastR){body.push([{content:i.rubro,colSpan:11,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=i.rubro}
+    body.push([i.n,i.desc,i.unidad,q2(i.cant),gs(pu),q2(a),p?q2(p):'',q2(ac),pc(i.cant?ac/i.cant:0),p?gs(p*pu):'',gs(ac*pu)])}
+  y=PDFK.tabla(doc,{startY:y,head:[['N°','Rubro','Unid.','Cant.','Precio unit.','Anterior','Presente','Acumulado','% av.','Monto presente','Monto acumulado']],body:body.length?body:[[{content:'Sin avance.',colSpan:11}]],
+    styles:{fontSize:7.4,cellPadding:1},columnStyles:{0:{cellWidth:11},1:{cellWidth:90},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right',fontStyle:'bold'},7:{halign:'right'},8:{halign:'right'},9:{halign:'right',fontStyle:'bold'},10:{halign:'right'}}});
+  if(y>150){doc.addPage();y=PDFK.TOP}
+  y=PDFK.tabla(doc,{startY:y+5,theme:'plain',tableWidth:120,margin:{left:297-PDFK.MR-120,right:PDFK.MR,top:PDFK.TOP},body:[['Certificado anterior acumulado',gs(tA)],['Monto de este certificado',gs(tP)],['Acumulado a la fecha',gs(tAc)],['Avance de la obra',pc(tAc/T.tot)]],styles:{fontSize:10,fontStyle:'bold'},columnStyles:{1:{halign:'right'}}});
+  doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('Monto de este certificado en letras: '+letrasGs(tP)+' guaraníes.',PDFK.ML,y+6);
+  PDFK.firmas(doc,y+6,['Aprobación cliente\n'+(o.cliente||''),'Profesional Avaroga Arquitectura S.A\nArq. Hugo Gaona']);
+  PDFK.cerrar(doc,`Avance_cliente_${n}_${o.obra}_${c.desde||hoy}`);
+}
+
+const OBRA_P=()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();return{obra:o?o.nombre:'',cliente:o?o.cliente||'':'',ubicacion:o?o.ubicacion||'':''}};
+const TABS=[['resumen','Resumen'],['detalle','Presupuesto'],['avance','Avance al cliente']];
+function render(){
+  const root=document.getElementById('pres-root');if(!root)return;
+  const o=window.ASIS_OBRA&&window.ASIS_OBRA();const oid=o?o.id:null;
+  if(oid!==ES.oid){root.innerHTML='<p class="sub">Cargando presupuesto…</p>';cargar(oid);return}
+  if(ES.refrescar){ES.refrescar=false;if(window.CDB)window.CDB.list(oid).then(l=>{ES.con=l;render()}).catch(()=>{})}
+  const foco=document.activeElement&&document.activeElement.id;
+  const sub=`<div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ptab="${k}" aria-pressed="${ES.tab===k}">${t}</button>`).join('')}</div>`;
+  if(!ES.doc){root.innerHTML=sub+`<div class="panel" style="padding:16px"><h3>Esta obra todavía no tiene presupuesto</h3><p class="sub">El presupuesto se carga desde tu planilla de Excel. Pedile a Claude que lo cargue para esta obra.</p></div>`;return}
+  const V={resumen:vResumen,detalle:vDetalle,avance:vAvance}[ES.tab];
+  root.innerHTML=sub+V();
+  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
+}
+window.PRES={mount:()=>{ES.refrescar=true;render()}};
+const dentro=e=>{const r=document.getElementById('pres-root');return r&&r.contains(e.target)};
+document.addEventListener('click',e=>{
+  if(!dentro(e))return;const t=e.target.closest('[data-ptab],[data-pact]');if(!t)return;
+  if(t.dataset.ptab){ES.tab=t.dataset.ptab;ES.buscar='';return render()}
+  const a=t.dataset.pact;
+  if(a==='ver'){ES.cert=+t.dataset.n;return render()}
+  if(a==='traer'){const sem=certsSemana(ES.per);ES.borr=avanceDesde(sem).pres;ES.cargado=ES.per;render();return toast('Avance cargado desde los certificados de contratistas')}
+  if(a==='emitir'){const certs=ES.doc.certs=ES.doc.certs||[];const n=(certs.length?certs[certs.length-1].n:0)+1;const pres={};for(const[k,v]of Object.entries(ES.borr))if(Number(v))pres[k]=Number(v);
+    const sem=certsSemana(ES.per);certs.push({n,fecha:hoy,desde:ES.per,hasta:addD(ES.per,6),pres,contratistas:sem.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.per=null;ES.cargado=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
+  if(a==='pdfres')return pdfResumen();
+  if(a==='pdfdet')return pdfDetalle();
+  if(a==='pdfav')return pdfAvance(+t.dataset.n);
+});
+document.addEventListener('input',e=>{
+  if(!dentro(e))return;const t=e.target;
+  if(t.id==='p-buscar'){ES.buscar=t.value;return render()}
+  if(t.dataset.pid){ES.borr[t.dataset.pid]=t.value===''?0:Number(t.value);clearTimeout(ES.k);ES.k=setTimeout(render,350)}
+});
+document.addEventListener('change',e=>{
+  if(!dentro(e))return;const t=e.target;
+  if(t.id==='pp-desde'&&t.value){const v=sab(t.value);if(v!==t.value)toast('Ajustado al sábado '+dm(v));ES.per=v;ES.borr={};ES.cargado=null;render()}
+  if(t.dataset.vinc){ES.doc.vinculos=ES.doc.vinculos||{};if(t.value)ES.doc.vinculos[t.dataset.vinc]=t.value;else delete ES.doc.vinculos[t.dataset.vinc];guardar();
+    if(ES.cargado){ES.borr=avanceDesde(certsSemana(ES.per)).pres}render();toast('Vínculo guardado')}
+});
+document.addEventListener('submit',e=>{
+  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
+  if(f.id==='p-datos'){ES.doc.m2=Number(fd.m2)||0;ES.doc.usd=Number(fd.usd)||0;ES.doc.indice=Number(fd.indice)||1;guardar();render();toast('Datos guardados')}
+},true);
 })();
 </script>
 </html>
