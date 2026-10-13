@@ -623,7 +623,7 @@ const PDFK={
   TOP:40,ML:14,MR:14,
   titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);doc.text(t,this.ML,y);y+=6;doc.setFontSize(10);
     (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{doc.setFont('times','bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(String(v),this.ML+kw,y);y+=4.8});return y+2},
-  tabla(doc,opts){const base={margin:{left:this.ML,right:this.MR,top:this.TOP,bottom:18},theme:'grid',
+  tabla(doc,opts){const base={margin:{left:this.ML,right:this.MR,top:this.TOP,bottom:18},theme:'grid',showFoot:'lastPage',
       styles:{font:'times',fontSize:8.5,cellPadding:1.4,textColor:0,lineColor:[150,150,150],lineWidth:0.15,valign:'middle'},
       headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold'},footStyles:{fillColor:[240,240,240],textColor:0,fontStyle:'bold'}};
     doc.autoTable(Object.assign(base,opts,{styles:Object.assign(base.styles,opts.styles||{})}));return doc.lastAutoTable.finalY},
@@ -681,8 +681,9 @@ function letrasGs(n){
   const Dd=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
   const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
   const c999=x=>{if(x===100)return 'cien';const c=Math.floor(x/100),r=x%100;let s=C[c];if(r){s+=(s?' ':'')+(r<30?U[r]:Dd[Math.floor(r/10)]+(r%10?' y '+U[r%10]:''))}return s};
-  const p=[];const mm=Math.floor(n/1e6),mi=Math.floor((n%1e6)/1000),re=n%1000;
-  if(mm)p.push(mm===1?'un millón':c999(mm).replace(/uno$/,'un')+' millones');if(mi)p.push(mi===1?'mil':c999(mi).replace(/uno$/,'un')+' mil');if(re)p.push(c999(re));
+  const miles=x=>{const q=[];const mi=Math.floor(x/1000),re=x%1000;if(mi)q.push(mi===1?'mil':c999(mi).replace(/uno$/,'un')+' mil');if(re)q.push(c999(re));return q.join(' ')};
+  const p=[];const mm=Math.floor(n/1e6),resto=n%1e6;
+  if(mm)p.push(mm===1?'un millón':miles(mm).replace(/uno$/,'un')+' millones');if(resto)p.push(miles(resto));
   const s=p.join(' ').replace(/veintiun\b/g,'veintiún');return s.charAt(0).toUpperCase()+s.slice(1);
 }
 window.letrasGs=letrasGs;
@@ -1137,10 +1138,10 @@ function letras(n){
   const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
   const c999=x=>{if(x===100)return 'cien';const c=Math.floor(x/100),r=x%100;let s=C[c];
     if(r){s+=(s?' ':'')+(r<30?U[r]:D[Math.floor(r/10)]+(r%10?' y '+U[r%10]:''))}return s};
-  const parts=[];const mm=Math.floor(n/1e6),miles=Math.floor((n%1e6)/1000),resto=n%1000;
-  if(mm)parts.push(mm===1?'un millón':c999(mm).replace(/uno$/,'un')+' millones');
-  if(miles)parts.push(miles===1?'mil':c999(miles).replace(/uno$/,'un')+' mil');
-  if(resto)parts.push(c999(resto));
+  const mil=x=>{const q=[];const mi=Math.floor(x/1000),re=x%1000;if(mi)q.push(mi===1?'mil':c999(mi).replace(/uno$/,'un')+' mil');if(re)q.push(c999(re));return q.join(' ')};
+  const parts=[];const mm=Math.floor(n/1e6),rr=n%1e6;
+  if(mm)parts.push(mm===1?'un millón':mil(mm).replace(/uno$/,'un')+' millones');
+  if(rr)parts.push(mil(rr));
   const s=parts.join(' ').replace(/veintiun\b/g,'veintiún');return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
@@ -1362,7 +1363,7 @@ function vCertificado(){
     <div><small>Total adicional</small><b>${gs(tA)}</b></div>
     <div><small>Total a pagar Gs</small><b>${gs(total)}</b></div>
     <div><small>Acumulado contrato</small><b>${pct(aO/(resumen().orig||1))}</b></div>
-    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-cact="pdfcert" data-n="${c.n}">Descargar PDF</button><button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
+    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`${selModo()}<button class="btn primary" data-cact="pdfcert" data-n="${c.n}">Descargar PDF</button><button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
     <div class="letras">En letras: ${total?letras(total)+' guaraníes':'—'}</div>
     ${over.length?`<div class="hint rojo letras">No se puede emitir: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
   </div>`;
@@ -1460,7 +1461,10 @@ function vAdicionales(){
 /* ---------- PDF ---------- */
 const PK=()=>window.PDFK;
 const enLetras=n=>(window.letrasGs?window.letrasGs(n):letras(n));
-function pdfCertificado(n){
+const pdfModo=()=>{const el=document.getElementById('pdf-modo');const v=el?el.value:'ejec';try{localStorage.setItem('pdf_modo',v)}catch(e){}return v};
+const pdfModoGuardado=()=>{try{return localStorage.getItem('pdf_modo')||'ejec'}catch(e){return 'ejec'}};
+const selModo=()=>`<select id="pdf-modo" aria-label="Ítems del PDF" title="Qué ítems lleva el PDF"><option value="ejec" ${pdfModoGuardado()==='ejec'?'selected':''}>PDF: solo ítems ejecutados</option><option value="todos" ${pdfModoGuardado()==='todos'?'selected':''}>PDF: todos los ítems</option></select>`;
+function pdfCertificado(n,modo){
   const P=PK();if(!P||!P.ok())return;const c=D.certs.find(x=>x.n===n);if(!c)return;
   const ant=acumHasta(n-1);const doc=P.nuevo('landscape');
   let y=P.titulo(doc,'CERTIFICADO N°'+n+' · '+(D.tipo||'').toUpperCase(),[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Dirección:',OBRA.direccion],['Contratista:',D.nombre],['Período:',c.desde?`${ddm(c.desde)}/${c.desde.slice(0,4)} al ${ddm(c.hasta)}/${c.hasta.slice(0,4)}`:'']]);
@@ -1468,7 +1472,7 @@ function pdfCertificado(n){
   const cierra=()=>{if(sub&&(sub.t||sub.ma||sub.mp)){body.push([{content:'Subtotal',colSpan:5,styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.t),styles:{fontStyle:'bold',halign:'right'}},'','','','',{content:gs(sub.ma),styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.mp),styles:{fontStyle:'bold',halign:'right'}},{content:gs(sub.mac),styles:{fontStyle:'bold',halign:'right'}}])}};
   for(const it of D.items){
     const a=ant[it.id]||0,p=Number(c.pres[it.id]||0),ac=a+p;
-    if(!(it.pu>0||ac>0))continue;
+    if(modo==='ejec'?!(ac>0):!(it.pu>0||ac>0))continue;
     if(it.rubro!==lastR){cierra();sub={t:0,ma:0,mp:0,mac:0};body.push([{content:it.rubro||'',colSpan:13,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=it.rubro}
     const mA=a*it.pu,mP=p*it.pu,mAc=ac*it.pu;sub.t+=it.cant*it.pu;sub.ma+=mA;sub.mp+=mP;sub.mac+=mAc;
     if(it.sec==='ADIC')tA+=mP;else tO+=mP;
@@ -1484,7 +1488,8 @@ function pdfCertificado(n){
     styles:{fontSize:10,fontStyle:'bold'},columnStyles:{1:{halign:'right'}},didParseCell:d=>{if(d.row.index===2){d.cell.styles.lineWidth={top:0.4};d.cell.styles.lineColor=0}}});
   doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('En letras: '+enLetras(total)+' guaraníes.',P.ML,y+6);
   P.firmas(doc,y+6,['Profesional Avaroga Arquitectura S.A\n'+(OBRA.firma||'Arq. Hugo Gaona'),'Contratista\n'+D.nombre]);
-  P.cerrar(doc,`Certificado_${n}_${D.nombre}_${c.desde||hoy}`);
+  if(modo==='ejec'){doc.setFont('times','italic');doc.setFontSize(8);doc.text('Se muestran solo los ítems con avance ejecutado.',P.ML,y+16)}
+  P.cerrar(doc,`Certificado_${n}_${D.nombre}_${c.desde||hoy}${modo==='ejec'?'_ejecutados':''}`);
 }
 function pdfDesembolsos(){
   const P=PK();if(!P||!P.ok())return;const R=resumen();const doc=P.nuevo('portrait');
@@ -1567,7 +1572,7 @@ document.addEventListener('click',e=>{
   if(t.dataset.ctab){S.tab=t.dataset.ctab;render();return}
   const a=t.dataset.cact;
   if(a==='abrir'){usar(+t.dataset.i);S.tab='resumen';render();window.scrollTo(0,0);return}
-  if(a==='pdfcert'){return pdfCertificado(+t.dataset.n)}
+  if(a==='pdfcert'){return pdfCertificado(+t.dataset.n,pdfModo())}
   if(a==='pdfdes'){return pdfDesembolsos()}
   if(a==='pdfres'){return pdfResumen()}
   if(a==='pdfcontrato'){return pdfContrato()}
@@ -1765,7 +1770,8 @@ function vAvance(){
     <div><small>Monto de este certificado</small><b>${gs(tP)}</b></div>
     <div><small>Acumulado al cliente</small><b>${gs(tAc)}</b></div>
     <div><small>Avance de la obra</small><b>${pc(tAc/T.tot)}</b></div>
-    ${nuevo?`<button class="btn primary" data-pact="emitir" ${(!tP||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-pact="pdfav" data-n="${c.n}">Descargar PDF</button>`}
+    ${selP()}
+    ${nuevo?`<button class="btn" data-pact="pdfborr" data-n="${c.n}" ${tP?'':'disabled'}>PDF borrador</button><button class="btn primary" data-pact="emitir" ${(!tP||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-pact="pdfav" data-n="${c.n}">Descargar PDF</button>`}
     <div class="letras">En letras: ${tP?letrasGs(tP)+' guaraníes':'—'}</div>
     ${over.length?`<div class="hint rojo letras">Supera lo presupuestado: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')}.</div>`:''}
   </div>`;
@@ -1824,11 +1830,14 @@ function pdfDetalle(){
   PDFK.firmas(doc,y+6,['Propietario\n'+(o.cliente||''),'Profesional\nArq. Hugo Gaona']);
   PDFK.cerrar(doc,`Presupuesto_${o.obra}_${hoy}`);
 }
-function pdfAvance(n){
-  if(!PDFK.ok())return;const c=(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return;const ant=acum(n-1);const T=totales();const o=OBRA_P();const doc=PDFK.nuevo('landscape');
-  let y=PDFK.titulo(doc,'CERTIFICADO DE AVANCE DE OBRA N°'+n,[['Obra:',o.obra],['Cliente:',o.cliente],['Dirección:',o.ubicacion],['Período:',c.desde?`${ddm(c.desde)}/${c.desde.slice(0,4)} al ${ddm(c.hasta)}/${c.hasta.slice(0,4)}`:'']]);
+const modoP=()=>{const el=document.getElementById('pp-modo');const v=el?el.value:'ejec';try{localStorage.setItem('pdf_modo',v)}catch(e){}return v};
+const modoG=()=>{try{return localStorage.getItem('pdf_modo')||'ejec'}catch(e){return 'ejec'}};
+const selP=()=>`<select id="pp-modo" aria-label="Ítems del PDF"><option value="ejec" ${modoG()==='ejec'?'selected':''}>PDF: solo ítems ejecutados</option><option value="todos" ${modoG()==='todos'?'selected':''}>PDF: todos los ítems</option></select>`;
+function pdfAvance(n,modo,borrador){
+  if(!PDFK.ok())return;const c=borrador||(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return;const ant=acum(n-1);const T=totales();const o=OBRA_P();const doc=PDFK.nuevo('landscape');
+  let y=PDFK.titulo(doc,(borrador?'BORRADOR · ':'')+'CERTIFICADO DE AVANCE DE OBRA N°'+n,[['Obra:',o.obra],['Cliente:',o.cliente],['Dirección:',o.ubicacion],['Período:',c.desde?`${ddm(c.desde)}/${c.desde.slice(0,4)} al ${ddm(c.hasta)}/${c.hasta.slice(0,4)}`:'']]);
   const body=[];let lastR=null,tP=0,tA=0,tAc=0;
-  for(const i of ES.doc.items){const a=ant[i.id]||0,p=Number(c.pres[i.id]||0),ac=a+p;if(!ac)continue;const pu=precio(i);tP+=p*pu;tA+=a*pu;tAc+=ac*pu;
+  for(const i of ES.doc.items){const a=ant[i.id]||0,p=Number(c.pres[i.id]||0),ac=a+p;if(modo==='ejec'&&!ac)continue;const pu=precio(i);tP+=p*pu;tA+=a*pu;tAc+=ac*pu;
     if(i.rubro!==lastR){body.push([{content:i.rubro,colSpan:11,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=i.rubro}
     body.push([i.n,i.desc,i.unidad,q2(i.cant),gs(pu),q2(a),p?q2(p):'',q2(ac),pc(i.cant?ac/i.cant:0),p?gs(p*pu):'',gs(ac*pu)])}
   y=PDFK.tabla(doc,{startY:y,head:[['N°','Rubro','Unid.','Cant.','Precio unit.','Anterior','Presente','Acumulado','% av.','Monto presente','Monto acumulado']],body:body.length?body:[[{content:'Sin avance.',colSpan:11}]],
@@ -1837,7 +1846,9 @@ function pdfAvance(n){
   y=PDFK.tabla(doc,{startY:y+5,theme:'plain',tableWidth:120,margin:{left:297-PDFK.MR-120,right:PDFK.MR,top:PDFK.TOP},body:[['Certificado anterior acumulado',gs(tA)],['Monto de este certificado',gs(tP)],['Acumulado a la fecha',gs(tAc)],['Avance de la obra',pc(tAc/T.tot)]],styles:{fontSize:10,fontStyle:'bold'},columnStyles:{1:{halign:'right'}}});
   doc.setFont('times','normal');doc.setFontSize(9.5);doc.text('Monto de este certificado en letras: '+letrasGs(tP)+' guaraníes.',PDFK.ML,y+6);
   PDFK.firmas(doc,y+6,['Aprobación cliente\n'+(o.cliente||''),'Profesional Avaroga Arquitectura S.A\nArq. Hugo Gaona']);
-  PDFK.cerrar(doc,`Avance_cliente_${n}_${o.obra}_${c.desde||hoy}`);
+  if(modo==='ejec'){doc.setFont('times','italic');doc.setFontSize(8);doc.text('Se muestran solo los ítems con avance ejecutado.',PDFK.ML,y+16)}
+  if(borrador){const n2=doc.getNumberOfPages();for(let i=1;i<=n2;i++){doc.setPage(i);doc.setTextColor(228);doc.setFont('helvetica','bold');doc.setFontSize(60);doc.text('BORRADOR',148,120,{align:'center',angle:20});doc.setTextColor(0)}}
+  PDFK.cerrar(doc,`${borrador?'Borrador_':''}Avance_cliente_${n}_${o.obra}_${c.desde||hoy}${modo==='ejec'?'_ejecutados':''}`);
 }
 
 const OBRA_P=()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();return{obra:o?o.nombre:'',cliente:o?o.cliente||'':'',ubicacion:o?o.ubicacion||'':''}};
@@ -1866,7 +1877,8 @@ document.addEventListener('click',e=>{
     const sem=certsSemana(ES.per);certs.push({n,fecha:hoy,desde:ES.per,hasta:addD(ES.per,6),pres,contratistas:sem.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.per=null;ES.cargado=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
   if(a==='pdfres')return pdfResumen();
   if(a==='pdfdet')return pdfDetalle();
-  if(a==='pdfav')return pdfAvance(+t.dataset.n);
+  if(a==='pdfav')return pdfAvance(+t.dataset.n,modoP());
+  if(a==='pdfborr')return pdfAvance(+t.dataset.n,modoP(),{n:+t.dataset.n,pres:{...ES.borr},desde:ES.per,hasta:addD(ES.per,6)});
 });
 document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
