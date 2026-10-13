@@ -1,5 +1,8 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
-<title>Asistencia de Obra</title>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Gestión de Obra</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -8,7 +11,7 @@
 :root{
   --bg:#eef0ef; --panel:#ffffff; --ink:#1d2321; --muted:#5f6a66; --line:#d5dad7;
   --accent:#f2b705; --accent-ink:#1d2321; --ok:#1f7a5a; --ok-bg:#dcefe6; --warn:#a15c00; --warn-bg:#fbedd2;
-  --bad:#b3261e; --bad-bg:#f8dedb; --chip:#e4e8e6;
+  --bad:#b3261e; --bad-bg:#f8dedb; --chip:#e4e8e6; --edit:#fff8dc; --bar:#c9cfcc;
   --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-num:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
@@ -17,11 +20,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141817; --panel:#1d2321; --ink:#e8ecea; --muted:#9aa5a1; --line:#2f3835;
   --accent:#f2b705; --accent-ink:#141817; --ok:#5fcf9f; --ok-bg:#163a2c; --warn:#f0b35a; --warn-bg:#3a2a12;
-  --bad:#ff8a80; --bad-bg:#3d1a17; --chip:#28302d; color-scheme:dark}}
+  --bad:#ff8a80; --bad-bg:#3d1a17; --chip:#28302d; --edit:#2e2a14; --bar:#3a4441; color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#141817; --panel:#1d2321; --ink:#e8ecea; --muted:#9aa5a1; --line:#2f3835;
   --accent:#f2b705; --accent-ink:#141817; --ok:#5fcf9f; --ok-bg:#163a2c; --warn:#f0b35a; --warn-bg:#3a2a12;
-  --bad:#ff8a80; --bad-bg:#3d1a17; --chip:#28302d; color-scheme:dark}
+  --bad:#ff8a80; --bad-bg:#3d1a17; --chip:#28302d; --edit:#2e2a14; --bar:#3a4441; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
@@ -147,6 +150,79 @@ button.cell{cursor:pointer}
   .firmas div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:12px;text-align:center}
   th,td{padding:4px 6px}
 }
+#cert-root h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;text-transform:uppercase;letter-spacing:.02em}
+#cert-root h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
+#cert-root .sub{color:var(--muted);font-size:14px}
+#cert-root .bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#cert-root .between{justify-content:space-between}
+#cert-root .btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:9px 14px;font-weight:600}
+#cert-root .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+#cert-root .btn.ghost{background:transparent}
+#cert-root .btn.sm{padding:5px 10px;font-size:13px}
+#cert-root .btn:disabled{opacity:.45;cursor:not-allowed}
+#cert-root input,#cert-root select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+#cert-root .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#cert-root .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:10px}
+#cert-root .kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+#cert-root .kpi small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+#cert-root .kpi b{font-family:var(--f-num);font-size:20px}
+#cert-root .kpi em{font-style:normal;font-size:13px;color:var(--muted)}
+#cert-root .kpi.ok{border:2px solid var(--ok)}
+#cert-root .kpi.ok b{color:var(--ok)}
+#cert-root .kpi.bad{border:2px solid var(--bad)}
+#cert-root .kpi.bad b{color:var(--bad)}
+#cert-root .dot{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
+#cert-root .dot.rojo{background:var(--bad)}
+#cert-root .dot.amarillo{background:var(--accent)}
+#cert-root .dot.verde{background:var(--ok)}
+#cert-root .alerta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:start;padding:10px 14px;border-top:1px solid var(--line)}
+#cert-root .alerta:first-child{border-top:0}
+#cert-root .alerta .dot{margin-top:6px}
+#cert-root .tw{overflow-x:auto}
+#cert-root table{border-collapse:collapse;width:100%}
+#cert-root th,#cert-root td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+#cert-root th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+#cert-root th.grp{text-align:center;border-bottom:2px solid var(--line);font-size:12px;color:var(--ink)}
+#cert-root td.n,#cert-root th.n{text-align:right}
+#cert-root td.desc{white-space:normal;min-width:220px;max-width:380px}
+#cert-root tr.rubro td{background:var(--chip);font-weight:600;font-family:var(--f-display);font-size:16px;letter-spacing:.02em}
+#cert-root tr.sector td{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding-top:10px}
+#cert-root tr.subt td{font-weight:600;border-bottom:2px solid var(--line)}
+#cert-root tr.over td{background:var(--bad-bg)}
+#cert-root tr.has td.pres{background:var(--edit)}
+#cert-root tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
+#cert-root td.pres input{width:90px;text-align:right;font-family:var(--f-num);padding:5px 6px}
+#cert-root .track{height:8px;background:var(--bar);border-radius:99px;position:relative;overflow:hidden;min-width:80px}
+#cert-root .track i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--ok)}
+#cert-root .track i.rojo{background:var(--bad)}
+#cert-root .mini{display:flex;align-items:center;gap:8px}
+#cert-root .mini .pct{font-family:var(--f-num);font-size:12px;width:48px;text-align:right}
+#cert-root .totales{position:sticky;bottom:0;z-index:10;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 -6px 18px rgba(0,0,0,.06);align-items:center}
+@media (max-width:760px){#cert-root .totales{bottom:calc(64px + env(safe-area-inset-bottom,0px))}}
+#cert-root .totales div small{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#cert-root .totales div b{font-family:var(--f-num);font-size:18px}
+#cert-root .letras{grid-column:1/-1;font-size:13px;color:var(--muted)}
+#cert-root .hint{font-size:13px;padding:8px 10px;border-radius:8px}
+#cert-root .hint.rojo{background:var(--bad-bg);color:var(--bad)}
+#cert-root .hint.verde{background:var(--ok-bg);color:var(--ok)}
+#cert-root .hint.amarillo{background:var(--warn-bg);color:var(--warn)}
+#cert-root .form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;align-items:end}
+#cert-root .form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+#cert-root .form .wide{grid-column:span 2}
+@media (max-width:520px){#cert-root .form .wide{grid-column:1/-1}}
+#cert-root .chips{display:flex;gap:6px;flex-wrap:wrap}
+#cert-root .chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:5px 12px;font-weight:600;font-size:14px}
+#cert-root .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+#cert-root .chip.nuevo{border-style:dashed}
+#cert-root{display:flex;flex-direction:column;gap:16px}
+#cert-root .subnav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+#cert-root .subnav select{max-width:100%}
+#cert-root .totales{bottom:0}
+@media (max-width:760px){#cert-root .totales{bottom:calc(64px + env(safe-area-inset-bottom,0px))}}
+.subnav-p{display:flex;gap:6px;flex-wrap:wrap}
+.chip-p{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:6px 14px;font-weight:600;font-size:14px}
+.chip-p[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (max-width:760px){nav.tabs{justify-content:space-around;gap:4px}nav.tabs button{flex:1;font-size:16px;padding:8px 6px}}
 </style>
 
 <style>
@@ -223,8 +299,8 @@ const SUPABASE_URL = 'https://spsfrepcsnxjqmwlckkq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_sCek0Zow3BXW7p5x8wLnRw_lvT1owlT';
 /* ============================================================ */
 
-const DEMO = {"personal":[{"numero":1,"nombre":"Rolando Mereles","categoria":"CAPATAZ","ci":"","jornada":200000,"calce":"","activo":true},{"numero":2,"nombre":"Francisco Benitez","categoria":"OFICIAL","ci":"","jornada":150000,"calce":"42","activo":true},{"numero":3,"nombre":"Mario Benitez","categoria":"MED. OFICIAL 1","ci":"","jornada":135000,"calce":"41","activo":true},{"numero":4,"nombre":"Cristhian Becker","categoria":"MED. OFICIAL 2","ci":"","jornada":135000,"calce":"42","activo":true},{"numero":5,"nombre":"Daniel Ruiz Diaz","categoria":"MED. OFICIAL 3","ci":"","jornada":135000,"calce":"39","activo":true},{"numero":6,"nombre":"Alex Nuñez","categoria":"MED. OFICIAL 4","ci":"","jornada":135000,"calce":"39","activo":true},{"numero":7,"nombre":"Sindulfo Peralta","categoria":"MED. OFICIAL 5","ci":"","jornada":135000,"calce":"41","activo":true},{"numero":8,"nombre":"Fernando Fernandez","categoria":"MED. OFICIAL 6","ci":"","jornada":135000,"calce":"42","activo":false},{"numero":9,"nombre":"Jacinto Roman","categoria":"MED. OFICIAL 7","ci":"","jornada":135000,"calce":"","activo":true},{"numero":10,"nombre":"Maximo Fretes","categoria":"MED. OFICIAL 10","ci":"","jornada":135000,"calce":"","activo":true},{"numero":11,"nombre":"Bernardo Delvalle","categoria":"MED. OFICIAL 11","ci":"","jornada":135000,"calce":"","activo":true},{"numero":12,"nombre":"Ariel Almada","categoria":"AYUDANTE 1","ci":"","jornada":100000,"calce":"43","activo":true},{"numero":13,"nombre":"Brian Patiño","categoria":"AYUDANTE 2","ci":"","jornada":100000,"calce":"40","activo":true},{"numero":14,"nombre":"Patricio Almada","categoria":"AYUDANTE 3","ci":"","jornada":100000,"calce":"41","activo":false},{"numero":15,"nombre":"Oscar Gonzalez","categoria":"AYUDANTE 4","ci":"","jornada":100000,"calce":"43","activo":true},{"numero":16,"nombre":"Daniel Fernandez","categoria":"AYUDANTE 5","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":17,"nombre":"Elias Benitez","categoria":"AYUDANTE 6","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":18,"nombre":"Aldo Maldonado","categoria":"AYUDANTE 7","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":19,"nombre":"Arnaldo Arroca","categoria":"AYUDANTE 8","ci":"","jornada":100000,"calce":"41","activo":false},{"numero":20,"nombre":"Arroca Hijo","categoria":"AYUDANTE 9","ci":"","jornada":100000,"calce":"","activo":true},{"numero":21,"nombre":"Alexis Baez","categoria":"AYUDANTE 10","ci":"","jornada":100000,"calce":"","activo":true},{"numero":22,"nombre":"Arnaldo Paiva","categoria":"AYUDANTE 11","ci":"","jornada":100000,"calce":"","activo":true},{"numero":23,"nombre":"Alias (ver Apellido)","categoria":"AYUDANTE 12","ci":"","jornada":100000,"calce":"","activo":true}],"asistencia":[{"nombre":"Rolando Mereles","fecha":"2026-09-07","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-08","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-08","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-08","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-09","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Alex Nuñez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Ariel Almada","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Brian Patiño","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Patricio Almada","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Rolando Mereles","fecha":"2026-09-14","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"11:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-15","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"14:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"14:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-22","ent_am":"07:00","sal_am":"10:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-22","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Ariel Almada","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-23","ent_am":"07:00","sal_am":"10:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Brian Patiño","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-24","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-24","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Brian Patiño","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Alex Nuñez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Jacinto Roman","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Brian Patiño","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Fernandez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Aldo Maldonado","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Paiva","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Bernardo Delvalle","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Paiva","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alias (ver Apellido)","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Bernardo Delvalle","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Arnaldo Paiva","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alias (ver Apellido)","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"}]};
-const DEMO_LLUVIAS = [{"fecha": "2026-09-11", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin actividad en obra por inclemencias climáticas que impidieron los trabajos programados (encofrado y armaduras de zapatas). Fuente: Informe de avance de obra, Semana 02."}, {"fecha": "2026-09-12", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Condiciones climáticas desfavorables impidieron trabajar en el terreno; la cuadrilla se reasignó a taller (corte, doblado y armado de armaduras de zapatas del Bloque 2). Horas perdidas estimadas. Consecuencias: lunes 14 y martes 15 se drenaron los pozos con motobomba y se limpió el barro; miércoles 16 hubo desmoronamiento de paredes de pozos. Fuente: Informe Semana 03."}, {"fecha": "2026-09-21", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones", "Excavación"], "observaciones": "Sin actividad en obra por el estado del terreno tras las precipitaciones del fin de semana. Se reanudó el martes 22. Fuente: Informe Semana 04."}, {"fecha": "2026-09-29", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin actividad durante la mañana por inclemencias climáticas. El temporal derribó un tramo del cerco perimetral, que se levantó por la tarde. Por la tarde solo se pudo desencofrar, acopiar madera, limpiar y armar armaduras por el estado del terreno. El miércoles 30 se achicó el agua de los pozos. Fuente: Informe Semana 05."}, {"fecha": "2026-10-03", "afectacion": "sin", "horas": 0, "mm": null, "actividades": [], "observaciones": "Se registraron precipitaciones el sábado; la jornada se trabajó normalmente (excavación de zanjas de vigas, encofrado, armaduras y corralitos de replanteo). Afectó la jornada del lunes 05. Fuente: Informe Semana 06."}, {"fecha": "2026-10-05", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones", "Excavación"], "observaciones": "Terreno con agua acumulada y suelo saturado por las lluvias del sábado 03; los trabajos se concentraron en sectores secos. Horas perdidas estimadas. El martes 06 se hicieron canales de drenaje. Fuente: Informe Semana 06."}, {"fecha": "2026-10-08", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin trabajos en obra por condiciones climáticas adversas. Quedaron detenidos la base de nivelación de ladrillos y el encofrado de vigas de fundación. Fuente: Informe Semana 06."}, {"fecha": "2026-10-09", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Excavación", "Fundaciones"], "observaciones": "Se mantuvo la suspensión por condiciones climáticas adversas. Se retomará el lunes si el terreno y el clima lo permiten. Fuente: Informe Semana 06."}, {"fecha": "2026-10-10", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Excavación", "Fundaciones"], "observaciones": ""}, {"fecha": "2026-10-12", "afectacion": "total", "horas": 8, "mm": null, "actividades": [], "observaciones": ""}];
+const DEMO = {"personal":[],"asistencia":[]};
+const DEMO_LLUVIAS = [];
 const AVAROGA_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABmCAYAAAA9KjRfAAAFnElEQVR42u2dbWhVdRzHP3du7tHMzNaDWdKDrFoPLLGMDGpFRb6wUSKNHim0XrSwF/miEAqyqAR7sSBakctIo0SysMhYy7AUK2sRYk840iJLcWZO5+nF+V+ca273nt939x7G7wMHNrj33HO/3/O75/z/53x/B0YH5wIzcVLDcmCdy5AOLgAOAxFwhctRfFYGMyLgPZejuFwK9PUz5AjQ4LIUjzX9zMgu77osxWFGqIiBhvQBl7g8hWfdIGZkl5UuT2GZNYQZUTjrutBlKhwdwxgSAW+4TIXhhhzMiIBDwDSXa2TJABtzNCQCXnPJRpbZeZgRAb3AOS7byFACbMnTkAh42aUbGW5LYEYEHATOdvm0lALfJTQkAlpdQi3NBjMi4ABwpsuoYSywzWhIBCxzKQs77hhu2Q+c5nLaqQB2iEx53uXU0CIyZB9Q63LaqQZ2iUxZ4nJqeExkyF7gZJfTznhgt8iUJ11ODYtFhvwFTHA57ZwUfnIUpjzhcmpYIjLkz/Az6BipBXpEpixyOTUsFRnyOzDO5bRzBvGEocKUR11ODa0iQ34DqlxOO1OJL9EqTHnY5dTwqsiQHUCly2nnfI5GEazLgy6nhhUiQ34Byl1OOxdxbCTBstzvcmp4R2TIduJLxo6RBgaPJiRZ7nY5NbwvMuQHoMzltDNTZEgE3OFyalgvMqSL+OY8x8i1wiq53eXUsEFkyNfAGJfTzs3CKpnjctrJAJtFhmwmjkE4RuYIq+QWl9NOCfCtyJCNXiUa5gmr5EaX005pGHUrDOkMxybHyD0iQ44A17mcdsYCP4lM+cSrRMMCYZXMcjntKAM/H7qcGlqEVeLNNgUoAz9rXU4NqsBPHzDd5bSjDPysdjk1LBZWyWUup52JwB6RKatcTg2qwM9hoN7ltKMM/LzpcmpQBX4OAXUup53J6AI/r7ucGlSBn17gPJfTzlTibnMKU15xOTW0iQw5GAx2jEwLB2aFKS+5nBpUgZ8DwBSX0049uljciy6nBlXgZz9wustp53J0sbgXXE4Na0WG9OBtBCVchS4W94zLaScDfIyujeCkJBvh+Ydj6QbuEqynPEyprHdJ7VXymahK/ibugOcVYmQXmtBnRRgsdrikNkqATaIq2U2ebQS9Qv5Pth/jXMG6Kom7aXe6rDbGAN+IquQP8mgj6BVy/CrZCzQJ1lUdDvCfu6w2ytAFfnYGY6S0h/KzLO0pEbuG+NGtw/U0UQV+IuIbvmXMwD75lqZ8RQZ4NofXKQM/3YjaCGaAjwQb1EG6EkjzcnzdfGGVPKTY8EZGZ5J1dY47SCW6wM+vGNsIlgBfCDZkE+nKepeFQdtZOb6+RVglD1g2vEm0EU0pq46F5Pes3JpwpqTQ4keGaCM41DiklPhB8ZOMX76r3x5WbMqJn4lIOMGoIn6WSNcw7+sNVdUo2IYJwM/E3Yby4l7RHnFnSqqiOnynurCz7QGey+N0dHyYUlFoso08G6RVEPexHa1dPrOGrAljjVxZLDyWNOezwY+IPnR+SkfhGeJp9k7gmnCMyAVl4Of7XKeuTgij6tQMhEaI7cDWBO97WlglcwtZlgtTbEYt8cWj7oTv3SfSaOtww4FT0Dx0K68p5yKwKEyJ7CRZlGCpsEpuLcQHPZ5iM0rDz9WVxNn1JJN+k4F/RFptOd6MwRQ0qaI9JLi4X0CuD+Mrwhjrg4RzbK3CKpk92AeoshJpf9bsU8DF/f5fQLJnhygDP18O3Cnq0OQkeoBTU25I+4ADaSbs7Q0J1tUmrJKb+q/4bdFKl6XcjHFB/IFUAW8BJ+a5PmXgZ0N2pdPR3NP6bx6zp8U4kNeEs6urw7Eju0wM0yLNCU/VVwirpDF78UkxadYG3JdCM8rCWVFF+HtM+JnKcPRKZh9xf97lCcYm9cBXaG4Y+fQ/luLF9/ksjKYAAAAASUVORK5CYII=";
 const NUBE = !!(SUPABASE_URL && SUPABASE_KEY && window.supabase);
 const EN_MARCO = (()=>{try{return window.self!==window.top}catch(e){return true}})();
@@ -245,6 +321,7 @@ const tramo=(a,b)=>{const x=mins(a),y=mins(b);return(x!=null&&y!=null&&y>x)?(y-x
 const horasDe=r=>r?Math.round((tramo(r.ent_am,r.sal_am)+tramo(r.ent_pm,r.sal_pm))*100)/100:0;
 const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
 const fmtH=h=>h?(Number.isInteger(h)?String(h):h.toFixed(2).replace(/0$/,'')):'';
+window.toast=toast;
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.k);toast.k=setTimeout(()=>t.classList.remove('show'),1400)}
 
 const AJ_DEF={empresa:'Avaroga Arquitectura S.A',obra:'Locales comerciales · Vanguard S.A',
@@ -287,6 +364,10 @@ function backendLocal(){
     async saveLluvia(r){const i=d.lluvias.findIndex(x=>x.obra_id===r.obra_id&&x.fecha===r.fecha);
       if(i>=0)d.lluvias[i]={...d.lluvias[i],...r};else d.lluvias.push({id:uid(),...r});save()},
     async delLluvia(oid,f){d.lluvias=d.lluvias.filter(x=>!(x.obra_id===oid&&x.fecha===f));save()},
+    async contratistas(oid){if(!d.contratistas){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];
+        d.contratistas=SEMILLA_CONTRATISTAS.map(c=>({...JSON.parse(JSON.stringify(c)),id:uid(),obra_id:o?o.id:null}));save()}
+      return d.contratistas.filter(c=>c.obra_id===oid).map(c=>JSON.parse(JSON.stringify(c)))},
+    async saveContratista(c){const v=JSON.parse(JSON.stringify(c));const i=d.contratistas.findIndex(x=>x.id===c.id);if(i>=0)d.contratistas[i]=v;else d.contratistas.push(v);save()},
   };
 }
 function backendNube(sb){
@@ -312,6 +393,8 @@ function backendNube(sb){
       .map(r=>({...r,horas:Number(r.horas)||0,mm:r.mm==null?null:Number(r.mm),actividades:r.actividades||[],observaciones:r.observaciones||''}))},
     async saveLluvia(r){const row={...r};delete row.id;ok(await sb.from('lluvias').upsert(row,{onConflict:'obra_id,fecha'}))},
     async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
+    async contratistas(oid){if(!oid)return[];return ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'))},
+    async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
   };
 }
 
@@ -762,16 +845,18 @@ function vLogin(err=''){
   </form>`;
 }
 
-const TABS=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['personal','Personal'],['ajustes','Ajustes']];
+const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['personal','Personal'],['ajustes','Ajustes']];
+const MODS=[['personal-obra','Personal en obra'],['contratistas','Contratistas']];
 function render(){
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
-  <header class="top"><div class="brand"><b>Asistencia <i>de</i> Obra</b>
+  <header class="top"><div class="brand"><b>Gestión <i>de</i> Obra</b>
     ${S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    <nav class="tabs">${TABS.map(([k,t])=>`<button data-tab="${k}" aria-current="${S.tab===k}">${t}</button>`).join('')}</nav></header>
-  ${NUBE?'':'<div class="demo">Modo prueba con tus datos del Excel · se guarda solo en este dispositivo</div>'}
-  <main>${V()}</main>`;
+    <nav class="tabs">${MODS.map(([k,t])=>{const act=k==='contratistas'?S.tab==='contratistas':S.tab!=='contratistas';return `<button data-tab="${k==='contratistas'?k:(S.lastP||'cargar')}" aria-current="${act}">${t}</button>`}).join('')}</nav></header>
+  ${NUBE?'':'<div class="demo">Prueba integrada: asistencia, lluvias y contratistas con tus planillas · se guarda solo en este dispositivo</div>'}
+  <main>${S.tab!=='contratistas'?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
+  if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
 }
 
@@ -785,7 +870,7 @@ async function guardarAsis(pid,campos){
 }
 document.addEventListener('click',async ev=>{
   const t=ev.target.closest('[data-tab],[data-act]');if(!t)return;
-  if(t.dataset.tab){S.tab=t.dataset.tab;S.edit=null;render();return refrescar()}
+  if(t.dataset.tab){S.tab=t.dataset.tab;if(S.tab!=='contratistas')S.lastP=S.tab;S.edit=null;render();return refrescar()}
   const a=t.dataset.act;
   if(a==='dia'){S.dia=addD(S.dia,+t.dataset.n);S.abierto=null;return refrescar()}
   if(a==='hoy'){S.dia=hoy;return refrescar()}
@@ -797,7 +882,7 @@ document.addEventListener('click',async ev=>{
   if(a==='rapido'){const d=parse(hoy);if(t.dataset.k==='mesant')d.setMonth(d.getMonth()-1);
     const ini=new Date(d.getFullYear(),d.getMonth(),1),fin=new Date(d.getFullYear(),d.getMonth()+1,0);
     S.rango={a:iso(ini),b:iso(fin)};return refrescar()}
-  if(a==='ir'){S.dia=t.dataset.f;S.tab='cargar';return refrescar()}
+  if(a==='ir'){S.dia=t.dataset.f;S.tab='cargar';S.lastP='cargar';return refrescar()}
   if(a==='marcar'){
     const pid=t.dataset.pid,k=t.dataset.k;
     if(k==='falta'){delete S.asis[key(pid,S.dia)];S.abierto=null;render();await DB.borrarAsis(pid,S.dia);return toast('Marcado ausente')}
@@ -824,7 +909,7 @@ document.addEventListener('click',async ev=>{
   if(a==='lldel'){S.llConf=true;return render()}
   if(a==='llno'){S.llConf=false;return render()}
   if(a==='llsi'){const f=S.llF;await DB.delLluvia(S.obra,f);S.lluv=S.lluv.filter(r=>r.fecha!==f);S.llConf=false;render();return toast('Día borrado')}
-  if(a==='irll'){S.llF=t.dataset.f;S.llConf=false;S.tab='lluvias';return refrescar()}
+  if(a==='irll'){S.llF=t.dataset.f;S.llConf=false;S.tab='lluvias';S.lastP='lluvias';return refrescar()}
   if(a==='llpdf'){return descargarConstancia()}
   if(a==='imprimir'){return window.print()}
   if(a==='excel'){return exportarExcel()}
@@ -907,6 +992,21 @@ function exportarExcel(){
   XLSX.writeFile(wb,`Personal_${(obraAct()?.nombre||'obra').replace(/[^\wáéíóúñÁÉÍÓÚÑ]+/g,'_')}_${per.a}_al_${per.b}.xlsx`);
 }
 
+
+/* ---------- puentes con el módulo de contratistas ---------- */
+window.ASIS_OBRA=()=>obraAct();
+window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
+const SEMILLA_CONTRATISTAS=[];
+window.ASIS_FIN=a=>addD(a,6);
+window.ASIS_SEMANA_PAGO=f=>periodo(addD(f,-1)).a;
+window.ASIS_LLUVIA=()=>{const m={};(S.lluv||[]).forEach(r=>{const a=periodo(r.fecha).a;m[a]=(m[a]||0)+perdido(r)});return m};
+window.ASIS_MO=async()=>{
+  const rows=await DB.asistencias('2000-01-01','2999-12-31');
+  const per=Object.fromEntries(S.personal.map(p=>[p.id,p]));const sem={};
+  for(const r of rows){const p=per[r.personal_id];if(!p)continue;const ob=r.obra_id||p.obra_id;if(ob!==S.obra)continue;
+    const a=periodo(r.fecha).a;sem[a]=sem[a]||{m:0,h:0};sem[a].m+=(Number(r.horas)||0)*costoHora(p);sem[a].h+=(Number(r.horas)||0)/(Number(S.aj.horasJornada)||9)}
+  return Object.entries(sem).sort().map(([a,o])=>({a,monto:o.m,jornadas:o.h}));
+};
 /* ---------- arranque ---------- */
 async function iniciar(session){
   if(session)S.email=session.user.email;
@@ -930,6 +1030,395 @@ async function iniciar(session){
   }
   DB=backendLocal();iniciar(null);
 })();
-</script>
 
-</body></html>
+(function(){
+
+
+const OBRA={empresa:'Avaroga Arquitectura S.A',ruc:'80130705-8',obra:'Locales comerciales',direccion:'Cambyretá, Itapúa',cliente:'Vanguard S.A',superficie:'846,10 m²',firma:'Arq. Hugo Gaona'};
+
+const gs=n=>(n<0?'−':'')+String(Math.round(Math.abs(n||0))).replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+const mill=n=>{const a=Math.abs(n);return (n<0?'−':'')+(a>=1e6?(a/1e6).toFixed(1).replace('.',',')+' M':gs(a))};
+const pct=x=>isFinite(x)?(Math.round(x*1000)/10).toString().replace('.',',')+'%':'—';
+const qf=x=>x?(Math.round(x*100)/100).toString().replace('.',','):'';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fdm=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'';
+const hoy=(()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`})();
+const toast=m=>window.toast(m);
+
+/* número a letras (guaraníes) */
+function letras(n){
+  n=Math.round(n);if(n===0)return 'cero';
+  const U=['','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const D=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','ciento','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  const c999=x=>{if(x===100)return 'cien';const c=Math.floor(x/100),r=x%100;let s=C[c];
+    if(r){s+=(s?' ':'')+(r<30?U[r]:D[Math.floor(r/10)]+(r%10?' y '+U[r%10]:''))}return s};
+  const parts=[];const mm=Math.floor(n/1e6),miles=Math.floor((n%1e6)/1000),resto=n%1000;
+  if(mm)parts.push(mm===1?'un millón':c999(mm).replace(/uno$/,'un')+' millones');
+  if(miles)parts.push(miles===1?'mil':c999(miles).replace(/uno$/,'un')+' mil');
+  if(resto)parts.push(c999(resto));
+  const s=parts.join(' ').replace(/veintiun\b/g,'veintiún');return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+
+/* fechas: certificados de sábado a viernes, pago el sábado siguiente */
+const pz=n=>String(n).padStart(2,'0');
+const isoD=d=>`${d.getFullYear()}-${pz(d.getMonth()+1)}-${pz(d.getDate())}`;
+const prs=s=>{const[a,b,c]=s.split('-').map(Number);return new Date(a,b-1,c)};
+const addDay=(s,n)=>{const d=prs(s);d.setDate(d.getDate()+n);return isoD(d)};
+const sabado=s=>{const d=prs(s);d.setDate(d.getDate()-((d.getDay()+1)%7));return isoD(d)};
+const DSEM=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+const ddm=s=>s?`${DSEM[prs(s).getDay()]} ${s.slice(8,10)}/${s.slice(5,7)}`:'';
+function propuestaPeriodo(){const ult=[...D.certs].reverse().find(c=>c.hasta);if(ult)return addDay(ult.hasta,1);return addDay(sabado(hoy),-7)}
+/* estado */
+const clon=x=>JSON.parse(JSON.stringify(x));
+let ALL={contratistas:[]};let D=null;let OBRA_CARGADA=undefined,CARGANDO=false;
+const guardar=()=>{if(D&&window.CDB)window.CDB.save(D).catch(()=>toast('No se pudo guardar en la base. Revisá la conexión.'))};
+const S={tab:'contratistas',sel:0,cert:null,soloAvance:true,buscar:'',borrador:{},per:null};
+function usar(i){S.sel=i;D=ALL.contratistas[i]||null;S.cert=null;S.borrador={};S.buscar='';S.soloAvance=true;S.per=null}
+async function asegurar(oid){if(CARGANDO)return;CARGANDO=true;try{ALL={contratistas:await window.CDB.list(oid)}}catch(e){ALL={contratistas:[]};toast('No se pudieron leer los contratistas')}
+  OBRA_CARGADA=oid;CARGANDO=false;usar(Math.min(S.sel,Math.max(0,ALL.contratistas.length-1)));if(!D)S.tab='contratistas';render()}
+function conR(c){const p=D;D=c;const r=resumen();r.alertas=controles(r);D=p;return r}
+
+/* cálculos */
+const byId=()=>Object.fromEntries(D.items.map(i=>[i.id,i]));
+function acumHasta(n){ // cantidades acumuladas incluyendo certificado n
+  const a={};for(const c of D.certs){if(c.n>n)continue;for(const[k,q]of Object.entries(c.pres))a[k]=(a[k]||0)+q}return a}
+function montoCert(c){const I=byId();let o=0,ad=0;for(const[k,q]of Object.entries(c.pres)){const it=I[k];if(!it)continue;const m=q*it.pu;if(it.sec==='ADIC')ad+=m;else o+=m}return{o,ad,t:o+ad}}
+function resumen(){
+  const orig=D.items.filter(i=>i.sec==='ORIG').reduce((s,i)=>s+i.cant*i.pu,0);
+  const adic=D.items.filter(i=>i.sec==='ADIC').reduce((s,i)=>s+i.cant*i.pu,0);
+  const ult=D.certs.length?D.certs[D.certs.length-1].n:0;
+  const ac=acumHasta(ult);const I=byId();
+  let certO=0,certA=0;for(const[k,q]of Object.entries(ac)){const it=I[k];if(!it)continue;if(it.sec==='ADIC')certA+=q*it.pu;else certO+=q*it.pu}
+  const desO=D.des.reduce((s,d)=>s+d.orig,0),desA=D.des.reduce((s,d)=>s+d.adic,0);
+  const over=D.items.filter(i=>(ac[i.id]||0)>i.cant+1e-9).map(i=>({i,q:ac[i.id]}));
+  return{orig,adic,ult,ac,certO,certA,desO,desA,over};
+}
+
+/* vistas */
+function controles(R){
+  const al=[];const dif=(R.desO+R.desA)-(R.certO+R.certA);
+  R.over.forEach(x=>al.push(['rojo',`<b>${esc(x.i.n)} ${esc(x.i.desc)}</b><div class="sub">Certificado ${qf(x.q)} de ${qf(x.i.cant)} ${esc(x.i.unidad)} contratados: ${gs((x.q-x.i.cant)*x.i.pu)} Gs por encima del contrato.</div>`]));
+  if(Math.abs(dif)>1000)al.push([dif>0?'rojo':'amarillo',`<b>${dif>0?'Se pagó más de lo certificado':'Hay certificado pendiente de pago'}</b><div class="sub">Desembolsado ${gs(R.desO+R.desA)} · certificado acumulado ${gs(R.certO+R.certA)} · diferencia ${gs(dif)}</div>`]);
+  if(R.orig&&R.adic/R.orig>0.05)al.push(['amarillo',`<b>Adicionales por encima del 5% del contrato</b><div class="sub">${pct(R.adic/R.orig)} sobre el original</div>`]);
+  D.items.filter(i=>i.ref_cant!=null&&(i.cant>i.ref_cant+1e-9||i.pu>i.ref_pu+0.5)).forEach(i=>al.push(['amarillo',`<b>${esc(i.n)} ${esc(i.desc)}</b><div class="sub">Contratado ${qf(i.cant)} ${esc(i.unidad)} a ${gs(i.pu)}; al cliente presupuestaste ${qf(i.ref_cant)} a ${gs(i.ref_pu)} de mano de obra. Diferencia ${gs(i.cant*i.pu-i.ref_cant*i.ref_pu)} Gs que salen de tu margen.</div>`]));
+  const conPrecio=new Set(D.items.filter(i=>i.pu>0).map(i=>i.rubro));const sinPrecio=D.items.filter(i=>i.sec==='ORIG'&&!i.pu&&conPrecio.has(i.rubro));
+  if(sinPrecio.length)al.push(['amarillo',`<b>${sinPrecio.length} ítem${sinPrecio.length>1?'s':''} sin precio en el contrato</b><div class="sub">${sinPrecio.map(i=>esc(i.n+' '+i.desc.slice(0,36))).join(' · ')}. Si los va a hacer este contratista, conviene fijar el precio antes de empezar.</div>`]);
+  return al;
+}
+
+const barra=(f,rojo)=>`<div class="mini"><div class="track"><i class="${rojo?'rojo':''}" style="width:${Math.min(100,f*100)}%"></i></div><span class="pct">${pct(f)}</span></div>`;
+
+
+
+const n2=v=>String(Math.round((v||0)*100)/100).replace('.',',');
+const fdm2=a=>a.slice(8,10)+'/'+a.slice(5,7);
+async function llenarMO(){
+  const el=document.getElementById('mo-total');if(!el||!window.ASIS_MO)return;
+  const ll=window.ASIS_LLUVIA?window.ASIS_LLUVIA():{};
+  /* 1) mano de obra pagada: solo certificados (la cuadrilla del contratista se paga por avance) */
+  const sem={};const add=(a,k,v)=>{sem[a]=sem[a]||{};sem[a][k]=(sem[a][k]||0)+v};
+  ALL.contratistas.forEach((c,i)=>c.des.forEach(d=>add(window.ASIS_SEMANA_PAGO(d.fecha),'c'+i,d.orig+d.adic)));
+  Object.keys(ll).forEach(a=>{sem[a]=sem[a]||{}});
+  const ks=Object.keys(sem).sort();
+  const cols=ALL.contratistas.map((c,i)=>['c'+i,esc(c.nombre.split(' (')[0])+'<br><span class="sub">'+esc(c.tipo.replace('Mano de obra · ',''))+'</span>']);
+  const tot={};let gran=0,llT=0;
+  const filas=ks.map(a=>{let t=0;const tds=cols.map(([k])=>{const v=sem[a][k]||0;t+=v;tot[k]=(tot[k]||0)+v;return `<td class="n">${v?gs(v):'—'}</td>`}).join('');gran+=t;const l=ll[a]||0;llT+=l;
+    return `<tr><td class="num">${fdm2(a)} – ${fdm2(window.ASIS_FIN(a))}</td><td class="n">${l?n2(l):'—'}</td>${tds}<td class="n"><b>${gs(t)}</b></td></tr>`}).join('');
+  el.innerHTML=`<div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Mano de obra pagada</h3><span class="sub">Pagos por certificado, semana a semana</span></div>
+  <div class="tw"><table><thead><tr><th>Semana</th><th class="n">Días perdidos<br><span class="sub">por lluvia</span></th>${cols.map(([,t])=>`<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr></thead>
+  <tbody>${filas||`<tr><td colspan="${cols.length+3}" class="sub">Sin pagos todavía.</td></tr>`}</tbody>
+  <tfoot><tr><td>Total</td><td class="n">${n2(llT)}</td>${cols.map(([k])=>`<td class="n">${gs(tot[k]||0)}</td>`).join('')}<td class="n">${gs(gran)}</td></tr></tfoot></table></div>`;
+  const cr=document.getElementById('cruce');if(cr)cr.innerHTML=await cruceHTML();
+}
+/* 2) análisis cruzado: certificado del contratista vs. costo de su cuadrilla según asistencia */
+async function cruceHTML(){
+  const ci=ALL.contratistas.findIndex(c=>c.cuadrilla);if(ci<0||!window.ASIS_MO)return'';
+  const c=ALL.contratistas[ci];const propio=await window.ASIS_MO();const ll=window.ASIS_LLUVIA?window.ASIS_LLUVIA():{};
+  const prev=D;D=c;const certs=c.certs.map(x=>{const d=c.des.find(p=>p.cert===x.n);return{n:x.n,desde:x.desde||null,f:(d&&d.fecha)||x.fecha||null,m:montoCert(x).t}});D=prev;
+  const W={};const g=a=>W[a]=W[a]||{h:0,costo:0,cert:0,ns:[]};
+  propio.forEach(w=>{const o=g(w.a);o.h+=w.jornadas;o.costo+=w.monto});
+  certs.forEach(x=>{const k=x.desde||(x.f&&window.ASIS_SEMANA_PAGO(x.f));if(!k)return;const o=g(k);o.cert+=x.m;o.ns.push(x.n)});
+  const ks=Object.keys(W).sort();let T={h:0,costo:0,cert:0,certCon:0,costoCon:0};
+  const est=r=>r==null?'':r<1?'rojo':r>2?'amarillo':'verde';
+  const filas=ks.map(a=>{const o=W[a];T.h+=o.h;T.costo+=o.costo;T.cert+=o.cert;if(o.costo&&o.cert){T.certCon+=o.cert;T.costoCon+=o.costo}
+    const r=o.costo&&o.cert?o.cert/o.costo:null;const l=ll[a]||0;
+    return `<tr><td class="num">${fdm2(a)} – ${fdm2(window.ASIS_FIN(a))}</td><td class="n">${l?n2(l):'—'}</td><td class="n">${o.h?n2(o.h):'—'}</td><td class="n">${o.costo?gs(o.costo):'—'}</td>
+      <td class="n">${o.cert?gs(o.cert):'—'}${o.ns.length?` <span class="sub">N°${o.ns.join(', ')}</span>`:''}</td><td class="n">${o.costo&&o.cert?gs(o.cert-o.costo):'—'}</td>
+      <td class="n">${r==null?`<span class="sub">${o.cert?'sin asistencia':'sin certificado'}</span>`:`<i class="dot ${est(r)}"></i> ${n2(r)}`}</td></tr>`}).join('');
+  const R=T.costoCon?T.certCon/T.costoCon:null;
+  const msg=R==null?'Todavía no hay semanas con asistencia y certificado para comparar.'
+    :R<1?`El certificado no alcanza a cubrir el costo de la cuadrilla: el contratista estaría perdiendo plata. Riesgo de que baje el ritmo, abandone o reclame.`
+    :R>2?`El certificado más que duplica el costo de la cuadrilla. Revisá que las cantidades medidas coincidan con lo hecho en obra.`
+    :`Relación normal: el certificado cubre el costo de la cuadrilla y deja un margen razonable al contratista.`;
+  return `<div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Análisis cruzado · ${esc(c.nombre)} vs. su cuadrilla</h3><span class="sub">Se paga por avance; la asistencia sirve para controlar</span></div>
+  <div class="kpis" style="padding:12px 14px">
+    <div class="kpi"><small>Certificado por cada Gs 1 de cuadrilla</small><b>${R==null?'—':n2(R)}</b><em>semanas con asistencia y certificado</em></div>
+    <div class="kpi"><small>Costo de la cuadrilla</small><b>${mill(T.costo)}</b><em>${n2(T.h)} jornadas según asistencia</em></div>
+    <div class="kpi"><small>Certificado al contratista</small><b>${mill(T.cert)}</b><em>margen estimado ${mill(T.certCon-T.costoCon)}</em></div>
+  </div>
+  <div class="alerta" style="border-top:1px solid var(--line)"><i class="dot ${est(R)||'verde'}"></i><div>${msg}</div></div>
+  <div class="tw"><table><thead><tr><th>Semana</th><th class="n">Días perdidos<br><span class="sub">por lluvia</span></th><th class="n">Jornadas<br><span class="sub">cuadrilla</span></th><th class="n">Costo cuadrilla<br><span class="sub">según asistencia</span></th><th class="n">Certificado</th><th class="n">Diferencia</th><th class="n">Cert. ÷ cuadrilla</th></tr></thead>
+  <tbody>${filas}</tbody>
+  <tfoot><tr><td>Total</td><td></td><td class="n">${n2(T.h)}</td><td class="n">${gs(T.costo)}</td><td class="n">${gs(T.cert)}</td><td class="n">${gs(T.cert-T.costo)}</td><td class="n">${R==null?'':n2(R)}</td></tr></tfoot></table></div>
+  <p class="sub" style="padding:0 14px 12px">Costo cuadrilla = horas cargadas × costo hora de cada persona. Cada certificado se compara con su período (sábado a viernes) y se paga el sábado siguiente. Verde entre 1 y 2; rojo si el certificado no cubre la cuadrilla; amarillo si la supera más del doble.</p>`;
+}
+
+function vContratistas(){
+  const rs=ALL.contratistas.map((c,i)=>({c,i,R:conR(c)}));
+  let T={o:0,a:0,ce:0,pa:0};
+  const filas=rs.map(({c,i,R})=>{const ce=R.certO+R.certA,pa=R.desO+R.desA;T.o+=R.orig;T.a+=R.adic;T.ce+=ce;T.pa+=pa;
+    const rojo=R.alertas.some(a=>a[0]==='rojo'),am=R.alertas.length;
+    return `<tr data-cact="abrir" data-i="${i}" style="cursor:pointer"><td><i class="dot ${rojo?'rojo':am?'amarillo':'verde'}"></i></td><td><b>${esc(c.nombre)}</b><div class="sub">${esc(c.tipo)}</div></td>
+      <td class="n">${gs(R.orig)}</td><td class="n">${gs(R.adic)}</td><td class="n">${R.ult}</td><td class="n">${gs(ce)}</td><td>${barra(R.orig?R.certO/R.orig:0)}</td><td class="n">${gs(pa)}</td><td class="n">${gs(R.orig+R.adic-pa)}</td>
+      <td><button class="btn sm" data-cact="abrir" data-i="${i}">Abrir</button></td></tr>`}).join('');
+  return `
+  <div><h2>Contratistas</h2><div class="sub">${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)}</div></div>
+  <div class="kpis">
+    <div class="kpi"><small>Contratado (con adicionales)</small><b>${mill(T.o+T.a)}</b><em>${ALL.contratistas.length} contratistas</em></div>
+    <div class="kpi"><small>Certificado</small><b>${mill(T.ce)}</b><em>${pct(T.ce/(T.o+T.a))} del total contratado</em></div>
+    <div class="kpi"><small>Pagado</small><b>${mill(T.pa)}</b><em>Saldo por pagar ${mill(T.o+T.a-T.pa)}</em></div>
+  </div>
+  <div class="panel tw"><table>
+    <thead><tr><th></th><th>Contratista</th><th class="n">Contrato</th><th class="n">Adicionales</th><th class="n">Cert.</th><th class="n">Certificado</th><th>Avance</th><th class="n">Pagado</th><th class="n">Saldo</th><th></th></tr></thead>
+    <tbody>${filas}</tbody>
+    <tfoot><tr><td></td><td>Total</td><td class="n">${gs(T.o)}</td><td class="n">${gs(T.a)}</td><td></td><td class="n">${gs(T.ce)}</td><td></td><td class="n">${gs(T.pa)}</td><td class="n">${gs(T.o+T.a-T.pa)}</td><td></td></tr></tfoot>
+  </table></div>
+  <div class="panel" id="cruce"></div>
+  <div class="panel" id="mo-total"><p class="sub" style="padding:12px 14px">Calculando la mano de obra de la obra…</p></div>
+  <form class="panel form" id="f-nuevo">
+    <h3 style="grid-column:1/-1">Agregar contratista</h3>
+    <label>Nombre<input id="n-nom" name="nombre" required></label>
+    <label class="wide">Trabajo<input id="n-tipo" name="tipo" required placeholder="Ej.: Mano de obra · pintura"></label>
+    <button class="btn primary">Agregar</button>
+  </form>
+  <p class="sub">El punto de color resume los controles de cada contrato: rojo si algo supera lo contratado o lo pagado no coincide con lo certificado, amarillo si hay algo para revisar.</p>`;
+}
+
+function vResumen(){
+  const R=resumen();const dif=(R.desO+R.desA)-(R.certO+R.certA);
+  const rubros=[...new Set(D.items.filter(i=>i.sec==='ORIG').map(i=>i.rubro))];
+  const filas=rubros.map(r=>{const its=D.items.filter(i=>i.rubro===r);const tot=its.reduce((s,i)=>s+i.cant*i.pu,0);const cert=its.reduce((s,i)=>s+(R.ac[i.id]||0)*i.pu,0);return{r,tot,cert}}).filter(x=>x.tot>0);
+  const al=controles(R);
+  return `
+  <div><h2>Contrato de ${esc(D.nombre)}</h2><div class="sub">${esc(D.tipo)} · ${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)} · ${esc(OBRA.superficie)}</div></div>
+  <div class="kpis">
+    <div class="kpi"><small>Contrato original</small><b>${mill(R.orig)}</b><em>${D.items.filter(i=>i.sec==='ORIG'&&i.pu>0).length} ítems con precio</em></div>
+    <div class="kpi"><small>Adicionales</small><b>${mill(R.adic)}</b><em>${pct(R.adic/R.orig)} sobre el original</em></div>
+    <div class="kpi"><small>Certificado acumulado</small><b>${mill(R.certO+R.certA)}</b><em>Avance del contrato ${pct(R.certO/R.orig)} · ${R.ult} certificados</em></div>
+    <div class="kpi"><small>Desembolsado</small><b>${mill(R.desO+R.desA)}</b><em>Saldo por pagar ${mill(R.orig+R.adic-R.desO-R.desA)}</em></div>
+    <div class="kpi ${Math.abs(dif)<=1000?'ok':'bad'}"><small>Pagado − certificado</small><b>${gs(dif)}</b><em>${Math.abs(dif)<=1000?'Conciliado con el certificado N°'+R.ult:'Revisar antes del próximo pago'}</em></div>
+  </div>
+  <div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Controles</h3><span class="sub">Se revisan solos con cada certificado</span></div>
+    ${al.map(([n,h])=>`<div class="alerta"><i class="dot ${n}"></i><div>${h}</div></div>`).join('')||'<div class="alerta"><i class="dot verde"></i><div><b>Todo en regla.</b><div class="sub">Ningún ítem supera lo contratado y lo pagado coincide con lo certificado.</div></div></div>'}
+  </div>
+  ${D.cuadrilla?'<div class="panel" id="cruce"></div>':''}
+  <div class="panel tw"><table>
+    <thead><tr><th>Rubro</th><th class="n">Monto</th><th class="n">Incidencia</th><th class="n">Certificado</th><th>Avance del rubro</th></tr></thead>
+    <tbody>${filas.map(x=>`<tr><td>${esc(x.r)}</td><td class="n">${gs(x.tot)}</td><td class="n">${pct(x.tot/R.orig)}</td><td class="n">${gs(x.cert)}</td><td>${barra(x.tot?x.cert/x.tot:0)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total original</td><td class="n">${gs(R.orig)}</td><td class="n">100%</td><td class="n">${gs(R.certO)}</td><td>${barra(R.certO/R.orig)}</td></tr></tfoot>
+  </table></div>`;
+}
+
+function vCertificado(){
+  const ult=D.certs.length?D.certs[D.certs.length-1].n:0;
+  if(S.cert==null||S.cert<1)S.cert=ult||1;
+  const nuevo=S.cert===ult+1;
+  if(nuevo&&!S.per)S.per=propuestaPeriodo();
+  const c=nuevo?{n:ult+1,pres:S.borrador}:D.certs.find(x=>x.n===S.cert);
+  const ant=acumHasta(c.n-1);
+  const pago=!nuevo&&D.des.find(d=>d.cert===c.n);
+  const solapa=nuevo&&D.certs.find(x=>x.desde&&!(addDay(S.per,6)<x.desde||S.per>x.hasta));
+  const q=(S.buscar||'').toLowerCase();
+  const rows=[];let lastR=null,lastS=null;const sub={};
+  let tO=0,tA=0,aO=0,aA=0,over=[];
+  for(const it of D.items){
+    const a=ant[it.id]||0,p=Number(c.pres[it.id]||0),ac=a+p;
+    const mA=a*it.pu,mP=p*it.pu,mAc=ac*it.pu;
+    if(it.sec==='ADIC'){tA+=mP;aA+=mAc}else{tO+=mP;aO+=mAc}
+    sub[it.rubro]=sub[it.rubro]||{mA:0,mP:0,mAc:0,tot:0};const s=sub[it.rubro];s.mA+=mA;s.mP+=mP;s.mAc+=mAc;s.tot+=it.cant*it.pu;
+    if(ac>it.cant+1e-9)over.push(it);
+    const visible=(q?(it.desc+' '+it.n+' '+it.rubro).toLowerCase().includes(q):true)&&(S.soloAvance?(nuevo?it.pu>0:(ac>0||p>0)):true);
+    if(!visible)continue;
+    if(it.rubro!==lastR){rows.push(`<tr class="rubro"><td colspan="13">${esc(it.rubro)}</td></tr>`);lastR=it.rubro;lastS=null}
+    if(it.sector&&it.sector!==lastS){rows.push(`<tr class="sector"><td></td><td colspan="12">${esc(it.sector)}</td></tr>`);lastS=it.sector}
+    rows.push(`<tr class="${ac>it.cant+1e-9?'over':''} ${p?'has':''}"><td class="num">${esc(it.n)}</td><td class="desc">${esc(it.desc)}</td><td>${esc(it.unidad)}</td>
+      <td class="n">${qf(it.cant)}</td><td class="n">${gs(it.pu)}</td>
+      <td class="n">${qf(a)}</td>
+      <td class="n pres">${nuevo?`<input type="number" step="any" min="0" id="p-${it.id}" data-id="${it.id}" value="${p||''}" aria-label="Presente ${esc(it.desc)}">`:qf(p)}</td>
+      <td class="n">${qf(ac)}</td><td class="n">${it.cant?pct(ac/it.cant):''}</td>
+      <td class="n">${gs(mA)}</td><td class="n">${gs(mP)}</td><td class="n">${gs(mAc)}</td>
+      <td class="n">${gs(it.cant*it.pu)}</td></tr>`);
+  }
+  const total=tO+tA;
+  const chips=D.certs.map(x=>`<button class="chip" data-cact="vercert" data-n="${x.n}" aria-pressed="${x.n===S.cert}">N°${x.n}</button>`).join('')+
+    `<button class="chip nuevo" data-cact="vercert" data-n="${ult+1}" aria-pressed="${nuevo}">+ Nuevo N°${ult+1}</button>`;
+  return `
+  <div class="bar between"><div><h2>Certificado N°${c.n}</h2><div class="sub">${esc(D.nombre)} · ${esc(D.tipo)} · ${esc(OBRA.obra)}</div>
+    ${!nuevo&&c.desde?`<div class="sub">Período <b>${ddm(c.desde)} al ${ddm(c.hasta)}</b>${pago?` · pagado el <b>${ddm(pago.fecha)}</b>`:` · pago previsto el <b>${ddm(addDay(c.hasta,1))}</b>`}</div>`:''}</div><div class="chips">${chips}</div></div>
+  ${nuevo?`<div class="panel form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+    <label>Desde (sábado)<input type="date" id="c-desde" value="${S.per}"></label>
+    <label>Hasta (viernes)<input type="date" value="${addDay(S.per,6)}" disabled></label>
+    <label>Pago (sábado)<input type="date" value="${addDay(S.per,7)}" disabled></label>
+    ${solapa?`<div class="hint rojo" style="grid-column:1/-1">Este período se superpone con el certificado N°${solapa.n} (${ddm(solapa.desde)} al ${ddm(solapa.hasta)}). Elegí la semana siguiente.</div>`:''}
+  </div>`:''}
+  ${nuevo?`<div class="hint amarillo">Cargá solo la columna <b>Presente</b> (lo medido esta semana). Anterior y Acumulado se calculan de los certificados ya emitidos, así no se pueden desfasar.</div>`:''}
+  <div class="bar">
+    <input type="search" id="buscar" placeholder="Buscar ítem o rubro" value="${esc(S.buscar)}" style="flex:1;min-width:200px">
+    <label class="bar sub"><input type="checkbox" id="solo" ${S.soloAvance?'checked':''}> ${nuevo?'Solo ítems con precio':'Solo ítems con avance'}</label>
+  </div>
+  <div class="panel tw"><table>
+    <thead>
+      <tr><th colspan="5"></th><th class="grp" colspan="4">Cantidades</th><th class="grp" colspan="3">Montos Gs</th><th></th></tr>
+      <tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Anterior</th><th class="n">Presente</th><th class="n">Acumulado</th><th class="n">% avance</th><th class="n">Anterior</th><th class="n">Presente</th><th class="n">Acumulado</th><th class="n">P. total</th></tr>
+    </thead>
+    <tbody>${rows.join('')||'<tr><td colspan="13" class="sub">Ningún ítem coincide con el filtro.</td></tr>'}</tbody>
+  </table></div>
+  <div class="totales">
+    <div><small>Total certificado</small><b>${gs(tO)}</b></div>
+    <div><small>Total adicional</small><b>${gs(tA)}</b></div>
+    <div><small>Total a pagar Gs</small><b>${gs(total)}</b></div>
+    <div><small>Acumulado contrato</small><b>${pct(aO/(resumen().orig||1))}</b></div>
+    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
+    <div class="letras">En letras: ${total?letras(total)+' guaraníes':'—'}</div>
+    ${over.length?`<div class="hint rojo letras">No se puede emitir: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
+  </div>`;
+}
+
+function vDesembolsos(){
+  const R=resumen();
+  let aO=0,aA=0;
+  const filas=D.des.map((d,i)=>{aO+=d.orig;aA+=d.adic;const cc=D.certs.find(x=>x.n===d.cert);return `<tr><td class="n">${i+1}</td><td class="num">${fdm(d.fecha)}</td><td>${cc?`N°${cc.n}${cc.desde?` <span class="sub">${ddm(cc.desde)} al ${ddm(cc.hasta)}</span>`:''}`:'—'}</td><td class="n">${gs(d.orig)}</td><td class="n">${gs(d.adic)}</td><td class="n">${gs(d.orig+d.adic)}</td><td class="n">${gs(aO+aA)}</td><td class="n">${gs(R.orig+R.adic-aO-aA)}</td><td>${barra((aO+aA)/(R.orig+R.adic))}</td></tr>`}).join('');
+  const dO=R.desO-R.certO,dA=R.desA-R.certA;
+  return `
+  <div><h2>Control de desembolsos</h2><div class="sub">Siempre conciliado contra el último certificado emitido (N°${R.ult})</div></div>
+  <div class="panel tw"><table>
+    <thead><tr><th></th><th class="n">Original</th><th class="n">Adicional</th><th class="n">Total</th></tr></thead>
+    <tbody>
+      <tr><td>Presupuesto de obra</td><td class="n">${gs(R.orig)}</td><td class="n">${gs(R.adic)}</td><td class="n">${gs(R.orig+R.adic)}</td></tr>
+      <tr><td>Certificado acumulado (N°${R.ult})</td><td class="n">${gs(R.certO)}</td><td class="n">${gs(R.certA)}</td><td class="n">${gs(R.certO+R.certA)}</td></tr>
+      <tr><td>Desembolsado</td><td class="n">${gs(R.desO)}</td><td class="n">${gs(R.desA)}</td><td class="n">${gs(R.desO+R.desA)}</td></tr>
+      <tr class="subt"><td>Diferencia (desembolsado − certificado)</td><td class="n">${gs(dO)}</td><td class="n">${gs(dA)}</td><td class="n">${gs(dO+dA)}</td></tr>
+      <tr><td>Saldo pendiente del contrato</td><td class="n">${gs(R.orig-R.desO)}</td><td class="n">${gs(R.adic-R.desA)}</td><td class="n">${gs(R.orig+R.adic-R.desO-R.desA)}</td></tr>
+    </tbody></table></div>
+  <div class="panel tw"><table>
+    <thead><tr><th class="n">Sem.</th><th>Pagado el</th><th>Certificado · período</th><th class="n">Original</th><th class="n">Adicional</th><th class="n">Total</th><th class="n">Acumulado</th><th class="n">Saldo</th><th>% pagado</th></tr></thead>
+    <tbody>${filas}</tbody></table></div>
+  <p class="sub">Para registrar un pago, abrí el certificado correspondiente y tocá <b>Registrar pago</b>: toma los montos del certificado, sin tipearlos.</p>`;
+}
+
+function vContrato(){
+  const R=resumen();const its=D.items.filter(i=>i.sec==='ORIG');
+  const vis=its.filter(i=>S.contratoTodo||i.pu>0);
+  const rubros=[...new Set(vis.map(i=>i.rubro))];
+  const filas=rubros.map(r=>{const xs=vis.filter(i=>i.rubro===r);const tot=xs.reduce((s,i)=>s+i.cant*i.pu,0);const cert=xs.reduce((s,i)=>s+(R.ac[i.id]||0)*i.pu,0);
+    return `<tr class="rubro"><td colspan="5">${esc(r||'Sin rubro')}</td><td class="n">${gs(tot)}</td><td class="n">${gs(cert)}</td><td>${barra(tot?cert/tot:0)}</td></tr>`+
+    xs.map(i=>{const a=R.ac[i.id]||0;return `<tr class="${a>i.cant+1e-9?'over':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${qf(i.cant)}</td><td class="n">${i.pu?gs(i.pu):'<span class="sub">sin precio</span>'}</td><td class="n">${gs(i.cant*i.pu)}</td><td class="n">${qf(a)}</td><td>${i.cant?barra(a/i.cant,a>i.cant+1e-9):''}</td></tr>`}).join('')}).join('');
+  return `
+  <div class="bar between"><div><h2>Contrato original</h2><div class="sub">${esc(D.nombre)} · ${esc(D.tipo)} · los precios quedan fijos desde el primer certificado</div></div>
+    <label class="bar sub"><input type="checkbox" id="contrato-todo" ${S.contratoTodo?'checked':''}> Mostrar ítems sin precio</label></div>
+  <div class="kpis">
+    <div class="kpi"><small>Monto del contrato</small><b>${mill(R.orig)}</b><em>${its.filter(i=>i.pu>0).length} ítems con precio</em></div>
+    <div class="kpi"><small>Certificado</small><b>${mill(R.certO)}</b><em>avance ${pct(R.orig?R.certO/R.orig:0)}</em></div>
+    <div class="kpi"><small>Saldo del contrato</small><b>${mill(R.orig-R.certO)}</b><em>sin contar adicionales</em></div>
+  </div>
+  <div class="panel tw"><table>
+    <thead><tr><th>N°</th><th>Ítem</th><th>Unid.</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th class="n">Certificado</th><th>Avance</th></tr></thead>
+    <tbody>${filas||'<tr><td colspan="8" class="sub">Todavía no hay ítems en el contrato.</td></tr>'}</tbody>
+    <tfoot><tr><td></td><td>Total contrato original</td><td colspan="3"></td><td class="n">${gs(R.orig)}</td><td class="n">${gs(R.certO)}</td><td>${barra(R.orig?R.certO/R.orig:0)}</td></tr></tfoot>
+  </table></div>
+  ${!D.certs.length?`<form class="panel form" id="f-item">
+    <h3 style="grid-column:1/-1">Agregar ítem al contrato</h3>
+    <label class="wide">Rubro<input id="o-rub" name="rubro" list="rubs" required placeholder="15. INSTALACIÓN ELÉCTRICA"><datalist id="rubs">${[...new Set(its.map(i=>i.rubro).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist></label>
+    <label>N°<input id="o-n" name="n" placeholder="15.28"></label>
+    <label class="wide">Descripción<input id="o-desc" name="desc" required></label>
+    <label>Unidad<input id="o-un" name="unidad" required></label>
+    <label>Cantidad<input id="o-cant" name="cant" type="number" step="any" min="0" required></label>
+    <label>Precio unitario Gs<input id="o-pu" name="pu" type="number" step="any" min="0" required></label>
+    <button class="btn primary">Agregar ítem</button>
+  </form>`:`<p class="sub">El contrato quedó cerrado con el certificado N°1. Cualquier trabajo extra o cambio se carga en <b>Adicionales</b>.</p>`}
+  <form class="panel form" id="f-datos">
+    <h3 style="grid-column:1/-1">Datos del contratista</h3>
+    <label>Nombre<input id="d-nom" name="nombre" value="${esc(D.nombre)}" required></label>
+    <label class="wide">Trabajo<input id="d-tipo" name="tipo" value="${esc(D.tipo)}" required></label>
+    <button class="btn">Guardar</button>
+  </form>`;
+}
+function vAdicionales(){
+  const R=resumen();const ad=D.items.filter(i=>i.sec==='ADIC');
+  const certA=ad.reduce((s,i)=>s+(R.ac[i.id]||0)*i.pu,0);
+  const pctA=R.orig?R.adic/R.orig:0;
+  return `
+  <div><h2>Adicionales</h2><div class="sub">${esc(D.nombre)} · obra extra fuera del contrato original, con su propio control y pago</div></div>
+  <div class="kpis">
+    <div class="kpi ${pctA>0.05?'bad':''}"><small>Total adicionales</small><b>${mill(R.adic)}</b><em>${pct(pctA)} sobre el contrato original${pctA>0.05?' · supera el 5%':''}</em></div>
+    <div class="kpi"><small>Certificado</small><b>${mill(certA)}</b><em>${pct(R.adic?certA/R.adic:0)} de los adicionales</em></div>
+    <div class="kpi"><small>Pagado</small><b>${mill(R.desA)}</b><em>saldo ${mill(R.adic-R.desA)}</em></div>
+  </div>
+  <div class="panel tw"><table>
+    <thead><tr><th>N°</th><th>Adicional</th><th>Aprobado</th><th>Unid.</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th class="n">Certificado</th><th>Avance</th></tr></thead>
+    <tbody>${ad.map(i=>{const a=R.ac[i.id]||0;return `<tr class="${a>i.cant+1e-9?'over':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}${i.motivo?`<div class="sub">${esc(i.motivo)}</div>`:''}</td><td class="num">${i.aprobado?fdm(i.aprobado):'—'}</td><td>${esc(i.unidad)}</td><td class="n">${qf(i.cant)}</td><td class="n">${gs(i.pu)}</td><td class="n">${gs(i.cant*i.pu)}</td><td class="n">${qf(a)}</td><td>${barra(i.cant?a/i.cant:0,a>i.cant+1e-9)}</td></tr>`}).join('')||'<tr><td colspan="9" class="sub">Sin adicionales por ahora.</td></tr>'}</tbody>
+    <tfoot><tr><td></td><td>Total adicionales</td><td colspan="4"></td><td class="n">${gs(R.adic)}</td><td class="n">${gs(certA)}</td><td></td></tr></tfoot>
+  </table></div>
+  <form class="panel form" id="f-adic">
+    <h3 style="grid-column:1/-1">Agregar adicional</h3>
+    <label class="wide">Descripción<input id="a-desc" name="desc" required placeholder="Ej.: Reparación de vallado por tormenta"></label>
+    <label class="wide">Motivo<input id="a-mot" name="motivo" placeholder="Ej.: pedido del cliente, lluvia, cambio de proyecto"></label>
+    <label>Aprobado el<input id="a-apr" name="aprobado" type="date" value="${hoy}"></label>
+    <label>Unidad<input id="a-un" name="unidad" required placeholder="gl"></label>
+    <label>Cantidad<input id="a-cant" name="cant" type="number" step="any" min="0" required></label>
+    <label>Precio unitario Gs<input id="a-pu" name="pu" type="number" step="any" min="0" required></label>
+    <button class="btn primary">Agregar adicional</button>
+  </form>
+  <p class="sub">Los adicionales aparecen en cada certificado debajo del contrato original, en su propio rubro, y se suman aparte como "Total adicional".</p>`;
+}
+
+const TABS=[['contratistas','Todos'],['resumen','Resumen'],['certificado','Certificados'],['desembolsos','Desembolsos'],['contrato','Contrato'],['adicionales','Adicionales']];
+function render(){
+  const ROOT=document.getElementById('cert-root');if(!ROOT)return;
+  const o=window.ASIS_OBRA&&window.ASIS_OBRA();if(o){OBRA.obra=o.nombre;OBRA.cliente=o.cliente||'';OBRA.direccion=o.ubicacion||''}
+  const oid=o?o.id:null;
+  if(oid!==OBRA_CARGADA){ROOT.innerHTML='<p class="sub">Cargando contratistas…</p>';asegurar(oid);return}
+  if(!D&&S.tab!=='contratistas')S.tab='contratistas';
+  const V={contratistas:vContratistas,resumen:vResumen,certificado:vCertificado,desembolsos:vDesembolsos,contrato:vContrato,adicionales:vAdicionales}[S.tab];
+  const foco=document.activeElement&&document.activeElement.id;
+  ROOT.innerHTML=`<div class="subnav">
+    <div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ctab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>
+    ${S.tab!=='contratistas'?`<select id="sel" aria-label="Contratista">${ALL.contratistas.map((c,i)=>`<option value="${i}" ${i===S.sel?'selected':''}>${esc(c.nombre)} · ${esc(c.tipo.replace('Mano de obra · ',''))}</option>`).join('')}</select>`:''}
+  </div>${V()}`;
+  if(foco){const el=document.getElementById(foco);if(el&&ROOT.contains(el))el.focus()}
+  if(S.tab==='contratistas')llenarMO();
+  if(S.tab==='resumen'&&D.cuadrilla)cruceHTML().then(h=>{const e=document.getElementById('cruce');if(e)e.innerHTML=h});
+}
+window.CERT={mount:render};
+document.addEventListener('click',e=>{
+  if(!document.getElementById('cert-root'))return;const t=e.target.closest('[data-ctab],[data-cact]');if(!t)return;
+  if(t.dataset.ctab){S.tab=t.dataset.ctab;render();return}
+  const a=t.dataset.cact;
+  if(a==='abrir'){usar(+t.dataset.i);S.tab='resumen';render();window.scrollTo(0,0);return}
+  if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;return render()}
+  if(a==='emitir'){const ult=D.certs.length?D.certs[D.certs.length-1].n:0;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
+    D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.per=null;S.cert=ult+1;guardar();render();return toast(`Certificado N°${ult+1} emitido`)}
+  if(a==='pagar'){const c=D.certs.find(x=>x.n===+t.dataset.n);const m=montoCert(c);D.des.push({sem:D.des.length+1,fecha:c.hasta?addDay(c.hasta,1):hoy,orig:m.o,adic:m.ad,total:m.t,cert:c.n});D.des.sort((a,b)=>a.fecha<b.fecha?-1:1);guardar();render();return toast('Pago registrado en Desembolsos')}
+
+});
+document.addEventListener('input',e=>{
+  if(!document.getElementById('cert-root'))return;const t=e.target;
+  if(t.id==='buscar'){S.buscar=t.value;return render()}
+  if(t.dataset.id){S.borrador[t.dataset.id]=t.value===''?0:Number(t.value);clearTimeout(S.k);S.k=setTimeout(render,350)}
+});
+document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas')S.tab='resumen';render()}});
+document.addEventListener('submit',e=>{
+  if(!document.getElementById('cert-root')||!document.getElementById('cert-root').contains(e.target))return;
+  e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
+  if(f.id==='f-datos'){D.nombre=fd.nombre.trim();D.tipo=fd.tipo.trim();guardar();render();return toast('Datos guardados')}
+  if(f.id==='f-nuevo'){ALL.contratistas.push({id:(crypto.randomUUID?crypto.randomUUID():'c'+Date.now()),obra_id:OBRA_CARGADA,nombre:fd.nombre.trim(),tipo:fd.tipo.trim(),cuadrilla:false,items:[],certs:[],des:[]});usar(ALL.contratistas.length-1);S.tab='contrato';guardar();render();return toast('Contratista agregado: cargá su contrato')}
+  if(f.id==='f-item'){D.items.push({id:'o'+Date.now(),sec:'ORIG',rubro:fd.rubro.trim(),sector:'',n:fd.n.trim(),desc:fd.desc.trim(),unidad:fd.unidad.trim(),cant:Number(fd.cant),pu:Number(fd.pu)});guardar();render();return toast('Ítem agregado al contrato')}
+  if(f.id==='f-adic'){const ad=D.items.filter(i=>i.sec==='ADIC');const n='1.'+(ad.length+1);
+    D.items.push({id:'a'+Date.now(),sec:'ADIC',rubro:'ADICIONALES',sector:'',n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant:Number(fd.cant),pu:Number(fd.pu)});guardar();render();toast('Adicional '+n+' agregado')}
+});
+
+})();
+</script>
+</html>
