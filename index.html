@@ -113,6 +113,11 @@ button.cell{cursor:pointer}
 .desc-add{display:grid;grid-template-columns:130px minmax(0,1fr) 130px auto;gap:6px}
 @media (max-width:560px){.desc-add{grid-template-columns:1fr 1fr}}
 .x{border:0;background:transparent;color:var(--bad);font-weight:700;padding:2px 8px}
+.desc-edit{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.6fr) 150px 130px;gap:8px;background:var(--chip);padding:10px;border-radius:8px;white-space:normal}
+.desc-edit label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.desc-edit .acciones{grid-column:1/-1}
+.btn.peligro{color:var(--bad);margin-left:auto}
+@media (max-width:640px){.desc-edit{grid-template-columns:1fr 1fr}}
 .firmas{display:none}
 .rango{padding:10px 12px;display:flex;flex-direction:column;gap:10px}
 .rango label.fecha{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
@@ -215,6 +220,7 @@ function backendLocal(){
     async descuentos(a,b){return d.descuentos.filter(r=>r.fecha>=a&&r.fecha<=b)},
     async addDesc(r){d.descuentos.push({id:uid(),...r});save()},
     async delDesc(id){d.descuentos=d.descuentos.filter(x=>x.id!==id);save()},
+    async updDesc(id,r){const i=d.descuentos.findIndex(x=>x.id===id);if(i>=0)d.descuentos[i]={...d.descuentos[i],...r};save()},
     async ajustes(){return d.ajustes},
     async saveAjustes(v){d.ajustes=v;save()},
   };
@@ -235,6 +241,7 @@ function backendNube(sb){
     async descuentos(a,b){return ok(await sb.from('descuentos').select('*').gte('fecha',a).lte('fecha',b)).map(x=>({...x,monto:Number(x.monto)}))},
     async addDesc(r){ok(await sb.from('descuentos').insert(r))},
     async delDesc(id){ok(await sb.from('descuentos').delete().eq('id',id))},
+    async updDesc(id,r){ok(await sb.from('descuentos').update(r).eq('id',id))},
     async ajustes(){const r=ok(await sb.from('ajustes').select('valor').eq('clave','general'));return r[0]?.valor||null},
     async saveAjustes(v){ok(await sb.from('ajustes').upsert({clave:'general',valor:v}))},
   };
@@ -242,7 +249,7 @@ function backendNube(sb){
 
 /* ---------- estado ---------- */
 const hoy=iso(new Date());
-const S={tab:'cargar',dia:hoy,ref:hoy,rango:null,obras:[],obra:null,editObra:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
+const S={editDesc:null,tab:'cargar',dia:hoy,ref:hoy,rango:null,obras:[],obra:null,editObra:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
 let DB=null, SB=null;
 const key=(pid,f)=>pid+'|'+f;
 const costoHora=p=>(Number(p.jornada)||0)/(Number(S.aj.horasJornada)||9);
@@ -414,7 +421,16 @@ function vLiquidacion(){
         <tfoot><tr><td colspan="3">Subtotal (${x.dias.toFixed(2)} jornadas)</td><td class="n">${fmtH(x.horas)}</td><td class="n">${gs(x.bruto)}</td></tr></tfoot>
       </table></div>
       ${x.desc.length?`<div class="tw"><table><thead><tr><th>Descuento</th><th>Fecha</th><th class="n">Monto Gs</th><th class="no-print"></th></tr></thead><tbody>
-        ${x.desc.map(d=>`<tr><td>${esc(d.concepto)}</td><td class="num">${dm(d.fecha)}</td><td class="n">− ${gs(d.monto)}</td><td class="no-print"><button class="x" data-act="deldesc" data-id="${d.id}" aria-label="Quitar descuento">×</button></td></tr>`).join('')}
+        ${x.desc.map(d=>d.id===S.editDesc?`<tr><td colspan="4">
+          <form class="desc-edit no-print" data-id="${d.id}">
+            <label>Persona<select id="ep-${d.id}" name="personal_id">${ordenar(S.personal.filter(p=>deObra(p)||p.id===d.personal_id)).map(p=>`<option value="${p.id}" ${p.id===d.personal_id?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></label>
+            <label>Concepto<input type="text" id="ec-${d.id}" name="concepto" value="${esc(d.concepto)}" required></label>
+            <label>Fecha<input type="date" id="ef-${d.id}" name="fecha" value="${d.fecha}" required></label>
+            <label>Monto Gs<input type="number" id="em-${d.id}" name="monto" min="0" step="1000" value="${Number(d.monto)}" required></label>
+            <div class="bar acciones"><button class="btn primary">Guardar</button><button type="button" class="btn ghost" data-act="canceldesc">Cancelar</button>
+              <button type="button" class="btn ghost peligro" data-act="deldesc" data-id="${d.id}">Eliminar</button></div>
+          </form></td></tr>`
+          :`<tr><td>${esc(d.concepto)}</td><td class="num">${dm(d.fecha)}</td><td class="n">− ${gs(d.monto)}</td><td class="no-print"><button class="btn ghost" data-act="editdesc" data-id="${d.id}">Editar</button></td></tr>`).join('')}
       </tbody></table></div>`:''}
       <form class="desc-add no-print" data-pid="${x.p.id}">
         <select id="dc-${x.p.id}" name="concepto"><option>Adelanto</option><option>Botas</option><option>Herramienta</option><option>Otro</option></select>
@@ -554,7 +570,9 @@ document.addEventListener('click',async ev=>{
     render();for(const p of faltan){const r=S.asis[key(p.id,S.dia)];await DB.upsertAsis({...r})}
     return toast(`${faltan.length} cargados`);
   }
-  if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);render();return toast('Descuento quitado')}
+  if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);S.editDesc=null;render();return toast('Descuento eliminado')}
+  if(a==='editdesc'){S.editDesc=t.dataset.id;return render()}
+  if(a==='canceldesc'){S.editDesc=null;return render()}
   if(a==='nuevo'){S.edit={activo:true,obra_id:S.obra,numero:(Math.max(0,...S.personal.filter(deObra).map(p=>p.numero||0))+1)};return render()}
   if(a==='editar'){S.edit={...S.personal.find(p=>p.id===t.dataset.pid)};return render()}
   if(a==='cancelar'){S.edit=null;return render()}
@@ -597,6 +615,12 @@ document.addEventListener('submit',async ev=>{
     if(g.activa===false&&g.id===S.obra){const otra=S.obras.find(x=>x.activa!==false);if(otra)elegirObra(otra.id)}
     S.editObra=null;render();return toast(nueva?'Obra creada y seleccionada':'Obra guardada')}
   if(f.id==='fa'){S.aj={...S.aj,...fd,horasJornada:Number(fd.horasJornada)||9,inicioSemana:Number(fd.inicioSemana)};await DB.saveAjustes(S.aj);render();return toast('Ajustes guardados')}
+  if(f.classList.contains('desc-edit')){const id=f.dataset.id;const monto=Number(fd.monto);if(!monto||!fd.fecha)return;
+    const antes=S.desc.find(d=>d.id===id);const cambios={personal_id:fd.personal_id,concepto:fd.concepto.trim(),fecha:fd.fecha,monto};
+    const nuevoDueno=S.personal.find(p=>p.id===fd.personal_id);if(nuevoDueno?.obra_id)cambios.obra_id=nuevoDueno.obra_id;
+    await DB.updDesc(id,cambios);const{a,b}=rango();S.desc=await DB.descuentos(a,b);S.editDesc=null;render();
+    const fuera=fd.fecha<a||fd.fecha>b;
+    return toast(fuera?'Guardado · la fecha quedó fuera de este período':(antes&&antes.personal_id!==fd.personal_id?'Descuento pasado a '+(nuevoDueno?.nombre||'otra persona'):'Descuento corregido'))}
   if(f.classList.contains('desc-add')){const pid=f.dataset.pid;const monto=Number(fd.monto);if(!monto)return;
     const{a,b}=rango();const fecha=hoy>=a&&hoy<=b?hoy:b;
     const r={personal_id:pid,obra_id:S.obra,fecha,concepto:fd.concepto+(fd.detalle?' · '+fd.detalle:''),monto};
