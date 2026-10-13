@@ -39,6 +39,8 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .brand b{font-family:var(--f-display);font-size:22px;letter-spacing:.02em;text-transform:uppercase;line-height:1}
 .brand span{font-size:13px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand b i{font-style:normal;color:var(--accent)}
+.obra-sel{margin-top:4px;background:transparent;color:var(--bg);border:1px solid color-mix(in srgb,var(--bg) 35%,transparent);border-radius:6px;padding:4px 8px;font-size:14px;max-width:100%}
+.obra-sel option{color:var(--ink);background:var(--panel)}
 nav.tabs{display:flex;gap:4px}
 nav.tabs button{background:transparent;border:0;color:var(--bg);opacity:.7;padding:8px 12px;border-radius:8px;
   font-family:var(--f-display);font-size:17px;letter-spacing:.03em;text-transform:uppercase}
@@ -196,9 +198,13 @@ function backendLocal(){
       ent_am:a.ent_am,sal_am:a.sal_am,ent_pm:a.ent_pm,sal_pm:a.sal_pm,obs:''};r.horas=horasDe(r);return r});
     d={personal,asistencia,descuentos:[],ajustes:null};
   }
+  if(!d.obras){const id=uid();d.obras=[{id,nombre:'Locales comerciales',cliente:'Vanguard S.A',activa:true}];
+    d.personal.forEach(p=>{p.obra_id=p.obra_id||id});d.asistencia.forEach(a=>{a.obra_id=a.obra_id||id});d.descuentos.forEach(x=>{x.obra_id=x.obra_id||id})}
   const save=()=>{try{localStorage.setItem(K,JSON.stringify(d))}catch(e){}};
   save();
   return{
+    async obras(){return d.obras.slice()},
+    async saveObra(o){if(o.id){const i=d.obras.findIndex(x=>x.id===o.id);d.obras[i]={...d.obras[i],...o}}else{o.id=uid();d.obras.push(o)}save();return o},
     async personal(){return d.personal.slice()},
     async savePersonal(p){if(p.id){const i=d.personal.findIndex(x=>x.id===p.id);d.personal[i]={...d.personal[i],...p}}else{p.id=uid();d.personal.push(p)}save();return p},
     async asistencias(a,b){return d.asistencia.filter(r=>r.fecha>=a&&r.fecha<=b)},
@@ -217,6 +223,8 @@ function backendNube(sb){
   const ok=({data,error})=>{if(error){toast('Error: '+error.message);throw error}return data};
   const normA=r=>({...r,ent_am:t5(r.ent_am),sal_am:t5(r.sal_am),ent_pm:t5(r.ent_pm),sal_pm:t5(r.sal_pm),horas:Number(r.horas)});
   return{
+    async obras(){return ok(await sb.from('obras').select('*').order('creado'))},
+    async saveObra(o){const row={...o};if(!row.id)delete row.id;return ok(await sb.from('obras').upsert(row).select().single())},
     async personal(){return ok(await sb.from('personal').select('*')).map(p=>({...p,jornada:Number(p.jornada)}))},
     async savePersonal(p){const row={...p};if(!row.id)delete row.id;return ok(await sb.from('personal').upsert(row).select().single())},
     async asistencias(a,b){return ok(await sb.from('asistencia').select('*').gte('fecha',a).lte('fecha',b)).map(normA)},
@@ -234,11 +242,16 @@ function backendNube(sb){
 
 /* ---------- estado ---------- */
 const hoy=iso(new Date());
-const S={tab:'cargar',dia:hoy,ref:hoy,rango:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
+const S={tab:'cargar',dia:hoy,ref:hoy,rango:null,obras:[],obra:null,editObra:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
 let DB=null, SB=null;
 const key=(pid,f)=>pid+'|'+f;
 const costoHora=p=>(Number(p.jornada)||0)/(Number(S.aj.horasJornada)||9);
-const activos=()=>S.personal.filter(p=>p.activo!==false);
+const obraAct=()=>S.obras.find(o=>o.id===S.obra)||null;
+const nombreObra=()=>{const o=obraAct();return o?o.nombre+(o.cliente?' · '+o.cliente:''):'Sin obra seleccionada'};
+const deObra=p=>p.obra_id===S.obra;
+const enObra=r=>r.obra_id?r.obra_id===S.obra:(S.personal.find(p=>p.id===r.personal_id)?.obra_id===S.obra);
+const activos=()=>S.personal.filter(p=>p.activo!==false&&deObra(p));
+function elegirObra(id){S.obra=id;try{localStorage.setItem('obra_sel',id)}catch(e){}}
 const ordenar=l=>l.slice().sort((a,b)=>(a.numero??999)-(b.numero??999)||a.nombre.localeCompare(b.nombre));
 function periodo(ref){const d=parse(ref);const off=(d.getDay()-Number(S.aj.inicioSemana)+7)%7;const a=addD(ref,-off);return{a,b:addD(a,6)}}
 const ndias=(a,b)=>Math.round((parse(b)-parse(a))/864e5)+1;
@@ -271,7 +284,7 @@ function estadoDe(r){
 
 function vCargar(){
   const d=parse(S.dia);
-  let lista=ordenar(S.inactivos?S.personal:activos());
+  let lista=ordenar(S.inactivos?S.personal.filter(deObra):activos());
   if(S.filtro){const f=S.filtro.toLowerCase();lista=lista.filter(p=>(p.nombre+' '+(p.categoria||'')).toLowerCase().includes(f))}
   const regs=activos().map(p=>S.asis[key(p.id,S.dia)]).filter(Boolean);
   const hs=regs.reduce((s,r)=>s+r.horas,0);
@@ -315,20 +328,21 @@ function vCargar(){
     <input type="text" id="filtro" placeholder="Buscar por nombre o categoría" value="${esc(S.filtro)}" style="flex:1">
     <label class="bar sub"><input type="checkbox" id="inactivos" ${S.inactivos?'checked':''}> Ver inactivos</label>
   </div>
-  <div class="panel lista">${filas||'<div class="fila sub">No hay personal cargado. Agregalo en la pestaña Personal.</div>'}</div>
+  <div class="panel lista">${filas||`<div class="fila sub">${S.obra?'Esta obra todavía no tiene personal. Agregalo en la pestaña Personal.':'Creá tu primera obra en Ajustes.'}</div>`}</div>
   <p class="sub">Jornada completa = ${S.aj.am_ent}–${S.aj.am_sal} y ${S.aj.pm_ent}–${S.aj.pm_sal}. Cada toque se guarda al instante.</p>`;
 }
 
 function datosPeriodo(){
   const p=rango();const dias=diasDe(p);
-  const conDatos=new Set(Object.values(S.asis).filter(r=>r.fecha>=p.a&&r.fecha<=p.b).map(r=>r.personal_id));
-  for(const d of S.desc)conDatos.add(d.personal_id);
-  const gente=ordenar(S.personal.filter(x=>x.activo!==false||conDatos.has(x.id)));
+  const conDatos=new Set(Object.values(S.asis).filter(r=>r.fecha>=p.a&&r.fecha<=p.b&&enObra(r)).map(r=>r.personal_id));
+  const descO=S.desc.filter(enObra);
+  for(const d of descO)conDatos.add(d.personal_id);
+  const gente=ordenar(S.personal.filter(x=>(deObra(x)&&x.activo!==false)||conDatos.has(x.id)));
   const filas=gente.map(x=>{
-    const regs=dias.map(f=>S.asis[key(x.id,f)]||null);
+    const regs=dias.map(f=>{const r=S.asis[key(x.id,f)];return r&&enObra(r)?r:null});
     const horas=regs.reduce((s,r)=>s+(r?r.horas:0),0);
     const ch=costoHora(x);const bruto=Math.round(horas*ch);
-    const desc=S.desc.filter(d=>d.personal_id===x.id);
+    const desc=descO.filter(d=>d.personal_id===x.id);
     const totDesc=desc.reduce((s,d)=>s+Number(d.monto),0);
     return{p:x,regs,horas:Math.round(horas*100)/100,dias:horas/(Number(S.aj.horasJornada)||9),ch,bruto,desc,totDesc,neto:bruto-totDesc};
   });
@@ -352,7 +366,7 @@ function navPeriodo(){
     </div>
   </div>`;
 }
-const membrete=t=>{const{a,b}=rango();return `<div class="membrete"><div><b>${esc(S.aj.empresa)}</b><br>${esc(S.aj.obra)}</div><div style="text-align:right"><b>${t}</b><br>Período ${dm(a)} al ${dm(b)}/${parse(b).getFullYear()}</div></div>`};
+const membrete=t=>{const{a,b}=rango();return `<div class="membrete"><div><b>${esc(S.aj.empresa)}</b><br>Obra: ${esc(nombreObra())}</div><div style="text-align:right"><b>${t}</b><br>Período ${dm(a)} al ${dm(b)}/${parse(b).getFullYear()}</div></div>`};
 const botonesSalida=()=>EN_MARCO
   ?`<span class="sub no-print">Imprimir y Excel funcionan en tu página publicada.</span>`
   :`<button class="btn no-print" data-act="excel">Descargar Excel</button><button class="btn primary no-print" data-act="imprimir">Imprimir / PDF</button>`;
@@ -366,7 +380,7 @@ function vPlanilla(){
   const tH=vis.reduce((s,x)=>s+x.horas,0),tG=vis.reduce((s,x)=>s+x.bruto,0);
   return `
   ${membrete('PLANILLA DE PERSONAL EN OBRA')}
-  <div class="bar between"><div><h2>Planilla de personal</h2><div class="sub no-print">${esc(S.aj.obra)}</div></div><div class="bar">${botonesSalida()}</div></div>
+  <div class="bar between"><div><h2>Planilla de personal</h2><div class="sub no-print">${esc(nombreObra())}</div></div><div class="bar">${botonesSalida()}</div></div>
   ${navPeriodo()}
   <div class="stats">
     <div class="stat"><small>Personas con asistencia</small><b>${vis.length}</b></div>
@@ -413,7 +427,7 @@ function vLiquidacion(){
     </div>`).join('');
   return `
   ${membrete(S.rango?'LIQUIDACIÓN DE PERSONAL':'LIQUIDACIÓN SEMANAL DE PERSONAL')}
-  <div class="bar between"><div><h2>${S.rango?'Liquidación del período':'Liquidación semanal'}</h2><div class="sub no-print">Desglose por persona para el pago</div></div><div class="bar">${botonesSalida()}</div></div>
+  <div class="bar between"><div><h2>${S.rango?'Liquidación del período':'Liquidación semanal'}</h2><div class="sub no-print">${esc(nombreObra())} · desglose por persona para el pago</div></div><div class="bar">${botonesSalida()}</div></div>
   ${navPeriodo()}
   <div class="stats">
     <div class="stat"><small>A pagar</small><b>${vis.length} personas</b></div>
@@ -434,15 +448,16 @@ function vPersonal(){
     <label>C.I.<input type="text" id="p-ci" name="ci" value="${esc(e.ci||'')}"></label>
     <label>Jornada completa (Gs)<input type="number" id="p-jornada" name="jornada" step="1000" value="${e.jornada??''}" required></label>
     <label>Calce<input type="text" id="p-calce" name="calce" value="${esc(e.calce??'')}"></label>
+    <label>Obra<select id="p-obra" name="obra_id">${S.obras.filter(o=>o.activa!==false||o.id===e.obra_id).map(o=>`<option value="${o.id}" ${o.id===(e.obra_id||S.obra)?'selected':''}>${esc(o.nombre)}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" id="p-activo" name="activo" ${e.activo!==false?'checked':''}> Activo en obra</label>
     <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar</button><button type="button" class="btn ghost" data-act="cancelar">Cancelar</button></div>
   </form>`:'';
   return `
-  <div class="bar between"><h2>Personal</h2><button class="btn primary" data-act="nuevo">Agregar personal</button></div>
+  <div class="bar between"><div><h2>Personal</h2><div class="sub">${esc(nombreObra())}</div></div><button class="btn primary" data-act="nuevo" ${S.obra?'':'disabled'}>Agregar personal</button></div>
   ${form}
   <div class="panel tw"><table>
     <thead><tr><th>N°</th><th>Nombre</th><th>Categoría</th><th>C.I.</th><th class="n">Jornada Gs</th><th class="n">Hora Gs</th><th>Calce</th><th>Estado</th><th></th></tr></thead>
-    <tbody>${ordenar(S.personal).map(p=>`<tr><td class="n">${p.numero??''}</td><td>${esc(p.nombre)}</td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
+    <tbody>${ordenar(S.personal.filter(deObra)).map(p=>`<tr><td class="n">${p.numero??''}</td><td>${esc(p.nombre)}</td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
       <td class="n">${gs(p.jornada)}</td><td class="n">${gs(costoHora(p))}</td><td>${esc(p.calce??'')}</td>
       <td><span class="pill ${p.activo===false?'off':''}">${p.activo===false?'Inactivo':'Activo'}</span></td>
       <td><button class="btn ghost" data-act="editar" data-pid="${p.id}">Editar</button></td></tr>`).join('')}</tbody>
@@ -452,10 +467,24 @@ function vPersonal(){
 
 function vAjustes(){
   const a=S.aj;
-  return `<h2>Ajustes</h2>
+  const eo=S.editObra;
+  const obrasH=`<div class="bar between"><h3>Obras</h3><button class="btn primary" data-act="nuevaobra">Agregar obra</button></div>
+  ${eo?`<form class="panel form" id="fo">
+    <label>Nombre de la obra<input type="text" id="o-nombre" name="nombre" value="${esc(eo.nombre||'')}" required placeholder="Ej.: Vivienda familia López"></label>
+    <label>Cliente<input type="text" id="o-cliente" name="cliente" value="${esc(eo.cliente||'')}"></label>
+    <label class="chk"><input type="checkbox" id="o-activa" name="activa" ${eo.activa!==false?'checked':''}> Obra en curso</label>
+    <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar obra</button><button type="button" class="btn ghost" data-act="cancelarobra">Cancelar</button></div>
+  </form>`:''}
+  <div class="panel tw"><table><thead><tr><th>Obra</th><th>Cliente</th><th class="n">Personal activo</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${S.obras.map(o=>`<tr><td>${esc(o.nombre)}${o.id===S.obra?' <span class="pill">Seleccionada</span>':''}</td><td>${esc(o.cliente||'')}</td>
+    <td class="n">${S.personal.filter(p=>p.obra_id===o.id&&p.activo!==false).length}</td>
+    <td><span class="pill ${o.activa===false?'off':''}">${o.activa===false?'Terminada':'En curso'}</span></td>
+    <td><button class="btn ghost" data-act="editobra" data-id="${o.id}">Editar</button></td></tr>`).join('')||'<tr><td colspan="5" class="sub">Todavía no hay obras.</td></tr>'}
+  </tbody></table></div>
+  <p class="sub">Una obra terminada deja de aparecer en el selector de arriba, pero su historial queda guardado.</p>`;
+  return `<h2>Ajustes</h2>${obrasH}<h3>General</h3>
   <form class="panel form" id="fa">
     <label>Empresa<input type="text" id="a-empresa" name="empresa" value="${esc(a.empresa)}"></label>
-    <label>Obra<input type="text" id="a-obra" name="obra" value="${esc(a.obra)}"></label>
     <label>Entrada mañana<input type="time" id="a-am_ent" name="am_ent" value="${a.am_ent}"></label>
     <label>Salida mañana<input type="time" id="a-am_sal" name="am_sal" value="${a.am_sal}"></label>
     <label>Entrada tarde<input type="time" id="a-pm_ent" name="pm_ent" value="${a.pm_ent}"></label>
@@ -482,7 +511,8 @@ function render(){
   const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
-  <header class="top"><div class="brand"><b>Asistencia <i>de</i> Obra</b><span>${esc(S.aj.obra)}</span></div>
+  <header class="top"><div class="brand"><b>Asistencia <i>de</i> Obra</b>
+    ${S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
     <nav class="tabs">${TABS.map(([k,t])=>`<button data-tab="${k}" aria-current="${S.tab===k}">${t}</button>`).join('')}</nav></header>
   ${NUBE?'':'<div class="demo">Modo prueba con tus datos del Excel · se guarda solo en este dispositivo</div>'}
   <main>${V()}</main>`;
@@ -492,9 +522,9 @@ function render(){
 /* ---------- acciones ---------- */
 async function guardarAsis(pid,campos){
   const prev=S.asis[key(pid,S.dia)]||{personal_id:pid,fecha:S.dia,ent_am:'',sal_am:'',ent_pm:'',sal_pm:'',obs:''};
-  const r={...prev,...campos};r.horas=horasDe(r);
+  const r={...prev,...campos,obra_id:S.obra};r.horas=horasDe(r);
   S.asis[key(pid,S.dia)]=r;render();
-  await DB.upsertAsis({personal_id:pid,fecha:S.dia,ent_am:r.ent_am,sal_am:r.sal_am,ent_pm:r.ent_pm,sal_pm:r.sal_pm,horas:r.horas,obs:r.obs||''});
+  await DB.upsertAsis({personal_id:pid,fecha:S.dia,obra_id:S.obra,ent_am:r.ent_am,sal_am:r.sal_am,ent_pm:r.ent_pm,sal_pm:r.sal_pm,horas:r.horas,obs:r.obs||''});
   toast('Guardado');
 }
 document.addEventListener('click',async ev=>{
@@ -520,14 +550,17 @@ document.addEventListener('click',async ev=>{
   }
   if(a==='todos'){
     const P=presets().completa;const faltan=activos().filter(p=>!S.asis[key(p.id,S.dia)]);
-    for(const p of faltan){const r={personal_id:p.id,fecha:S.dia,...P,obs:''};r.horas=horasDe(r);S.asis[key(p.id,S.dia)]=r}
+    for(const p of faltan){const r={personal_id:p.id,fecha:S.dia,obra_id:S.obra,...P,obs:''};r.horas=horasDe(r);S.asis[key(p.id,S.dia)]=r}
     render();for(const p of faltan){const r=S.asis[key(p.id,S.dia)];await DB.upsertAsis({...r})}
     return toast(`${faltan.length} cargados`);
   }
   if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);render();return toast('Descuento quitado')}
-  if(a==='nuevo'){S.edit={activo:true,numero:(Math.max(0,...S.personal.map(p=>p.numero||0))+1)};return render()}
+  if(a==='nuevo'){S.edit={activo:true,obra_id:S.obra,numero:(Math.max(0,...S.personal.filter(deObra).map(p=>p.numero||0))+1)};return render()}
   if(a==='editar'){S.edit={...S.personal.find(p=>p.id===t.dataset.pid)};return render()}
   if(a==='cancelar'){S.edit=null;return render()}
+  if(a==='nuevaobra'){S.editObra={activa:true};return render()}
+  if(a==='editobra'){S.editObra={...S.obras.find(o=>o.id===t.dataset.id)};return render()}
+  if(a==='cancelarobra'){S.editObra=null;return render()}
   if(a==='imprimir'){return window.print()}
   if(a==='excel'){return exportarExcel()}
   if(a==='salir'){await SB.auth.signOut();location.reload()}
@@ -543,6 +576,7 @@ document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='dia'&&t.value){S.dia=t.value;return refrescar()}
   if(t.id==='inactivos'){S.inactivos=t.checked;return render()}
+  if(t.id==='obra-sel'){elegirObra(t.value);S.edit=null;S.abierto=null;return refrescar()}
   if((t.id==='r-a'||t.id==='r-b')&&t.value){
     let{a,b}=rango();if(t.id==='r-a'){a=t.value;if(b<a)b=a}else{b=t.value;if(b<a)a=b}
     if(ndias(a,b)>MAX_DIAS){toast(`Máximo ${MAX_DIAS} días por planilla`);if(t.id==='r-a')b=addD(a,MAX_DIAS-1);else a=addD(b,-(MAX_DIAS-1))}
@@ -554,23 +588,28 @@ document.addEventListener('submit',async ev=>{
   if(f.id==='fl'){const{data,error}=await SB.auth.signInWithPassword({email:fd.email,password:fd.pass});
     if(error){document.getElementById('app').innerHTML=vLogin('Correo o contraseña incorrectos.');return}return iniciar(data.session)}
   if(f.id==='fp'){const p={...S.edit,numero:fd.numero?Number(fd.numero):null,nombre:fd.nombre.trim(),categoria:fd.categoria.trim(),ci:fd.ci.trim(),
-      jornada:Number(fd.jornada)||0,calce:fd.calce.trim(),activo:!!fd.activo};
+      jornada:Number(fd.jornada)||0,calce:fd.calce.trim(),activo:!!fd.activo,obra_id:fd.obra_id||S.obra};
     const g=await DB.savePersonal(p);const i=S.personal.findIndex(x=>x.id===g.id);if(i>=0)S.personal[i]={...S.personal[i],...g};else S.personal.push(g);
-    S.edit=null;render();return toast('Personal guardado')}
+    S.edit=null;render();return toast(p.obra_id!==S.obra?'Guardado y movido a otra obra':'Personal guardado')}
+  if(f.id==='fo'){const o={...S.editObra,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),activa:!!fd.activa};
+    const nueva=!o.id;const g=await DB.saveObra(o);const i=S.obras.findIndex(x=>x.id===g.id);if(i>=0)S.obras[i]={...S.obras[i],...g};else S.obras.push(g);
+    if(nueva||!S.obra)elegirObra(g.id);
+    if(g.activa===false&&g.id===S.obra){const otra=S.obras.find(x=>x.activa!==false);if(otra)elegirObra(otra.id)}
+    S.editObra=null;render();return toast(nueva?'Obra creada y seleccionada':'Obra guardada')}
   if(f.id==='fa'){S.aj={...S.aj,...fd,horasJornada:Number(fd.horasJornada)||9,inicioSemana:Number(fd.inicioSemana)};await DB.saveAjustes(S.aj);render();return toast('Ajustes guardados')}
   if(f.classList.contains('desc-add')){const pid=f.dataset.pid;const monto=Number(fd.monto);if(!monto)return;
     const{a,b}=rango();const fecha=hoy>=a&&hoy<=b?hoy:b;
-    const r={personal_id:pid,fecha,concepto:fd.concepto+(fd.detalle?' · '+fd.detalle:''),monto};
+    const r={personal_id:pid,obra_id:S.obra,fecha,concepto:fd.concepto+(fd.detalle?' · '+fd.detalle:''),monto};
     await DB.addDesc(r);S.desc=await DB.descuentos(a,b);render();return toast('Descuento agregado')}
 });
 
 function exportarExcel(){
   if(!window.XLSX)return toast('No se pudo cargar el generador de Excel');
   const{per,dias,filas}=datosPeriodo();const vis=filas.filter(f=>f.horas>0||f.desc.length);
-  const p1=[[S.aj.empresa],[S.aj.obra],[`Planilla de personal · ${dm(per.a)} al ${dm(per.b)}`],[],
+  const p1=[[S.aj.empresa],['Obra: '+nombreObra()],[`Planilla de personal · ${dm(per.a)} al ${dm(per.b)}`],[],
     ['N°','Nombre','Categoría',...dias.map(f=>DC[parse(f).getDay()]+' '+dm(f)),'Días','Horas','Jornada Gs','Total Gs'],
     ...vis.map(x=>[x.p.numero,x.p.nombre,x.p.categoria,...x.regs.map(r=>r?r.horas:''),Number(x.dias.toFixed(2)),x.horas,Number(x.p.jornada),x.bruto])];
-  const p2=[[S.aj.empresa],[`Liquidación semanal · ${dm(per.a)} al ${dm(per.b)}`],[],['Nombre','Categoría','Fecha','Mañana','Tarde','Horas','Monto Gs']];
+  const p2=[[S.aj.empresa],['Obra: '+nombreObra()],[`Liquidación semanal · ${dm(per.a)} al ${dm(per.b)}`],[],['Nombre','Categoría','Fecha','Mañana','Tarde','Horas','Monto Gs']];
   for(const x of vis){
     x.regs.forEach((r,i)=>{if(r)p2.push([x.p.nombre,x.p.categoria,dm(dias[i]),r.ent_am?r.ent_am+'-'+r.sal_am:'',r.ent_pm?r.ent_pm+'-'+r.sal_pm:'',r.horas,Math.round(r.horas*x.ch)])});
     p2.push(['','Subtotal','','','',x.horas,x.bruto]);
@@ -580,7 +619,7 @@ function exportarExcel(){
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(p1),'Planilla');
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(p2),'Liquidación');
-  XLSX.writeFile(wb,`Personal_${per.a}_al_${per.b}.xlsx`);
+  XLSX.writeFile(wb,`Personal_${(obraAct()?.nombre||'obra').replace(/[^\wáéíóúñÁÉÍÓÚÑ]+/g,'_')}_${per.a}_al_${per.b}.xlsx`);
 }
 
 /* ---------- arranque ---------- */
@@ -588,6 +627,10 @@ async function iniciar(session){
   if(session)S.email=session.user.email;
   document.getElementById('app').innerHTML='<main><p class="sub">Cargando…</p></main>';
   S.aj={...AJ_DEF,...(await DB.ajustes()||{})};
+  S.obras=await DB.obras();
+  let guardada=null;try{guardada=localStorage.getItem('obra_sel')}catch(e){}
+  const ok=S.obras.find(o=>o.id===guardada)||S.obras.find(o=>o.activa!==false)||S.obras[0];
+  S.obra=ok?ok.id:null;
   S.personal=await DB.personal();
   const ult=await DB.ultimaFecha();
   if(ult&&ult<periodo(hoy).a)S.ref=ult;
