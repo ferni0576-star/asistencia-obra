@@ -1,7 +1,4 @@
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Asistencia de Obra</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -152,11 +149,70 @@ button.cell{cursor:pointer}
 }
 </style>
 
+<style>
+/* Libro de lluvias (por obra) */
+:root{--ll:#1f5f96;--ll-ink:#ffffff;--ll-soft:#d6e5f2;--llp:#c9821c;--llp-soft:#f6e6cc}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}}
+:root[data-theme="dark"]{--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}
+@media (max-width:760px){nav.tabs{gap:0}nav.tabs button{padding:8px 3px;font-size:14px;letter-spacing:.01em}}
+.ll-main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:860px){.ll-main{grid-template-columns:minmax(0,1fr)}}
+.ll-cal{padding:14px;display:flex;flex-direction:column;gap:16px}
+.ll-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}
+.ll-legend i{display:inline-block;width:14px;height:14px;vertical-align:-2px;margin-right:6px;border-radius:3px;border:1px solid var(--line)}
+.ll-legend .t{background:var(--ll);border-color:var(--ll)}
+.ll-legend .p{background:linear-gradient(135deg,var(--llp) 50%,var(--llp-soft) 50%);border-color:var(--llp)}
+.ll-legend .s{box-shadow:inset 0 0 0 2px var(--ll-soft)}
+.ll-mes{font-size:18px;text-transform:capitalize;margin-bottom:6px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}
+.ll-mes small{font-size:12px;text-transform:none;font-weight:400}
+.ll-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.ll-dow{font-family:var(--f-num);font-size:11px;color:var(--muted);text-align:center;text-transform:uppercase}
+.ll-day{border:1px solid var(--line);background:var(--panel);min-height:42px;padding:4px;border-radius:6px;font-family:var(--f-num);font-size:13px;
+  text-align:left;display:flex;flex-direction:column;justify-content:space-between}
+.ll-day:hover:not([disabled]){border-color:var(--ll)}
+.ll-day[disabled]{opacity:.35;cursor:default;border-style:dashed}
+.ll-day.sun{background:var(--bg)}
+.ll-day.today{box-shadow:inset 0 0 0 2px var(--ink)}
+.ll-day.sel{outline:2px solid var(--ink);outline-offset:1px}
+.ll-day.total{background:var(--ll);border-color:var(--ll);color:var(--ll-ink)}
+.ll-day.parcial{background:linear-gradient(135deg,var(--llp) 50%,var(--llp-soft) 50%);border-color:var(--llp)}
+.ll-day.sin{box-shadow:inset 0 0 0 2px var(--ll-soft)}
+.ll-day em{font-style:normal;font-size:10px}
+.ll-form textarea{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-height:70px;resize:vertical;text-transform:none;letter-spacing:0}
+.ll-seg{display:flex;flex-direction:column;gap:6px}
+.ll-seg label{flex-direction:row!important;align-items:flex-start;gap:10px;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important;
+  border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer}
+.ll-seg label:has(input:checked){border-color:var(--ink);background:var(--chip)}
+.ll-seg input{margin-top:3px;accent-color:var(--ll)}
+.ll-seg small{display:block;color:var(--muted);font-size:12px}
+.ll-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ll-chips label{flex-direction:row!important;align-items:center;text-transform:none!important;letter-spacing:0!important;font-size:13px!important;color:var(--ink)!important;
+  border:1px solid var(--line);border-radius:99px;padding:5px 11px;cursor:pointer}
+.ll-chips label:has(input:checked){background:var(--ink);color:var(--panel)!important;border-color:var(--ink)}
+.ll-chips input{position:absolute;opacity:0;pointer-events:none}
+.ll-chips label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
+.ll-confirm{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border:1px solid var(--bad);border-radius:8px;padding:8px 10px;font-size:14px}
+.ll-pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.ll-pill.total{background:var(--ll);color:var(--ll-ink)}
+.ll-pill.parcial{background:var(--llp-soft);color:var(--ink);border:1px solid var(--llp)}
+.ll-pill.sin{background:var(--ll-soft);color:var(--ink)}
+tr.ll-row{cursor:pointer}
+tr.ll-row:hover td{background:var(--chip)}
+td.wrap{white-space:normal;min-width:200px}
+.ll-aviso{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;justify-content:space-between;border:1px solid var(--ll);background:var(--ll-soft);border-radius:8px;padding:8px 12px;font-size:14px}
+.ll-tag{display:inline-block;margin-top:2px;font-size:10px;padding:0 5px;border-radius:4px;background:var(--ll);color:var(--ll-ink);letter-spacing:.03em}
+.ll-tag.parcial{background:var(--llp);color:#1d2321}
+.ll-tag.sin{background:var(--ll-soft);color:var(--ink)}
+.stat.ll b{color:var(--ll)}
+@media print{.ll-tag{border:1px solid #000;background:#fff!important;color:#000!important}}
+</style>
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
 /* ============================================================
    CONFIGURACIÓN — pegá acá los datos de tu proyecto de Supabase
@@ -168,6 +224,8 @@ const SUPABASE_KEY = 'sb_publishable_sCek0Zow3BXW7p5x8wLnRw_lvT1owlT';
 /* ============================================================ */
 
 const DEMO = {"personal":[{"numero":1,"nombre":"Rolando Mereles","categoria":"CAPATAZ","ci":"","jornada":200000,"calce":"","activo":true},{"numero":2,"nombre":"Francisco Benitez","categoria":"OFICIAL","ci":"","jornada":150000,"calce":"42","activo":true},{"numero":3,"nombre":"Mario Benitez","categoria":"MED. OFICIAL 1","ci":"","jornada":135000,"calce":"41","activo":true},{"numero":4,"nombre":"Cristhian Becker","categoria":"MED. OFICIAL 2","ci":"","jornada":135000,"calce":"42","activo":true},{"numero":5,"nombre":"Daniel Ruiz Diaz","categoria":"MED. OFICIAL 3","ci":"","jornada":135000,"calce":"39","activo":true},{"numero":6,"nombre":"Alex Nuñez","categoria":"MED. OFICIAL 4","ci":"","jornada":135000,"calce":"39","activo":true},{"numero":7,"nombre":"Sindulfo Peralta","categoria":"MED. OFICIAL 5","ci":"","jornada":135000,"calce":"41","activo":true},{"numero":8,"nombre":"Fernando Fernandez","categoria":"MED. OFICIAL 6","ci":"","jornada":135000,"calce":"42","activo":false},{"numero":9,"nombre":"Jacinto Roman","categoria":"MED. OFICIAL 7","ci":"","jornada":135000,"calce":"","activo":true},{"numero":10,"nombre":"Maximo Fretes","categoria":"MED. OFICIAL 10","ci":"","jornada":135000,"calce":"","activo":true},{"numero":11,"nombre":"Bernardo Delvalle","categoria":"MED. OFICIAL 11","ci":"","jornada":135000,"calce":"","activo":true},{"numero":12,"nombre":"Ariel Almada","categoria":"AYUDANTE 1","ci":"","jornada":100000,"calce":"43","activo":true},{"numero":13,"nombre":"Brian Patiño","categoria":"AYUDANTE 2","ci":"","jornada":100000,"calce":"40","activo":true},{"numero":14,"nombre":"Patricio Almada","categoria":"AYUDANTE 3","ci":"","jornada":100000,"calce":"41","activo":false},{"numero":15,"nombre":"Oscar Gonzalez","categoria":"AYUDANTE 4","ci":"","jornada":100000,"calce":"43","activo":true},{"numero":16,"nombre":"Daniel Fernandez","categoria":"AYUDANTE 5","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":17,"nombre":"Elias Benitez","categoria":"AYUDANTE 6","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":18,"nombre":"Aldo Maldonado","categoria":"AYUDANTE 7","ci":"","jornada":100000,"calce":"41","activo":true},{"numero":19,"nombre":"Arnaldo Arroca","categoria":"AYUDANTE 8","ci":"","jornada":100000,"calce":"41","activo":false},{"numero":20,"nombre":"Arroca Hijo","categoria":"AYUDANTE 9","ci":"","jornada":100000,"calce":"","activo":true},{"numero":21,"nombre":"Alexis Baez","categoria":"AYUDANTE 10","ci":"","jornada":100000,"calce":"","activo":true},{"numero":22,"nombre":"Arnaldo Paiva","categoria":"AYUDANTE 11","ci":"","jornada":100000,"calce":"","activo":true},{"numero":23,"nombre":"Alias (ver Apellido)","categoria":"AYUDANTE 12","ci":"","jornada":100000,"calce":"","activo":true}],"asistencia":[{"nombre":"Rolando Mereles","fecha":"2026-09-07","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-08","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-08","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-08","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-08","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-09","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-09","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-10","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Alex Nuñez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Ariel Almada","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Brian Patiño","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Patricio Almada","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-12","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Rolando Mereles","fecha":"2026-09-14","ent_am":"07:00","sal_am":"10:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"11:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-14","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-15","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-15","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"14:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"14:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-16","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-16","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-17","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Patricio Almada","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-18","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-22","ent_am":"07:00","sal_am":"10:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-22","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Ariel Almada","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-22","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-23","ent_am":"07:00","sal_am":"10:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Fernando Fernandez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Brian Patiño","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-23","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Rolando Mereles","fecha":"2026-09-24","ent_am":"07:00","sal_am":"09:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-24","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-24","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-25","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Brian Patiño","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-26","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"15:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arroca Hijo","fecha":"2026-09-28","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-29","ent_am":"","sal_am":"","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Sindulfo Peralta","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Elias Benitez","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-09-30","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-01","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-02","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Mario Benitez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Cristhian Becker","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Alex Nuñez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Jacinto Roman","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Brian Patiño","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Oscar Gonzalez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Daniel Fernandez","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Aldo Maldonado","fecha":"2026-10-03","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Francisco Benitez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Paiva","fecha":"2026-10-05","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Bernardo Delvalle","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Paiva","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alias (ver Apellido)","fecha":"2026-10-06","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Francisco Benitez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Mario Benitez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Cristhian Becker","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Ruiz Diaz","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alex Nuñez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Jacinto Roman","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Maximo Fretes","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Bernardo Delvalle","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Ariel Almada","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Brian Patiño","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Oscar Gonzalez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Daniel Fernandez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Aldo Maldonado","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Arnaldo Arroca","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alexis Baez","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"","sal_pm":""},{"nombre":"Arnaldo Paiva","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"},{"nombre":"Alias (ver Apellido)","fecha":"2026-10-07","ent_am":"07:00","sal_am":"12:00","ent_pm":"13:00","sal_pm":"17:00"}]};
+const DEMO_LLUVIAS = [{"fecha": "2026-09-11", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin actividad en obra por inclemencias climáticas que impidieron los trabajos programados (encofrado y armaduras de zapatas). Fuente: Informe de avance de obra, Semana 02."}, {"fecha": "2026-09-12", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Condiciones climáticas desfavorables impidieron trabajar en el terreno; la cuadrilla se reasignó a taller (corte, doblado y armado de armaduras de zapatas del Bloque 2). Horas perdidas estimadas. Consecuencias: lunes 14 y martes 15 se drenaron los pozos con motobomba y se limpió el barro; miércoles 16 hubo desmoronamiento de paredes de pozos. Fuente: Informe Semana 03."}, {"fecha": "2026-09-21", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones", "Excavación"], "observaciones": "Sin actividad en obra por el estado del terreno tras las precipitaciones del fin de semana. Se reanudó el martes 22. Fuente: Informe Semana 04."}, {"fecha": "2026-09-29", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin actividad durante la mañana por inclemencias climáticas. El temporal derribó un tramo del cerco perimetral, que se levantó por la tarde. Por la tarde solo se pudo desencofrar, acopiar madera, limpiar y armar armaduras por el estado del terreno. El miércoles 30 se achicó el agua de los pozos. Fuente: Informe Semana 05."}, {"fecha": "2026-10-03", "afectacion": "sin", "horas": 0, "mm": null, "actividades": [], "observaciones": "Se registraron precipitaciones el sábado; la jornada se trabajó normalmente (excavación de zanjas de vigas, encofrado, armaduras y corralitos de replanteo). Afectó la jornada del lunes 05. Fuente: Informe Semana 06."}, {"fecha": "2026-10-05", "afectacion": "parcial", "horas": 4, "mm": null, "actividades": ["Fundaciones", "Excavación"], "observaciones": "Terreno con agua acumulada y suelo saturado por las lluvias del sábado 03; los trabajos se concentraron en sectores secos. Horas perdidas estimadas. El martes 06 se hicieron canales de drenaje. Fuente: Informe Semana 06."}, {"fecha": "2026-10-08", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Fundaciones"], "observaciones": "Sin trabajos en obra por condiciones climáticas adversas. Quedaron detenidos la base de nivelación de ladrillos y el encofrado de vigas de fundación. Fuente: Informe Semana 06."}, {"fecha": "2026-10-09", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Excavación", "Fundaciones"], "observaciones": "Se mantuvo la suspensión por condiciones climáticas adversas. Se retomará el lunes si el terreno y el clima lo permiten. Fuente: Informe Semana 06."}, {"fecha": "2026-10-10", "afectacion": "total", "horas": 8, "mm": null, "actividades": ["Excavación", "Fundaciones"], "observaciones": ""}, {"fecha": "2026-10-12", "afectacion": "total", "horas": 8, "mm": null, "actividades": [], "observaciones": ""}];
+const AVAROGA_LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABmCAYAAAA9KjRfAAAFnElEQVR42u2dbWhVdRzHP3du7tHMzNaDWdKDrFoPLLGMDGpFRb6wUSKNHim0XrSwF/miEAqyqAR7sSBakctIo0SysMhYy7AUK2sRYk840iJLcWZO5+nF+V+ca273nt939x7G7wMHNrj33HO/3/O75/z/53x/B0YH5wIzcVLDcmCdy5AOLgAOAxFwhctRfFYGMyLgPZejuFwK9PUz5AjQ4LIUjzX9zMgu77osxWFGqIiBhvQBl7g8hWfdIGZkl5UuT2GZNYQZUTjrutBlKhwdwxgSAW+4TIXhhhzMiIBDwDSXa2TJABtzNCQCXnPJRpbZeZgRAb3AOS7byFACbMnTkAh42aUbGW5LYEYEHATOdvm0lALfJTQkAlpdQi3NBjMi4ABwpsuoYSywzWhIBCxzKQs77hhu2Q+c5nLaqQB2iEx53uXU0CIyZB9Q63LaqQZ2iUxZ4nJqeExkyF7gZJfTznhgt8iUJ11ODYtFhvwFTHA57ZwUfnIUpjzhcmpYIjLkz/Az6BipBXpEpixyOTUsFRnyOzDO5bRzBvGEocKUR11ODa0iQ34DqlxOO1OJL9EqTHnY5dTwqsiQHUCly2nnfI5GEazLgy6nhhUiQ34Byl1OOxdxbCTBstzvcmp4R2TIduJLxo6RBgaPJiRZ7nY5NbwvMuQHoMzltDNTZEgE3OFyalgvMqSL+OY8x8i1wiq53eXUsEFkyNfAGJfTzs3CKpnjctrJAJtFhmwmjkE4RuYIq+QWl9NOCfCtyJCNXiUa5gmr5EaX005pGHUrDOkMxybHyD0iQ44A17mcdsYCP4lM+cSrRMMCYZXMcjntKAM/H7qcGlqEVeLNNgUoAz9rXU4NqsBPHzDd5bSjDPysdjk1LBZWyWUup52JwB6RKatcTg2qwM9hoN7ltKMM/LzpcmpQBX4OAXUup53J6AI/r7ucGlSBn17gPJfTzlTibnMKU15xOTW0iQw5GAx2jEwLB2aFKS+5nBpUgZ8DwBSX0049uljciy6nBlXgZz9wustp53J0sbgXXE4Na0WG9OBtBCVchS4W94zLaScDfIyujeCkJBvh+Ydj6QbuEqynPEyprHdJ7VXymahK/ibugOcVYmQXmtBnRRgsdrikNkqATaIq2U2ebQS9Qv5Pth/jXMG6Kom7aXe6rDbGAN+IquQP8mgj6BVy/CrZCzQJ1lUdDvCfu6w2ytAFfnYGY6S0h/KzLO0pEbuG+NGtw/U0UQV+IuIbvmXMwD75lqZ8RQZ4NofXKQM/3YjaCGaAjwQb1EG6EkjzcnzdfGGVPKTY8EZGZ5J1dY47SCW6wM+vGNsIlgBfCDZkE+nKepeFQdtZOb6+RVglD1g2vEm0EU0pq46F5Pes3JpwpqTQ4keGaCM41DiklPhB8ZOMX76r3x5WbMqJn4lIOMGoIn6WSNcw7+sNVdUo2IYJwM/E3Yby4l7RHnFnSqqiOnynurCz7QGey+N0dHyYUlFoso08G6RVEPexHa1dPrOGrAljjVxZLDyWNOezwY+IPnR+SkfhGeJp9k7gmnCMyAVl4Of7XKeuTgij6tQMhEaI7cDWBO97WlglcwtZlgtTbEYt8cWj7oTv3SfSaOtww4FT0Dx0K68p5yKwKEyJ7CRZlGCpsEpuLcQHPZ5iM0rDz9WVxNn1JJN+k4F/RFptOd6MwRQ0qaI9JLi4X0CuD+Mrwhjrg4RzbK3CKpk92AeoshJpf9bsU8DF/f5fQLJnhygDP18O3Cnq0OQkeoBTU25I+4ADaSbs7Q0J1tUmrJKb+q/4bdFKl6XcjHFB/IFUAW8BJ+a5PmXgZ0N2pdPR3NP6bx6zp8U4kNeEs6urw7Eju0wM0yLNCU/VVwirpDF78UkxadYG3JdCM8rCWVFF+HtM+JnKcPRKZh9xf97lCcYm9cBXaG4Y+fQ/luLF9/ksjKYAAAAASUVORK5CYII=";
 const NUBE = !!(SUPABASE_URL && SUPABASE_KEY && window.supabase);
 const EN_MARCO = (()=>{try{return window.self!==window.top}catch(e){return true}})();
 
@@ -190,7 +248,7 @@ const fmtH=h=>h?(Number.isInteger(h)?String(h):h.toFixed(2).replace(/0$/,'')):''
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(toast.k);toast.k=setTimeout(()=>t.classList.remove('show'),1400)}
 
 const AJ_DEF={empresa:'Avaroga Arquitectura S.A',obra:'Locales comerciales · Vanguard S.A',
-  am_ent:'07:00',am_sal:'12:00',pm_ent:'13:00',pm_sal:'17:00',horasJornada:9,inicioSemana:6};
+  am_ent:'07:00',am_sal:'12:00',pm_ent:'13:00',pm_sal:'17:00',horasJornada:9,inicioSemana:6,horasLluvia:8};
 
 /* ---------- almacenamiento: local (prueba) o Supabase (nube) ---------- */
 function backendLocal(){
@@ -203,8 +261,10 @@ function backendLocal(){
       ent_am:a.ent_am,sal_am:a.sal_am,ent_pm:a.ent_pm,sal_pm:a.sal_pm,obs:''};r.horas=horasDe(r);return r});
     d={personal,asistencia,descuentos:[],ajustes:null};
   }
-  if(!d.obras){const id=uid();d.obras=[{id,nombre:'Locales comerciales',cliente:'Vanguard S.A',activa:true}];
+  if(!d.obras){const id=uid();d.obras=[{id,nombre:'Locales comerciales',cliente:'Vanguard S.A',ubicacion:'Cambyretá, Itapúa',inicio:'2026-09-02',activa:true}];
     d.personal.forEach(p=>{p.obra_id=p.obra_id||id});d.asistencia.forEach(a=>{a.obra_id=a.obra_id||id});d.descuentos.forEach(x=>{x.obra_id=x.obra_id||id})}
+  if(!d.lluvias){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.lluvias=[];
+    if(o){if(!o.ubicacion)o.ubicacion='Cambyretá, Itapúa';if(!o.inicio)o.inicio='2026-09-02';d.lluvias=DEMO_LLUVIAS.map(r=>({id:uid(),obra_id:o.id,...r}))}}
   const save=()=>{try{localStorage.setItem(K,JSON.stringify(d))}catch(e){}};
   save();
   return{
@@ -223,6 +283,10 @@ function backendLocal(){
     async updDesc(id,r){const i=d.descuentos.findIndex(x=>x.id===id);if(i>=0)d.descuentos[i]={...d.descuentos[i],...r};save()},
     async ajustes(){return d.ajustes},
     async saveAjustes(v){d.ajustes=v;save()},
+    async lluvias(oid){return d.lluvias.filter(r=>r.obra_id===oid)},
+    async saveLluvia(r){const i=d.lluvias.findIndex(x=>x.obra_id===r.obra_id&&x.fecha===r.fecha);
+      if(i>=0)d.lluvias[i]={...d.lluvias[i],...r};else d.lluvias.push({id:uid(),...r});save()},
+    async delLluvia(oid,f){d.lluvias=d.lluvias.filter(x=>!(x.obra_id===oid&&x.fecha===f));save()},
   };
 }
 function backendNube(sb){
@@ -244,12 +308,16 @@ function backendNube(sb){
     async updDesc(id,r){ok(await sb.from('descuentos').update(r).eq('id',id))},
     async ajustes(){const r=ok(await sb.from('ajustes').select('valor').eq('clave','general'));return r[0]?.valor||null},
     async saveAjustes(v){ok(await sb.from('ajustes').upsert({clave:'general',valor:v}))},
+    async lluvias(oid){return ok(await sb.from('lluvias').select('*').eq('obra_id',oid).order('fecha'))
+      .map(r=>({...r,horas:Number(r.horas)||0,mm:r.mm==null?null:Number(r.mm),actividades:r.actividades||[],observaciones:r.observaciones||''}))},
+    async saveLluvia(r){const row={...r};delete row.id;ok(await sb.from('lluvias').upsert(row,{onConflict:'obra_id,fecha'}))},
+    async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
   };
 }
 
 /* ---------- estado ---------- */
 const hoy=iso(new Date());
-const S={editDesc:null,tab:'cargar',dia:hoy,ref:hoy,rango:null,obras:[],obra:null,editObra:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
+const S={lluv:[],llF:hoy,llConf:false,editDesc:null,tab:'cargar',dia:hoy,ref:hoy,rango:null,obras:[],obra:null,editObra:null,personal:[],asis:{},desc:[],aj:{...AJ_DEF},filtro:'',inactivos:false,abierto:null,edit:null,cargando:false};
 let DB=null, SB=null;
 const key=(pid,f)=>pid+'|'+f;
 const costoHora=p=>(Number(p.jornada)||0)/(Number(S.aj.horasJornada)||9);
@@ -273,6 +341,7 @@ async function cargarRango(a,b){
 }
 async function refrescar(){
   S.cargando=true;
+  S.lluv=S.obra?await DB.lluvias(S.obra):[];
   if(S.tab==='cargar')await cargarRango(S.dia,S.dia);
   if(S.tab==='planilla'||S.tab==='liquidacion'){const p=rango();await cargarRango(p.a,p.b);S.desc=await DB.descuentos(p.a,p.b)}
   S.cargando=false;render();
@@ -325,6 +394,7 @@ function vCargar(){
     </div>
     <button class="btn primary" data-act="todos" ${sinMarcar?'':'disabled'}>Marcar ${sinMarcar} sin cargar como jornada completa</button>
   </div>
+  ${avisoLluvia(S.dia)}
   <div class="stats">
     <div class="stat"><small>En obra</small><b>${regs.length}</b></div>
     <div class="stat"><small>Sin cargar</small><b>${sinMarcar}</b></div>
@@ -395,7 +465,7 @@ function vPlanilla(){
     <div class="stat"><small>Total a pagar (bruto)</small><b>${gs(tG)}</b></div>
   </div>
   <div class="panel tw"><table>
-    <thead><tr><th>N°</th><th>Nombre</th><th>Categoría</th>${dias.map(f=>`<th class="c">${DC[parse(f).getDay()]}<br>${dm(f)}</th>`).join('')}<th class="n">Días</th><th class="n">Horas</th><th class="n">Jornada Gs</th><th class="n">Total Gs</th></tr></thead>
+    <thead><tr><th>N°</th><th>Nombre</th><th>Categoría</th>${dias.map(f=>`<th class="c">${DC[parse(f).getDay()]}<br>${dm(f)}${tagLluvia(f)}</th>`).join('')}<th class="n">Días</th><th class="n">Horas</th><th class="n">Jornada Gs</th><th class="n">Total Gs</th></tr></thead>
     <tbody>${vis.map(x=>`<tr><td class="n">${x.p.numero??''}</td><td>${esc(x.p.nombre)}</td><td>${esc(x.p.categoria||'')}</td>
       ${x.regs.map((r,i)=>`<td class="c">${cel(r,dias[i],x)}</td>`).join('')}
       <td class="n">${x.dias.toFixed(2)}</td><td class="n">${fmtH(x.horas)}</td><td class="n">${gs(x.p.jornada)}</td><td class="n">${gs(x.bruto)}</td></tr>`).join('')
@@ -454,6 +524,173 @@ function vLiquidacion(){
   ${tarjetas||'<div class="panel liq sub">Sin asistencias en este período.</div>'}`;
 }
 
+/* ---------- libro de lluvias (por obra) ---------- */
+const AFL={total:'Obra parada',parcial:'Parcial',sin:'Sin afectar'};
+const ACTS_LL=['Excavación','Fundaciones','Hormigonado','Mampostería','Reboque exterior','Contrapiso','Techo / cubierta','Pintura exterior','Instalaciones','Limpieza / acopio'];
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const hJL=()=>Number(S.aj.horasLluvia)||8;
+const perdido=r=>r.afectacion==='total'?1:r.afectacion==='parcial'?Math.min(1,(Number(r.horas)||0)/hJL()):0;
+const n1=v=>String(Math.round((v||0)*100)/100).replace('.',',');
+const ddmmyy=s=>`${dm(s)}/${parse(s).getFullYear()}`;
+function inicioObra(){
+  const o=obraAct();const pri=S.lluv.reduce((m,r)=>!m||r.fecha<m?r.fecha:m,'');
+  const c=[o?.inicio,pri].filter(Boolean).sort()[0];
+  return c||addD(hoy,-60);
+}
+function avisoLluvia(f){
+  const r=S.lluv.find(x=>x.fecha===f);if(!r)return'';
+  const txt=r.afectacion==='total'?'obra parada por lluvia':r.afectacion==='parcial'?`afectación parcial por lluvia (${n1(r.horas)} h perdidas)`:'llovió sin afectar los trabajos';
+  return `<div class="ll-aviso"><span><b>Día de lluvia:</b> ${txt}.</span><button class="btn ghost" data-act="irll" data-f="${f}">Ver en libro de lluvias</button></div>`;
+}
+function tagLluvia(f){const r=S.lluv.find(x=>x.fecha===f);return r?`<br><span class="ll-tag ${r.afectacion}" title="${AFL[r.afectacion]}">${r.afectacion==='total'?'LLUVIA':r.afectacion==='parcial'?'LL. '+n1(r.horas)+'h':'llovió'}</span>`:''}
+
+function vLluvias(){
+  if(!S.obra)return `<h2>Libro de lluvias</h2><div class="panel liq sub">Creá tu primera obra en Ajustes.</div>`;
+  const o=obraAct();const ini=inicioObra();
+  const regs=S.lluv.slice().sort((a,b)=>a.fecha<b.fecha?-1:1);
+  const by=Object.fromEntries(regs.map(r=>[r.fecha,r]));
+  let tot=0,par=0,eq=0;regs.forEach(r=>{if(r.afectacion==='total')tot++;if(r.afectacion==='parcial')par++;eq+=perdido(r)});
+
+  const meses=[];const s=parse(ini),e=parse(hoy);
+  for(let y=s.getFullYear(),m=s.getMonth();y<e.getFullYear()||(y===e.getFullYear()&&m<=e.getMonth());){
+    const first=new Date(y,m,1),nd=new Date(y,m+1,0).getDate();let ml=0,mr=0;
+    let cel=DC.map(d=>`<div class="ll-dow">${d}</div>`).join('')+'<div></div>'.repeat(first.getDay());
+    for(let d=1;d<=nd;d++){
+      const f=`${y}-${pad(m+1)}-${pad(d)}`;const r=by[f];if(r){mr++;ml+=perdido(r)}
+      const cls=['ll-day',new Date(y,m,d).getDay()===0?'sun':'',f===hoy?'today':'',f===S.llF?'sel':'',r?r.afectacion:''].filter(Boolean).join(' ');
+      cel+=`<button type="button" class="${cls}" data-act="llday" data-f="${f}" ${f<ini||f>hoy?'disabled':''} aria-label="${d} de ${MESES[m]}${r?', '+AFL[r.afectacion]:''}"><span>${d}</span>${r&&r.afectacion==='parcial'?`<em>${n1(r.horas)} h</em>`:''}</button>`;
+    }
+    meses.push(`<div><h3 class="ll-mes">${MESES[m]} ${y} <small class="sub num">${mr} con lluvia · ${n1(ml)} perdidos</small></h3><div class="ll-grid">${cel}</div></div>`);
+    m++;if(m>11){m=0;y++}
+  }
+  meses.reverse();
+
+  const r=by[S.llF];const af=r?.afectacion||'total';const hj=hJL();
+  const horas=af==='total'?hj:af==='sin'?0:(r?.horas??hj/2);
+  const acts=[...new Set([...ACTS_LL,...(r?.actividades||[])])];
+  const d=parse(S.llF);
+  const form=`<form class="panel form ll-form" id="fll">
+    <h3 style="grid-column:1/-1">${r?'Corregir':'Registrar'} · ${DIAS[d.getDay()]} ${dm(S.llF)}</h3>
+    <label style="grid-column:1/-1">Fecha<input type="date" id="ll-fecha" name="fecha" value="${S.llF}" min="${ini}" max="${hoy}" required></label>
+    <div class="ll-seg" style="grid-column:1/-1" role="radiogroup" aria-label="Cómo afectó la lluvia">
+      ${[['total','Obra parada todo el día','No se pudo trabajar'],['parcial','Afectación parcial','Se perdieron algunas horas o se trabajó bajo techo'],['sin','Llovió sin afectar','Queda anotado, no suma días perdidos']]
+        .map(([v,t,sm])=>`<label><input type="radio" name="af" value="${v}" ${af===v?'checked':''}><span><b>${t}</b><small>${sm}</small></span></label>`).join('')}
+    </div>
+    <label>Horas perdidas<input type="number" id="ll-horas" name="horas" min="0" max="12" step="0.5" value="${horas}" ${af!=='parcial'?'disabled':''}></label>
+    <label>Lluvia (mm)<input type="number" id="ll-mm" name="mm" min="0" step="1" value="${r?.mm??''}" placeholder="opcional"></label>
+    <div style="grid-column:1/-1;display:flex;flex-direction:column;gap:6px"><span class="sub" style="font-size:12px;text-transform:uppercase;letter-spacing:.05em">Trabajos afectados</span>
+      <div class="ll-chips">${acts.map((x,i)=>`<label><input type="checkbox" id="ll-act-${i}" name="act" value="${esc(x)}" ${(r?.actividades||[]).includes(x)?'checked':''}>${esc(x)}</label>`).join('')}</div></div>
+    <label style="grid-column:1/-1">Observaciones<textarea id="ll-obs" name="observaciones" placeholder="Ej.: terreno anegado, se suspendió el hormigonado">${esc(r?.observaciones||'')}</textarea></label>
+    <div class="bar" style="grid-column:1/-1"><button class="btn primary">${r?'Actualizar día':'Guardar día'}</button>
+      ${S.llF!==hoy?`<button type="button" class="btn ghost" data-act="llhoy">Ir a hoy</button>`:''}
+      ${r?`<button type="button" class="btn ghost peligro" data-act="lldel">Borrar este día</button>`:''}</div>
+    ${S.llConf&&r?`<div class="ll-confirm"><span>¿Borrar el registro del <b>${ddmmyy(S.llF)}</b>?</span><button type="button" class="btn peligro" data-act="llsi">Sí, borrar</button><button type="button" class="btn ghost" data-act="llno">Cancelar</button></div>`:''}
+  </form>`;
+
+  const filas=regs.slice().reverse().map(x=>`<tr class="ll-row" data-act="llday" data-f="${x.fecha}">
+    <td class="num">${ddmmyy(x.fecha)}</td><td>${DC[parse(x.fecha).getDay()]}</td><td><span class="ll-pill ${x.afectacion}">${AFL[x.afectacion]}</span></td>
+    <td class="n">${x.afectacion==='sin'?'—':n1(x.horas)}</td><td class="n">${n1(perdido(x))}</td><td class="n">${x.mm==null||x.mm===''?'—':x.mm}</td>
+    <td class="wrap">${esc((x.actividades||[]).join(', ')||'—')}</td><td class="wrap">${esc(x.observaciones||'—')}</td></tr>`).join('');
+
+  const salida=EN_MARCO?`<span class="sub no-print">La constancia en PDF se descarga desde tu página publicada.</span>`
+    :`<button class="btn primary no-print" data-act="llpdf" ${regs.length?'':'disabled'}>Descargar constancia (PDF)</button>`;
+  return `
+  <div class="bar between"><div><h2>Libro de lluvias</h2><div class="sub">${esc(nombreObra())}${o?.ubicacion?' · '+esc(o.ubicacion):''} · desde ${ddmmyy(ini)}${o?.inicio?'':' (cargá el inicio de obra en Ajustes)'}</div></div><div class="bar">${salida}</div></div>
+  <div class="stats">
+    <div class="stat ll"><small>Días perdidos (equiv.)</small><b>${n1(eq)}</b></div>
+    <div class="stat"><small>Obra parada</small><b>${tot}</b></div>
+    <div class="stat"><small>Afectación parcial</small><b>${par}</b></div>
+    <div class="stat"><small>Días con lluvia</small><b>${regs.length}</b></div>
+  </div>
+  <div class="ll-main">
+    <section class="panel ll-cal" aria-label="Calendario de jornadas">
+      <div class="ll-legend"><span><i class="t"></i>Obra parada</span><span><i class="p"></i>Parcial</span><span><i class="s"></i>Llovió sin afectar</span></div>
+      ${meses.join('')}
+    </section>
+    ${form}
+  </div>
+  <div class="panel tw"><table>
+    <thead><tr><th>Fecha</th><th>Día</th><th>Afectación</th><th class="n">Horas perd.</th><th class="n">Días perd.</th><th class="n">mm</th><th>Trabajos afectados</th><th>Observaciones</th></tr></thead>
+    <tbody>${filas||'<tr><td colspan="8" class="sub">Todavía no hay días de lluvia en esta obra. Tocá un día del calendario para anotarlo.</td></tr>'}</tbody>
+  </table></div>
+  <p class="sub">Días perdidos = jornadas paradas + horas perdidas ÷ ${hj} en las parciales. Tocá una fila o un día para corregirlo.</p>`;
+}
+
+function buildPdfLluvias(jsPDF,recs,hoyISO,logo,info){
+  const DOWL=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const f=s=>ddmmyy(s);
+  const hj=info.hj;
+  const lostD=r=>r.afectacion==='total'?1:r.afectacion==='parcial'?Math.min(1,(Number(r.horas)||0)/hj):0;
+  const nf=v=>String(Math.round(v*100)/100).replace('.',',');
+  const list=recs.slice().sort((a,b)=>a.fecha<b.fecha?-1:1);
+  let tot=0,par=0,sin=0,eq=0;
+  list.forEach(r=>{if(r.afectacion==='total')tot++;else if(r.afectacion==='parcial')par++;else sin++;eq+=lostD(r)});
+  const doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+  const W=210,ML=20,MR=20,TOP=46;
+  function membrete(){
+    if(logo)doc.addImage(logo,'PNG',ML,13,11.8,12);
+    doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(0);
+    doc.text(info.empresa,ML,31);
+    doc.setFont('helvetica','normal');doc.setFontSize(7.5);
+    const x=W-MR;
+    doc.text('Tel: +595 987 179275',x,14.5,{align:'right'});
+    doc.text('Juan L. Mallorquín Nro. 1220 c/ Cerro Corá – 3er Piso',x,18,{align:'right'});
+    const em='avarogaarq@gmail.com';doc.text(em,x,21.5,{align:'right'});
+    const ew=doc.getTextWidth(em);doc.setLineWidth(0.15);doc.line(x-ew,22,x,22);
+    doc.text('Encarnación, Paraguay',x,25,{align:'right'});
+    doc.setFontSize(8);doc.text('©'+parse(hoyISO).getFullYear()+' | '+info.empresa,W/2,287,{align:'center'});
+  }
+  let y=TOP;
+  doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);
+  doc.text('CONSTANCIA DE DÍAS DE LLUVIA Y AFECTACIÓN EN OBRA',ML,y);y+=7;
+  doc.setFontSize(11);
+  const kv=(k,v)=>{doc.setFont('times','bold');doc.text(k,ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(v,ML+kw,y);y+=5.5};
+  kv('Obra:',info.obra);
+  if(info.cliente)kv('Cliente:',info.cliente);
+  if(info.ubicacion)kv('Ubicación:',info.ubicacion);
+  kv('Período:',DOWL[parse(info.inicio).getDay()]+' '+f(info.inicio)+' al '+DOWL[parse(hoyISO).getDay()].toLowerCase()+' '+f(hoyISO));
+  kv('Fecha de emisión:',f(hoyISO));
+  y+=3;
+  doc.setFont('times','bold');doc.text('Resumen',ML,y);y+=6;
+  doc.autoTable({startY:y,margin:{left:ML,right:MR,top:TOP},theme:'plain',tableWidth:120,
+    body:[['Jornadas con obra parada por lluvia',String(tot)],['Jornadas con afectación parcial',String(par)],['Días con lluvia sin afectación',String(sin)],['Total de días de obra perdidos (equivalente)',nf(eq)+' días']],
+    styles:{font:'times',fontSize:10.5,cellPadding:{top:1.2,bottom:1.2,left:0,right:2},textColor:0},
+    columnStyles:{1:{halign:'right',fontStyle:'bold'}},
+    didParseCell:d=>{if(d.row.index===3){d.cell.styles.fontStyle='bold';d.cell.styles.lineWidth={top:0.3};d.cell.styles.lineColor=0}}});
+  y=doc.lastAutoTable.finalY+8;
+  doc.setFont('times','bold');doc.setFontSize(11);doc.text('Detalle de jornadas',ML,y);y+=3;
+  const body=list.map(r=>[f(r.fecha),DOWL[parse(r.fecha).getDay()],AFL[r.afectacion]||r.afectacion,
+    r.afectacion==='sin'?'—':nf(Number(r.horas)||0),nf(lostD(r)),(r.actividades||[]).join(', ')||'—',r.observaciones||'—']);
+  doc.autoTable({startY:y,margin:{left:ML,right:MR,top:TOP,bottom:22},
+    head:[['Fecha','Día','Afectación','Horas perd.','Días perd.','Trabajos afectados','Observaciones']],
+    body:body.length?body:[[{content:'Sin registros en el período.',colSpan:7}]],theme:'grid',
+    styles:{font:'times',fontSize:8.5,cellPadding:1.6,textColor:0,lineColor:[150,150,150],lineWidth:0.15,valign:'top'},
+    headStyles:{fillColor:[235,235,235],textColor:0,fontStyle:'bold',fontSize:8.5},
+    columnStyles:{0:{cellWidth:17},1:{cellWidth:16},2:{cellWidth:17},3:{cellWidth:12,halign:'right'},4:{cellWidth:11,halign:'right'},5:{cellWidth:24},6:{cellWidth:'auto'}}});
+  y=doc.lastAutoTable.finalY+6;
+  if(y>240){doc.addPage();y=TOP}
+  doc.setFont('times','italic');doc.setFontSize(9);
+  const nota=doc.splitTextToSize(`Días perdidos equivalentes: cada jornada con obra parada cuenta 1 día; las jornadas con afectación parcial se computan como horas perdidas / ${nf(hj)} (jornada de ${nf(hj)} horas).`,W-ML-MR);
+  doc.text(nota,ML,y);y+=nota.length*4+22;
+  if(y>270){doc.addPage();y=TOP+22}
+  doc.setLineWidth(0.3);doc.line(W-MR-70,y,W-MR,y);
+  doc.setFont('times','normal');doc.setFontSize(10);
+  doc.text('Dirección de Obra',W-MR-35,y+5,{align:'center'});
+  doc.text(info.empresa,W-MR-35,y+10,{align:'center'});
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);membrete();doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text('Pág. '+i+' de '+n,W-MR,287,{align:'right'})}
+  return doc;
+}
+function descargarConstancia(){
+  if(!window.jspdf?.jsPDF)return toast('No se pudo cargar el generador de PDF');
+  const o=obraAct();if(!o)return;
+  try{
+    const doc=buildPdfLluvias(window.jspdf.jsPDF,S.lluv,hoy,AVAROGA_LOGO,
+      {empresa:S.aj.empresa||AJ_DEF.empresa,obra:o.nombre,cliente:o.cliente||'',ubicacion:o.ubicacion||'',inicio:inicioObra(),hj:hJL()});
+    doc.save(`Constancia_lluvias_${o.nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ]+/g,'_')}_${hoy}.pdf`);
+  }catch(e){toast('No se pudo generar el PDF')}
+}
+
 function vPersonal(){
   const e=S.edit;
   const form=e?`<form class="panel form" id="fp">
@@ -488,16 +725,18 @@ function vAjustes(){
   ${eo?`<form class="panel form" id="fo">
     <label>Nombre de la obra<input type="text" id="o-nombre" name="nombre" value="${esc(eo.nombre||'')}" required placeholder="Ej.: Vivienda familia López"></label>
     <label>Cliente<input type="text" id="o-cliente" name="cliente" value="${esc(eo.cliente||'')}"></label>
+    <label>Ubicación<input type="text" id="o-ubicacion" name="ubicacion" value="${esc(eo.ubicacion||'')}" placeholder="Ej.: Cambyretá, Itapúa"></label>
+    <label>Inicio de obra<input type="date" id="o-inicio" name="inicio" value="${eo.inicio||''}"></label>
     <label class="chk"><input type="checkbox" id="o-activa" name="activa" ${eo.activa!==false?'checked':''}> Obra en curso</label>
     <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar obra</button><button type="button" class="btn ghost" data-act="cancelarobra">Cancelar</button></div>
   </form>`:''}
-  <div class="panel tw"><table><thead><tr><th>Obra</th><th>Cliente</th><th class="n">Personal activo</th><th>Estado</th><th></th></tr></thead><tbody>
-  ${S.obras.map(o=>`<tr><td>${esc(o.nombre)}${o.id===S.obra?' <span class="pill">Seleccionada</span>':''}</td><td>${esc(o.cliente||'')}</td>
+  <div class="panel tw"><table><thead><tr><th>Obra</th><th>Cliente</th><th>Ubicación</th><th>Inicio</th><th class="n">Personal activo</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${S.obras.map(o=>`<tr><td>${esc(o.nombre)}${o.id===S.obra?' <span class="pill">Seleccionada</span>':''}</td><td>${esc(o.cliente||'')}</td><td>${esc(o.ubicacion||'')}</td><td class="num">${o.inicio?dm(o.inicio)+'/'+parse(o.inicio).getFullYear():''}</td>
     <td class="n">${S.personal.filter(p=>p.obra_id===o.id&&p.activo!==false).length}</td>
     <td><span class="pill ${o.activa===false?'off':''}">${o.activa===false?'Terminada':'En curso'}</span></td>
-    <td><button class="btn ghost" data-act="editobra" data-id="${o.id}">Editar</button></td></tr>`).join('')||'<tr><td colspan="5" class="sub">Todavía no hay obras.</td></tr>'}
+    <td><button class="btn ghost" data-act="editobra" data-id="${o.id}">Editar</button></td></tr>`).join('')||'<tr><td colspan="7" class="sub">Todavía no hay obras.</td></tr>'}
   </tbody></table></div>
-  <p class="sub">Una obra terminada deja de aparecer en el selector de arriba, pero su historial queda guardado.</p>`;
+  <p class="sub">Una obra terminada deja de aparecer en el selector de arriba, pero su historial queda guardado. La ubicación y el inicio de obra salen en la constancia de lluvias.</p>`;
   return `<h2>Ajustes</h2>${obrasH}<h3>General</h3>
   <form class="panel form" id="fa">
     <label>Empresa<input type="text" id="a-empresa" name="empresa" value="${esc(a.empresa)}"></label>
@@ -506,6 +745,7 @@ function vAjustes(){
     <label>Entrada tarde<input type="time" id="a-pm_ent" name="pm_ent" value="${a.pm_ent}"></label>
     <label>Salida tarde<input type="time" id="a-pm_sal" name="pm_sal" value="${a.pm_sal}"></label>
     <label>Horas por jornada<input type="number" id="a-horas" name="horasJornada" step="0.5" value="${a.horasJornada}"></label>
+    <label>Jornada para días de lluvia (h)<input type="number" id="a-hll" name="horasLluvia" step="0.5" value="${a.horasLluvia??8}"></label>
     <label>La semana de pago empieza el<select id="a-inicio" name="inicioSemana">${DIAS.map((d,i)=>`<option value="${i}" ${Number(a.inicioSemana)===i?'selected':''}>${d}</option>`).join('')}</select></label>
     <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar ajustes</button></div>
   </form>
@@ -522,9 +762,9 @@ function vLogin(err=''){
   </form>`;
 }
 
-const TABS=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['personal','Personal'],['ajustes','Ajustes']];
+const TABS=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['personal','Personal'],['ajustes','Ajustes']];
 function render(){
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b>Asistencia <i>de</i> Obra</b>
@@ -579,6 +819,13 @@ document.addEventListener('click',async ev=>{
   if(a==='nuevaobra'){S.editObra={activa:true};return render()}
   if(a==='editobra'){S.editObra={...S.obras.find(o=>o.id===t.dataset.id)};return render()}
   if(a==='cancelarobra'){S.editObra=null;return render()}
+  if(a==='llday'){S.llF=t.dataset.f;S.llConf=false;render();if(window.innerWidth<860)document.getElementById('fll')?.scrollIntoView({behavior:'smooth'});return}
+  if(a==='llhoy'){S.llF=hoy;S.llConf=false;return render()}
+  if(a==='lldel'){S.llConf=true;return render()}
+  if(a==='llno'){S.llConf=false;return render()}
+  if(a==='llsi'){const f=S.llF;await DB.delLluvia(S.obra,f);S.lluv=S.lluv.filter(r=>r.fecha!==f);S.llConf=false;render();return toast('Día borrado')}
+  if(a==='irll'){S.llF=t.dataset.f;S.llConf=false;S.tab='lluvias';return refrescar()}
+  if(a==='llpdf'){return descargarConstancia()}
   if(a==='imprimir'){return window.print()}
   if(a==='excel'){return exportarExcel()}
   if(a==='salir'){await SB.auth.signOut();location.reload()}
@@ -594,6 +841,10 @@ document.addEventListener('change',ev=>{
   const t=ev.target;
   if(t.id==='dia'&&t.value){S.dia=t.value;return refrescar()}
   if(t.id==='inactivos'){S.inactivos=t.checked;return render()}
+  if(t.id==='ll-fecha'&&t.value){S.llF=t.value;S.llConf=false;return render()}
+  if(t.name==='af'&&t.form?.id==='fll'){const h=document.getElementById('ll-horas');
+    if(t.value==='total'){h.value=hJL();h.disabled=true}else if(t.value==='sin'){h.value=0;h.disabled=true}
+    else{h.disabled=false;if(!(Number(h.value)>0&&Number(h.value)<hJL()))h.value=hJL()/2;h.focus()}return}
   if(t.id==='obra-sel'){elegirObra(t.value);S.edit=null;S.abierto=null;return refrescar()}
   if((t.id==='r-a'||t.id==='r-b')&&t.value){
     let{a,b}=rango();if(t.id==='r-a'){a=t.value;if(b<a)b=a}else{b=t.value;if(b<a)a=b}
@@ -603,18 +854,28 @@ document.addEventListener('change',ev=>{
 });
 document.addEventListener('submit',async ev=>{
   ev.preventDefault();const f=ev.target;const fd=Object.fromEntries(new FormData(f));
+  if(f.id==='fll'){
+    const fecha=fd.fecha;const ini=inicioObra();
+    if(!fecha||fecha>hoy||fecha<ini)return toast('Elegí una fecha entre el inicio de obra y hoy');
+    const af=fd.af||'total';const hj=hJL();
+    const horas=af==='total'?hj:af==='sin'?0:Number(document.getElementById('ll-horas').value);
+    if(af==='parcial'&&!(horas>0&&horas<=hj))return toast(`Indicá entre 0,5 y ${hj} horas perdidas`);
+    const r={obra_id:S.obra,fecha,afectacion:af,horas,mm:fd.mm===''||fd.mm==null?null:Number(fd.mm),
+      actividades:new FormData(f).getAll('act'),observaciones:(fd.observaciones||'').trim()};
+    await DB.saveLluvia(r);const i=S.lluv.findIndex(x=>x.fecha===fecha);if(i>=0)S.lluv[i]={...S.lluv[i],...r};else S.lluv.push(r);
+    S.llF=fecha;render();return toast('Día de lluvia guardado')}
   if(f.id==='fl'){const{data,error}=await SB.auth.signInWithPassword({email:fd.email,password:fd.pass});
     if(error){document.getElementById('app').innerHTML=vLogin('Correo o contraseña incorrectos.');return}return iniciar(data.session)}
   if(f.id==='fp'){const p={...S.edit,numero:fd.numero?Number(fd.numero):null,nombre:fd.nombre.trim(),categoria:fd.categoria.trim(),ci:fd.ci.trim(),
       jornada:Number(fd.jornada)||0,calce:fd.calce.trim(),activo:!!fd.activo,obra_id:fd.obra_id||S.obra};
     const g=await DB.savePersonal(p);const i=S.personal.findIndex(x=>x.id===g.id);if(i>=0)S.personal[i]={...S.personal[i],...g};else S.personal.push(g);
     S.edit=null;render();return toast(p.obra_id!==S.obra?'Guardado y movido a otra obra':'Personal guardado')}
-  if(f.id==='fo'){const o={...S.editObra,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),activa:!!fd.activa};
+  if(f.id==='fo'){const o={...S.editObra,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),ubicacion:(fd.ubicacion||'').trim(),inicio:fd.inicio||null,activa:!!fd.activa};
     const nueva=!o.id;const g=await DB.saveObra(o);const i=S.obras.findIndex(x=>x.id===g.id);if(i>=0)S.obras[i]={...S.obras[i],...g};else S.obras.push(g);
     if(nueva||!S.obra)elegirObra(g.id);
     if(g.activa===false&&g.id===S.obra){const otra=S.obras.find(x=>x.activa!==false);if(otra)elegirObra(otra.id)}
     S.editObra=null;render();return toast(nueva?'Obra creada y seleccionada':'Obra guardada')}
-  if(f.id==='fa'){S.aj={...S.aj,...fd,horasJornada:Number(fd.horasJornada)||9,inicioSemana:Number(fd.inicioSemana)};await DB.saveAjustes(S.aj);render();return toast('Ajustes guardados')}
+  if(f.id==='fa'){S.aj={...S.aj,...fd,horasJornada:Number(fd.horasJornada)||9,horasLluvia:Number(fd.horasLluvia)||8,inicioSemana:Number(fd.inicioSemana)};await DB.saveAjustes(S.aj);render();return toast('Ajustes guardados')}
   if(f.classList.contains('desc-edit')){const id=f.dataset.id;const monto=Number(fd.monto);if(!monto||!fd.fecha)return;
     const antes=S.desc.find(d=>d.id===id);const cambios={personal_id:fd.personal_id,concepto:fd.concepto.trim(),fecha:fd.fecha,monto};
     const nuevoDueno=S.personal.find(p=>p.id===fd.personal_id);if(nuevoDueno?.obra_id)cambios.obra_id=nuevoDueno.obra_id;
@@ -671,4 +932,4 @@ async function iniciar(session){
 })();
 </script>
 
-</html>
+</body></html>
