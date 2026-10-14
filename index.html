@@ -1616,7 +1616,7 @@ async function cargar(oid){
   if(ES.cargando)return;ES.cargando=true;
   try{ES.doc=await window.PDB.get(oid)}catch(e){ES.doc=null;toast('No se pudo leer el presupuesto')}
   try{ES.con=window.CDB?await window.CDB.list(oid):[]}catch(e){ES.con=[]}
-  ES.oid=oid;ES.cargando=false;ES.cert=null;ES.borr={};ES.per=null;render();
+  ES.oid=oid;ES.cargando=false;ES.cert=null;ES.borr={};ES.desde=null;ES.hasta=null;render();
 }
 const guardar=()=>{if(ES.doc&&window.PDB)window.PDB.save(ES.doc).catch(()=>toast('No se pudo guardar en la base. Revisá la conexión.'))};
 
@@ -1638,10 +1638,14 @@ function mapa(){
   return M;
 }
 const ultHasta=()=>{const cs=(ES.doc.certs||[]).filter(c=>c.hasta);const h=cs.length?cs[cs.length-1].hasta:'';return [h,ES.doc.baseHasta||''].sort().pop()};
-function certsSemana(desde){return ES.con.map(c=>{const x=(c.certs||[]).find(k=>k.desde===desde);if(!x)return null;
+const finMes=d=>{const x=parse(d);return iso(new Date(x.getFullYear(),x.getMonth()+1,0))};
+const MESES_P=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const cierreDe=x=>x.hasta||x.desde||x.fecha||'';
+/* certificados de contratistas cuyo período termina dentro del rango elegido */
+function certsRango(desde,hasta){if(!desde||!hasta)return[];return ES.con.flatMap(c=>(c.certs||[]).filter(k=>{const f=cierreDe(k);return f&&f>=desde&&f<=hasta}).map(x=>{
   let m=0;for(const[k,v]of Object.entries(x.pres)){const it=c.items.find(i=>i.id===k);if(it)m+=v*it.pu}
-  const pago=(c.des||[]).find(d=>d.cert===x.n);return{c,x,monto:m,pago}}).filter(Boolean)}
-function semanasPendientes(){const h=ultHasta();const w=new Set();ES.con.forEach(c=>(c.certs||[]).forEach(x=>{if(x.desde&&x.desde>h)w.add(x.desde)}));return[...w].sort()}
+  const pago=(c.des||[]).find(d=>d.cert===x.n);return{c,x,monto:m,pago}}))}
+function semanasPendientes(){const h=ultHasta();const w=new Set();ES.con.forEach(c=>(c.certs||[]).forEach(x=>{const f=cierreDe(x);if(f&&f>h)w.add(f)}));return[...w].sort()}
 function avanceDesde(lista){const M=mapa();const pres={},sin=[];
   for(const{c,x}of lista)for(const[k,v]of Object.entries(x.pres)){const it=c.items.find(i=>i.id===k);if(!it||it.sec!=='ORIG')continue;const pid=M[c.id+'|'+k];
     if(pid)pres[pid]=(pres[pid]||0)+v;else if(pid!==null)sin.push({c,it,q:v})}
@@ -1680,7 +1684,7 @@ function vResumen(){
   let tc=0,tmo=0,pend=0;rs.forEach(r=>{tc+=r.con;tmo+=r.mo;if(!r.con)pend+=r.mo});
   const al=[];
   rs.forEach(r=>{const[e,t]=estado(r);if(e==='rojo'||e==='amarillo')al.push([e,`<b>${esc(r.nombre)}</b><div class="sub">${t}. Mano de obra presupuestada ${gs(r.mo)} · contratada ${gs(r.con)} (${esc([...r.quien].join(', '))}) · diferencia ${gs(r.con-r.mo)} Gs.</div>`])});
-  const pw=semanasPendientes();if(pw.length)al.unshift(['amarillo',`<b>Avance al cliente pendiente</b><div class="sub">Hay certificados de contratistas sin su avance al cliente en ${pw.length===1?'la semana del':'las semanas del'} ${pw.map(w=>ddm(w)).join(', ')}. Emitilo en Avance al cliente.</div>`]);
+  const pw=semanasPendientes();if(pw.length)al.unshift(['amarillo',`<b>Avance al cliente pendiente</b><div class="sub">Hay ${pw.length} semana${pw.length>1?'s':''} de certificados de contratistas (hasta el ${ddm(pw[pw.length-1])}) que todavía no están en un avance al cliente. Emitilo en Avance al cliente.</div>`]);
   const sin=rs.filter(r=>!r.con&&r.mo>0);
   if(sin.length)al.push(['gris',`<b>${sin.length} rubros sin contratista</b><div class="sub">${sin.map(r=>esc(r.nombre)).join(' · ')}. Mano de obra presupuestada pendiente de contratar: ${gs(pend)} Gs.</div>`]);
   const igual=rs.filter(r=>r.con&&Math.abs(r.con-r.mo)<1);
@@ -1738,10 +1742,12 @@ function vAvance(){
   const certs=ES.doc.certs||[];const ult=certs.length?certs[certs.length-1].n:0;
   if(ES.cert==null)ES.cert=ult+1>1?ult:1;
   const nuevo=ES.cert===ult+1;
-  if(nuevo&&!ES.per){const pend=semanasPendientes();const h=ultHasta();ES.per=pend[0]||(h?addD(h,1):addD(sab(hoy),-7))}
-  const sem=certsSemana(nuevo?ES.per:(certs.find(x=>x.n===ES.cert)||{}).desde);
-  if(nuevo&&!ES.cargado&&sem.length&&!Object.keys(ES.borr).length){Object.assign(ES.borr,avanceDesde(sem).pres);ES.cargado=ES.per}
-  const c=nuevo?{n:ult+1,pres:ES.borr,desde:ES.per,hasta:addD(ES.per,6)}:certs.find(x=>x.n===ES.cert);
+  if(nuevo&&!ES.desde){const h=ultHasta();ES.desde=h?addD(h,1):iso(new Date(parse(hoy).getFullYear(),parse(hoy).getMonth(),1));ES.hasta=finMes(ES.desde)}
+  const cv=nuevo?null:certs.find(x=>x.n===ES.cert);
+  const sem=nuevo?certsRango(ES.desde,ES.hasta):(cv&&cv.contratistas?certsRango(cv.desde,cv.hasta):certsRango(cv&&cv.desde,cv&&cv.hasta));
+  const clave=ES.desde+'|'+ES.hasta;
+  if(nuevo&&ES.cargado!==clave&&!Object.keys(ES.borr).length&&sem.length){Object.assign(ES.borr,avanceDesde(sem).pres);ES.cargado=clave}
+  const c=nuevo?{n:ult+1,pres:ES.borr,desde:ES.desde,hasta:ES.hasta}:cv;
   const ant=acum(c.n-1);const q=(ES.buscar||'').toLowerCase();
   let tP=0,tAc=0,over=[];const rows=[];let lastR=null;
   for(const i of ES.doc.items){
@@ -1754,11 +1760,14 @@ function vAvance(){
   }
   const T=totales();
   const chips=certs.map(x=>`<button class="chip-p" data-pact="ver" data-n="${x.n}" aria-pressed="${x.n===ES.cert}">N°${x.n}</button>`).join('')+`<button class="chip-p" style="border-style:dashed" data-pact="ver" data-n="${ult+1}" aria-pressed="${nuevo}">+ Nuevo N°${ult+1}</button>`;
-  const solapa=nuevo&&certs.find(x=>x.desde&&!(addD(ES.per,6)<x.desde||ES.per>x.hasta));
+  const solapa=nuevo&&certs.find(x=>x.desde&&!(ES.hasta<x.desde||ES.desde>x.hasta));const malRango=nuevo&&ES.hasta<ES.desde;
   return `
-  <div class="bar between"><div><h2>Avance al cliente · certificado N°${c.n}</h2><div class="sub">${esc(OBRA_P().cliente)} · período ${ddm(c.desde)} al ${ddm(c.hasta)}${Object.keys(ES.doc.base||{}).length?' · el anterior incluye el avance registrado en tu planilla':''}</div></div><div class="subnav-p">${chips}</div></div>
-  ${nuevo?`<div class="panel form"><label>Desde (sábado)<input type="date" id="pp-desde" value="${ES.per}"></label><label>Hasta (viernes)<input type="date" value="${addD(ES.per,6)}" disabled></label>
-    ${solapa?`<div class="hint rojo" style="grid-column:1/-1">Este período se superpone con el certificado N°${solapa.n}.</div>`:''}</div>
+  <div class="bar between"><div><h2>Avance al cliente · certificado N°${c.n}</h2><div class="sub">${esc(OBRA_P().cliente)} · período ${dm(c.desde)}/${(c.desde||'').slice(0,4)} al ${dm(c.hasta)}/${(c.hasta||'').slice(0,4)}${Object.keys(ES.doc.base||{}).length?' · el anterior incluye el avance registrado en tu planilla':''}</div></div><div class="subnav-p">${chips}</div></div>
+  ${nuevo?`<div class="panel form"><label>Desde<input type="date" id="pp-desde" value="${ES.desde}"></label><label>Hasta<input type="date" id="pp-hasta" value="${ES.hasta}" min="${ES.desde}"></label>
+    <button type="button" class="btn ghost" data-pact="mes">Hasta fin de ${MESES_P[parse(ES.desde).getMonth()]}</button>
+    <div class="sub" style="grid-column:1/-1">Anterior = todo lo ya certificado al cliente${Object.keys(ES.doc.base||{}).length?' (incluye el avance de tu planilla hasta el '+dm(ES.doc.baseHasta||'')+')':''}. Presente = lo que certificaron los contratistas en las semanas que terminan dentro de este período.</div>
+    ${solapa?`<div class="hint rojo" style="grid-column:1/-1">Este período se superpone con el certificado N°${solapa.n} (${dm(solapa.desde)} al ${dm(solapa.hasta)}). Empezá después del ${dm(solapa.hasta)}.</div>`:''}
+    ${malRango?`<div class="hint rojo" style="grid-column:1/-1">La fecha "hasta" es anterior a "desde".</div>`:''}</div>
     <div class="hint amarillo">Cargá en <b>Presente</b> lo ejecutado en la semana. Anterior y Acumulado se calculan solos.</div>`:''}
   ${panelSemana(sem,nuevo,c)}
   <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">
@@ -1771,7 +1780,7 @@ function vAvance(){
     <div><small>Acumulado al cliente</small><b>${gs(tAc)}</b></div>
     <div><small>Avance de la obra</small><b>${pc(tAc/T.tot)}</b></div>
     ${selP()}
-    ${nuevo?`<button class="btn" data-pact="pdfborr" data-n="${c.n}" ${tP?'':'disabled'}>PDF borrador</button><button class="btn primary" data-pact="emitir" ${(!tP||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-pact="pdfav" data-n="${c.n}">Descargar PDF</button>`}
+    ${nuevo?`<button class="btn" data-pact="pdfborr" data-n="${c.n}" ${tP?'':'disabled'}>PDF borrador</button><button class="btn primary" data-pact="emitir" ${(!tP||over.length||solapa||malRango)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`<button class="btn primary" data-pact="pdfav" data-n="${c.n}">Descargar PDF</button>`}
     <div class="letras">En letras: ${tP?letrasGs(tP)+' guaraníes':'—'}</div>
     ${over.length?`<div class="hint rojo letras">Supera lo presupuestado: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')}.</div>`:''}
   </div>`;
@@ -1781,19 +1790,19 @@ function vAvance(){
 function panelSemana(sem,nuevo,c){
   const tot=sem.reduce((s,x)=>s+x.monto,0);const{pres,sin}=avanceDesde(sem);
   const moPres=ES.doc.items.reduce((s,i)=>s+(Number(c.pres[i.id]||0))*i.mo*(ES.doc.indice||1),0);
-  const pend=semanasPendientes().filter(w=>w!==ES.per);
+  const pend=semanasPendientes().filter(w=>!(w>=c.desde&&w<=c.hasta));
   const its=ES.doc.items.filter(i=>sin.some(x=>rnum(x.it.rubro)===rnum(i.rubro)));
-  return `<div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Contratistas de la semana ${ddm(c.desde)} al ${ddm(c.hasta)}</h3>
+  return `<div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Certificados de contratistas del ${dm(c.desde)} al ${dm(c.hasta)}</h3>
       ${nuevo&&sem.length?`<button class="btn" data-pact="traer">Volver a cargar desde los contratistas</button>`:''}</div>
     ${sem.length?`<div class="tw"><table><thead><tr><th>Contratista</th><th>Certificado</th><th class="n">Monto</th><th>Pago</th></tr></thead><tbody>
       ${sem.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])} <span class="sub">${esc((x.c.tipo||'').replace('Mano de obra · ',''))}</span></td><td>N°${x.x.n}</td><td class="n">${gs(x.monto)}</td><td>${x.pago?'pagado el '+ddm(x.pago.fecha):'<span class="sub">pendiente</span>'}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td>Total contratistas</td><td></td><td class="n">${gs(tot)}</td><td></td></tr></tfoot></table></div>
-      <div class="alerta">${moPres+1>=tot?'<i class="dot verde"></i>':'<i class="dot rojo"></i>'}<div><b>Mano de obra presupuestada en este avance: ${gs(moPres)}</b><div class="sub">${moPres+1>=tot?'Cubre lo que se paga a los contratistas esta semana.':`Se paga a los contratistas ${gs(tot-moPres)} más de lo que el presupuesto prevé de mano de obra para este avance.`}</div></div></div>`
-    :`<p class="sub" style="padding:12px 14px">No hay certificados de contratistas para esta semana. Emití primero los certificados de cada contratista (Contratistas → Certificados) para que el avance se cargue solo.</p>`}
+      <div class="alerta">${moPres+1>=tot?'<i class="dot verde"></i>':'<i class="dot rojo"></i>'}<div><b>Mano de obra presupuestada en este avance: ${gs(moPres)}</b><div class="sub">${moPres+1>=tot?'Cubre lo que se paga a los contratistas en este período.':`En este período se paga a los contratistas ${gs(tot-moPres)} más de lo que el presupuesto prevé de mano de obra para este avance.`}</div></div></div>`
+    :`<p class="sub" style="padding:12px 14px">No hay certificados de contratistas que cierren en este período. Emití primero los certificados de cada contratista (Contratistas → Certificados), o cargá el avance a mano.</p>`}
     ${nuevo&&sin.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>${sin.length} ítem${sin.length>1?'s':''} de contratistas sin vincular al presupuesto</b><div class="sub">Elegí a qué ítem del presupuesto corresponde cada uno. Queda guardado para las próximas semanas.</div>
       <div class="tw"><table><tbody>${sin.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])}</td><td class="desc">${esc(x.it.n+' '+x.it.desc)} <span class="sub">(${q2(x.q)} ${esc(x.it.unidad)})</span></td>
         <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${its.filter(i=>rnum(i.rubro)===rnum(x.it.rubro)).map(i=>`<option value="${i.id}">${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
-    ${nuevo&&pend.length?`<p class="sub" style="padding:0 14px 12px">También hay certificados de contratistas sin avance al cliente en: ${pend.map(w=>ddm(w)).join(', ')}.</p>`:''}
+    ${nuevo&&pend.length?`<p class="sub" style="padding:0 14px 12px">Quedan afuera de este período certificados de contratistas que cierran el ${pend.map(w=>dm(w)).join(', ')}.</p>`:''}
   </div>`;
 }
 
@@ -1872,13 +1881,14 @@ document.addEventListener('click',e=>{
   if(t.dataset.ptab){ES.tab=t.dataset.ptab;ES.buscar='';return render()}
   const a=t.dataset.pact;
   if(a==='ver'){ES.cert=+t.dataset.n;return render()}
-  if(a==='traer'){const sem=certsSemana(ES.per);ES.borr=avanceDesde(sem).pres;ES.cargado=ES.per;render();return toast('Avance cargado desde los certificados de contratistas')}
+  if(a==='mes'){ES.hasta=finMes(ES.desde);ES.borr={};ES.cargado=null;return render()}
+  if(a==='traer'){const sem=certsRango(ES.desde,ES.hasta);ES.borr=avanceDesde(sem).pres;ES.cargado=ES.desde+'|'+ES.hasta;render();return toast('Avance cargado desde los certificados de contratistas')}
   if(a==='emitir'){const certs=ES.doc.certs=ES.doc.certs||[];const n=(certs.length?certs[certs.length-1].n:0)+1;const pres={};for(const[k,v]of Object.entries(ES.borr))if(Number(v))pres[k]=Number(v);
-    const sem=certsSemana(ES.per);certs.push({n,fecha:hoy,desde:ES.per,hasta:addD(ES.per,6),pres,contratistas:sem.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.per=null;ES.cargado=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
+    const sem=certsRango(ES.desde,ES.hasta);certs.push({n,fecha:hoy,desde:ES.desde,hasta:ES.hasta,pres,contratistas:sem.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.desde=null;ES.hasta=null;ES.cargado=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
   if(a==='pdfres')return pdfResumen();
   if(a==='pdfdet')return pdfDetalle();
   if(a==='pdfav')return pdfAvance(+t.dataset.n,modoP());
-  if(a==='pdfborr')return pdfAvance(+t.dataset.n,modoP(),{n:+t.dataset.n,pres:{...ES.borr},desde:ES.per,hasta:addD(ES.per,6)});
+  if(a==='pdfborr')return pdfAvance(+t.dataset.n,modoP(),{n:+t.dataset.n,pres:{...ES.borr},desde:ES.desde,hasta:ES.hasta});
 });
 document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
@@ -1887,9 +1897,10 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   if(!dentro(e))return;const t=e.target;
-  if(t.id==='pp-desde'&&t.value){const v=sab(t.value);if(v!==t.value)toast('Ajustado al sábado '+dm(v));ES.per=v;ES.borr={};ES.cargado=null;render()}
+  if(t.id==='pp-desde'&&t.value){ES.desde=t.value;if(!ES.hasta||ES.hasta<ES.desde)ES.hasta=finMes(ES.desde);ES.borr={};ES.cargado=null;render()}
+  if(t.id==='pp-hasta'&&t.value){ES.hasta=t.value;ES.borr={};ES.cargado=null;render()}
   if(t.dataset.vinc){ES.doc.vinculos=ES.doc.vinculos||{};if(t.value)ES.doc.vinculos[t.dataset.vinc]=t.value;else delete ES.doc.vinculos[t.dataset.vinc];guardar();
-    if(ES.cargado){ES.borr=avanceDesde(certsSemana(ES.per)).pres}render();toast('Vínculo guardado')}
+    if(ES.cargado){ES.borr=avanceDesde(certsRango(ES.desde,ES.hasta)).pres}render();toast('Vínculo guardado')}
 });
 document.addEventListener('submit',e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
