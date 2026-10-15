@@ -2436,13 +2436,14 @@ function pdfPedido(p){
   const cs=conP?{0:{halign:'center',cellWidth:10},2:{cellWidth:20},3:{halign:'right',cellWidth:18},4:{cellWidth:38},5:{halign:'right',cellWidth:22},6:{halign:'right',cellWidth:24}}:{0:{halign:'center',cellWidth:12},2:{cellWidth:24},3:{halign:'right',cellWidth:22},4:{cellWidth:55}};
   y=PDFK.tabla(doc,{startY:y,head:[head],body:body.length?body:[[{content:'Sin materiales.',colSpan:head.length}]],foot:conP?[[{content:'TOTAL Gs',colSpan:6,styles:{halign:'right'}},{content:gs(total(p)),styles:{halign:'right'}}]]:undefined,columnStyles:cs});
   if(p.nota){doc.setFont('times','italic');doc.setFontSize(9.5);doc.text('Nota: '+p.nota,PDFK.ML,y+6,{maxWidth:180});y+=6}
-  if((p.sugeridos||[]).length){if(y>245){doc.addPage();y=PDFK.TOP}
-    doc.setFont('times','bold');doc.setFontSize(8.5);doc.setTextColor(60);doc.text('Proveedores sugeridos',PDFK.ML,y+7);const wT=doc.getTextWidth('Proveedores sugeridos ');
-    doc.setFont('times','italic');doc.setFontSize(7);doc.text('— sugerencia de la Dirección de Obra; el proveedor lo elige el cliente.',PDFK.ML+wT+1,y+7);doc.setTextColor(0);
-    y=PDFK.tabla(doc,{startY:y+9,head:[['N°','Proveedor','Contacto','Teléfono','Observación']],body:p.sugeridos.map((x,k)=>[k+1,x.nombre+(p.proveedor&&p.proveedor===x.nombre?' (elegido)':''),x.contacto||'',x.telefono||'',[x.obs,x.email].filter(Boolean).join(' · ')]),
-      styles:{fontSize:7,cellPadding:0.8,textColor:60,lineColor:[190,190,190],lineWidth:0.1},headStyles:{fillColor:[245,245,245],textColor:60,fontStyle:'bold',fontSize:7},
-      columnStyles:{0:{halign:'center',cellWidth:8},2:{cellWidth:30},3:{cellWidth:26}}});
-    doc.setFont('times','normal');doc.setFontSize(8);doc.setTextColor(60);doc.text('Proveedor elegido por el cliente: '+(p.proveedor||'______________________________'),PDFK.ML,y+5);doc.setTextColor(0);y+=5}
+  if((p.sugeridos||[]).length){if(y>260){doc.addPage();y=PDFK.TOP}
+    doc.setFont('times','bold');doc.setFontSize(6.5);doc.setTextColor(110);doc.text('Proveedores sugeridos',PDFK.ML,y+6);const wT=doc.getTextWidth('Proveedores sugeridos ');
+    doc.setFont('times','italic');doc.text('(sugerencia de la Dirección de Obra; el proveedor lo elige el cliente)',PDFK.ML+wT+0.5,y+6);doc.setTextColor(0);
+    y=PDFK.tabla(doc,{startY:y+7,theme:'plain',tableWidth:140,head:[['N°','Proveedor','Contacto','Teléfono','Observación']],
+      body:p.sugeridos.map((x,k)=>[k+1,x.nombre+(p.proveedor&&p.proveedor===x.nombre?' (elegido)':''),x.contacto||'',x.telefono||'',[x.obs,x.email].filter(Boolean).join(' · ')]),
+      styles:{fontSize:6,cellPadding:0.4,textColor:110,lineWidth:0},headStyles:{fillColor:false,textColor:110,fontStyle:'bold',fontSize:6},
+      columnStyles:{0:{cellWidth:6},1:{cellWidth:38},2:{cellWidth:30},3:{cellWidth:22}}});
+    doc.setFont('times','normal');doc.setFontSize(6.5);doc.setTextColor(110);doc.text('Proveedor elegido por el cliente: '+(p.proveedor||'_______________________'),PDFK.ML,y+4);doc.setTextColor(0);y+=4}
   PDFK.firmas(doc,y+2,(p.sugeridos||[]).length?['Solicitado por\nDirección de Obra','Conformidad del cliente']:['Solicitado por\nDirección de Obra','Autorizado por']);
   PDFK.cerrar(doc,`Pedido_${p.numero}_${(p.ref||'').trim()}_${p.fecha}`);
 }
