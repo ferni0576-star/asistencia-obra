@@ -385,6 +385,9 @@ function backendLocal(){
       return d.pedidos.filter(p=>p.obra_id===oid).map(p=>JSON.parse(JSON.stringify(p)))},
     async savePedido(p){const v=JSON.parse(JSON.stringify(p));const i=d.pedidos.findIndex(x=>x.id===p.id);if(i>=0)d.pedidos[i]=v;else d.pedidos.push(v);save()},
     async delPedido(id){d.pedidos=d.pedidos.filter(x=>x.id!==id);save()},
+    async proveedores(){if(!d.proveedores){d.proveedores=[];save()}return JSON.parse(JSON.stringify(d.proveedores))},
+    async saveProveedor(v){const x=JSON.parse(JSON.stringify(v));const i=d.proveedores.findIndex(y=>y.id===v.id);if(i>=0)d.proveedores[i]=x;else d.proveedores.push(x);save()},
+    async delProveedor(id){d.proveedores=d.proveedores.filter(x=>x.id!==id);save()},
   };
 }
 function backendNube(sb){
@@ -418,6 +421,9 @@ function backendNube(sb){
     async pedidos(oid){if(!oid)return[];return ok(await sb.from('pedidos').select('*').eq('obra_id',oid).order('numero')).map(p=>({...p,items:p.items||[]}))},
     async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items}))},
     async delPedido(id){ok(await sb.from('pedidos').delete().eq('id',id))},
+    async proveedores(){return ok(await sb.from('proveedores').select('*').order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
+    async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
+    async delProveedor(id){ok(await sb.from('proveedores').delete().eq('id',id))},
   };
 }
 
@@ -1099,6 +1105,7 @@ window.ASIS_OBRA=()=>obraAct();
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
+window.PVB={list:()=>DB.proveedores(),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
 const SEMILLA_PEDIDOS=[];
 window.PLB=(()=>{
   if(NUBE)return{
@@ -2228,12 +2235,108 @@ function vVer(){
     ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
     <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
   </div>
+  ${vSugeridos(p)}
   <div class="panel">
     <div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div><h3>Control de llegada a obra</h3><span class="sub">Tildá cada material cuando llega. Si llegó una parte, cargá la cantidad en “Parcial / nota”.</span></div>
       ${e!=='ok'?`<button class="btn sm" data-mact="todo">Llegó todo</button>`:`<button class="btn sm ghost" data-mact="nada">Desmarcar todo</button>`}</div>
     <div class="m-chks">${p.items.map((i,k)=>filaChk(p,i,k,false)).join('')||'<p class="sub" style="padding:14px">El pedido no tiene materiales.</p>'}</div>
   </div>`;
 }
+
+
+/* ---------- proveedores: directorio + sugerencias ---------- */
+const RUBROS=[
+ ['Corralón (arena, cemento, ladrillo)',/arena|piedra|triturad|cemento|\bcal\b|cal hidrat|ladrillo|bloque|suelo|relleno|cascote/],
+ ['Hormigón elaborado',/hormig[oó]n elaborado|hormigon elaborado|h ?2[0-9]{2}/],
+ ['Hierros y alambres',/varilla|hierro|alambre|malla|estribo|separador/],
+ ['Maderas',/tabla|alfaj|puntal|madera|tirante|encofrado|terciad/],
+ ['Chapas y techos',/chapa|teja|canaleta|cumbrera/],
+ ['Electricidad',/cable|electroducto|el[eé]ctric|interruptor|tomacorriente|aislador|prensa|t[eé]rmic|preensambl|pimenton/],
+ ['Plomería y sanitarios',/ca[nñ]o.*(agua|media|1\/2)|codo|uni[oó]n|\bt de\b|canilla|llave de paso|tefl[oó]n|cisterna|sisterna|inodoro|pvc|ca[nñ]o negro de media/],
+ ['Impermeabilizantes y pinturas',/asf[aá]lt|impermeab|negrolin|vedacit|murokall|hidr[oó]fu|pintura|aislapol|brocha|rodillo/],
+ ['Ferretería y herramientas',/clavo|bisagra|candado|cadena|disco|tornillo|tanza|hilo|cinta|balde|pala|carretilla|herramient|portacandado/],
+ ['Seguridad (EPP)',/zapat[oó]n|casco|chaleco|cahaleco|guante|botas|anteojo|arn[eé]s/],
+ ['Alquiler de equipos',/alquiler|motobomba|retroexcavad|sapito|compactad|andamio|mezcladora|hormigonera/]
+];
+const RN=RUBROS.map(x=>x[0]);
+const rubroDe=d=>{const t=String(d||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');for(const[n,re]of RUBROS){const re2=new RegExp(re.source.normalize('NFD').replace(/[̀-ͯ]/g,''));if(re2.test(t))return n}return 'Otros'};
+const PV={lista:null,cargando:false,edit:null,rubro:'Todos',q:'',confirm:null};
+async function cargarPV(){if(PV.cargando)return;PV.cargando=true;try{PV.lista=await window.PVB.list()}catch(e){PV.lista=[]}PV.cargando=false;render()}
+const telWA=t=>{let d=String(t||'').replace(/\D/g,'');if(!d)return'';if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='595'+d.slice(1);else if(!d.startsWith('595')&&d.length<=9)d='595'+d;return d};
+const mapa=q=>'https://www.google.com/maps/search/'+encodeURIComponent(q+' cerca de '+((OB()||{}).ubicacion||'Encarnación, Itapúa'));
+function textoPedido(p,items,pv){const o=OB()||{};const emp=(typeof S!=='undefined'&&S.aj&&S.aj.empresa)||'Avaroga Arquitectura S.A';
+  return `Hola${pv&&pv.contacto?' '+pv.contacto:''}, le escribe ${emp}. Necesitamos cotización y disponibilidad de entrega para el pedido N° ${p.numero}${p.ref?' ('+p.ref+')':''}, obra ${o.nombre||''}${o.ubicacion?' – '+o.ubicacion:''}:\n\n`+
+    items.map((i,k)=>`${k+1}. ${i.desc} – ${fq(i.cant)} ${i.ud||''}`).join('\n')+`\n\nMuchas gracias.`}
+function contactos(pv,p,items){const wa=telWA(pv.whatsapp||pv.telefono);const txt=p?textoPedido(p,items,pv):'';
+  return `${wa?`<a class="btn sm pv-wa" target="_blank" rel="noopener" href="https://wa.me/${wa}${txt?'?text='+encodeURIComponent(txt):''}">${p?'Enviar por WhatsApp':'WhatsApp'}</a>`:''}
+    ${pv.telefono?`<a class="btn sm" href="tel:${esc(String(pv.telefono).replace(/[^\d+]/g,''))}">Llamar</a>`:''}
+    ${pv.email?`<a class="btn sm" href="mailto:${esc(pv.email)}${p?`?subject=${encodeURIComponent('Pedido de materiales N° '+p.numero)}&body=${encodeURIComponent(txt)}`:''}">Email</a>`:''}
+    ${pv.direccion?`<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/${encodeURIComponent(pv.direccion)}">Ubicación</a>`:''}`}
+function sugerencias4(p){
+  const L=PV.lista||[];const rub={};p.items.forEach(i=>{const r=rubroDe(i.desc);(rub[r]=rub[r]||[]).push(i)});
+  const usados={};M.lista.forEach(q=>{if(!q.proveedor)return;q.items.forEach(i=>{const k=(i.desc||'').trim().toLowerCase();(usados[k]=usados[k]||new Set()).add(q.proveedor.trim().toLowerCase())})});
+  const res=L.map(pv=>{const rs=pv.rubros||[];const nom=(pv.nombre||'').trim().toLowerCase();
+    const cubre=p.items.filter(i=>rs.includes(rubroDe(i.desc))||(usados[(i.desc||'').trim().toLowerCase()]||new Set()).has(nom));
+    const hist=p.items.filter(i=>(usados[(i.desc||'').trim().toLowerCase()]||new Set()).has(nom)).length;
+    return{pv,cubre,hist,score:cubre.length*10+hist*3+(pv.favorito?2:0)}}).filter(x=>x.cubre.length).sort((a,b)=>b.score-a.score);
+  const sinProv=Object.keys(rub).filter(r=>!res.some(x=>(x.pv.rubros||[]).includes(r)));
+  const enDir=new Set(L.map(x=>(x.nombre||'').trim().toLowerCase()));
+  const viejos=[...new Set(M.lista.filter(q=>q.proveedor&&!enDir.has(q.proveedor.trim().toLowerCase())).map(q=>q.proveedor.trim()))];
+  return{res,rub,sinProv,viejos}}
+function vSugeridos(p){
+  if(PV.lista===null){cargarPV();return '<div class="panel" style="padding:14px"><span class="sub">Buscando proveedores…</span></div>'}
+  const{res,rub,sinProv,viejos}=sugerencias4(p);
+  return `<div class="panel">
+    <div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div><h3>Proveedores sugeridos</h3><span class="sub">Según los materiales del pedido: ${Object.entries(rub).map(([r,i])=>esc(r)+' ('+i.length+')').join(' · ')}</span></div>
+      <button class="btn sm" data-mtab="proveedores">Ver todos los proveedores</button></div>
+    ${res.slice(0,5).map(({pv,cubre,hist})=>`<div class="pv-sug">
+      <div class="pv-info"><div class="bar" style="gap:6px"><b>${esc(pv.nombre)}</b>${pv.favorito?'<span class="m-badge ok">Preferido</span>':''}${p.proveedor&&p.proveedor.trim().toLowerCase()===pv.nombre.trim().toLowerCase()?'<span class="m-badge warn">Asignado</span>':''}</div>
+        <span class="sub">${pv.contacto?esc(pv.contacto)+' · ':''}${pv.telefono?esc(pv.telefono)+' · ':''}tiene ${cubre.length} de ${p.items.length} materiales${hist?' · ya le compraste '+hist:''}</span>
+        <span class="sub pv-items">${cubre.slice(0,4).map(i=>esc(i.desc)).join(' · ')}${cubre.length>4?' · …':''}</span></div>
+      <div class="pv-btns">${contactos(pv,p,cubre)}<button class="btn sm ghost" data-mact="asignar" data-pv="${pv.id}">Asignar al pedido</button></div></div>`).join('')
+      ||`<p class="sub" style="padding:12px 14px">Todavía no tenés proveedores cargados para estos materiales.</p>`}
+    ${sinProv.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>Sin proveedor en tu lista para:</b> ${sinProv.map(esc).join(', ')}
+      <div class="bar" style="margin-top:6px">${sinProv.filter(r=>r!=='Otros').map(r=>`<a class="btn sm" target="_blank" rel="noopener" href="${mapa(r.split(' (')[0])}">Buscar ${esc(r.split(' (')[0].toLowerCase())} en el mapa</a>`).join('')}<button class="btn sm primary" data-mact="pv-nuevo" data-r="${esc(sinProv[0])}">+ Agregar proveedor</button></div></div></div>`:''}
+    ${viejos.length?`<p class="sub" style="padding:0 14px 12px">Proveedores de pedidos anteriores sin contacto guardado: ${viejos.map(v=>`<button class="btn sm ghost" data-mact="pv-nuevo" data-n="${esc(v)}">${esc(v)} +</button>`).join(' ')}</p>`:''}
+  </div>`}
+function vProveedores(){
+  if(PV.lista===null){cargarPV();return '<p class="sub">Cargando proveedores…</p>'}
+  const q=PV.q.trim().toLowerCase();const usados=new Set(PV.lista.flatMap(x=>x.rubros||[]));
+  const vis=PV.lista.filter(pv=>(PV.rubro==='Todos'||(pv.rubros||[]).includes(PV.rubro))&&(!q||[pv.nombre,pv.contacto,pv.telefono,pv.notas,(pv.rubros||[]).join(' ')].some(v=>(v||'').toLowerCase().includes(q))))
+    .sort((a,b)=>(b.favorito?1:0)-(a.favorito?1:0)||a.nombre.localeCompare(b.nombre));
+  const compras=nom=>M.lista.filter(p=>(p.proveedor||'').trim().toLowerCase()===nom.trim().toLowerCase()).length;
+  return `
+  <div class="bar between"><div><h2>Proveedores</h2><div class="sub">Tu lista de proveedores y contactos. Sirve para todas las obras.</div></div>
+    <div class="bar"><input type="text" id="pv-q" placeholder="Buscar proveedor o material" value="${esc(PV.q)}" style="width:220px"><button class="btn primary" data-mact="pv-nuevo">+ Agregar proveedor</button></div></div>
+  ${PV.edit?vPVForm():''}
+  <div class="subnav-p">${['Todos',...RN.filter(r=>usados.has(r))].map(r=>`<button class="chip-p" data-mact="pv-rubro" data-r="${esc(r)}" aria-pressed="${PV.rubro===r}">${esc(r.split(' (')[0])}</button>`).join('')}</div>
+  <div class="pv-grid">${vis.map(pv=>`<div class="panel pv-card">
+    <div class="bar between"><b>${esc(pv.nombre)}</b>${pv.favorito?'<span class="m-badge ok">Preferido</span>':''}</div>
+    <span class="sub">${[pv.contacto,pv.telefono,pv.email].filter(Boolean).map(esc).join(' · ')||'Sin datos de contacto'}</span>
+    ${pv.direccion?`<span class="sub">${esc(pv.direccion)}</span>`:''}
+    <div class="pv-chips">${(pv.rubros||[]).map(r=>`<span>${esc(r.split(' (')[0])}</span>`).join('')}</div>
+    ${pv.notas?`<span class="sub" style="font-style:italic">${esc(pv.notas)}</span>`:''}
+    <span class="sub">${compras(pv.nombre)?compras(pv.nombre)+' pedido'+(compras(pv.nombre)>1?'s':'')+' en esta obra':'Sin pedidos en esta obra'}</span>
+    <div class="pv-btns">${contactos(pv,null,[])}<button class="btn sm ghost" data-mact="pv-editar" data-pv="${pv.id}">Editar</button>
+      ${PV.confirm===pv.id?`<button class="btn sm" style="color:var(--bad)" data-mact="pv-borrar" data-pv="${pv.id}">¿Borrar?</button>`:`<button class="btn sm ghost" data-mact="pv-conf" data-pv="${pv.id}" aria-label="Borrar proveedor">×</button>`}</div>
+  </div>`).join('')||`<div class="panel" style="padding:16px">${PV.lista.length?'Ningún proveedor coincide.':'Todavía no cargaste proveedores. Agregá los que ya usás, o buscá nuevos en el mapa:'}</div>`}</div>
+  <div class="panel" style="padding:12px 14px"><b>Buscar proveedores nuevos cerca de la obra</b><div class="sub" style="margin:2px 0 8px">Abre Google Maps con negocios reales, teléfonos y opiniones. Cuando elijas uno, agregalo a tu lista.</div>
+    <div class="bar">${RN.map(r=>`<a class="btn sm" target="_blank" rel="noopener" href="${mapa(r.split(' (')[0])}">${esc(r.split(' (')[0])}</a>`).join('')}</div></div>`;
+}
+function vPVForm(){const v=PV.edit;
+  return `<form class="panel form" id="pv-f" autocomplete="off">
+    <h3 style="grid-column:1/-1">${v.id?'Editar proveedor':'Nuevo proveedor'}</h3>
+    <label class="wide">Nombre del negocio<input type="text" name="nombre" value="${esc(v.nombre||'')}" required></label>
+    <label>Persona de contacto<input type="text" name="contacto" value="${esc(v.contacto||'')}"></label>
+    <label>Teléfono<input type="text" inputmode="tel" name="telefono" value="${esc(v.telefono||'')}" placeholder="0985 123 456"></label>
+    <label>WhatsApp (si es otro número)<input type="text" inputmode="tel" name="whatsapp" value="${esc(v.whatsapp||'')}"></label>
+    <label>Email<input type="text" inputmode="email" name="email" value="${esc(v.email||'')}"></label>
+    <label class="wide">Dirección<input type="text" name="direccion" value="${esc(v.direccion||'')}" placeholder="Calle, ciudad"></label>
+    <fieldset class="pv-rub" style="grid-column:1/-1"><legend>¿Qué te vende?</legend>${RN.map(r=>`<label><input type="checkbox" name="rubros" value="${esc(r)}" ${(v.rubros||[]).includes(r)?'checked':''}> ${esc(r)}</label>`).join('')}</fieldset>
+    <label class="wide">Notas<input type="text" name="notas" value="${esc(v.notas||'')}" placeholder="Ej.: entrega en obra sin costo, cuenta corriente 30 días"></label>
+    <label class="chk" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" name="favorito" ${v.favorito?'checked':''}> Preferido</label>
+    <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar proveedor</button><button type="button" class="btn ghost" data-mact="pv-cancelar">Cancelar</button></div>
+  </form>`}
 
 function vFaltantes(){
   const L=ordenados().filter(p=>p.items.some(i=>estItem(i)!=='ok'));
@@ -2260,7 +2363,7 @@ function vForm(){
       <label class="wide">Nota (opcional)<input type="text" name="nota" value="${esc(f.nota||'')}"></label>
     </div>
     <datalist id="m-refs">${[...new Set(M.lista.map(p=>(p.ref||'').trim()).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
-    <datalist id="m-provs">${[...new Set(M.lista.map(p=>(p.proveedor||'').trim()).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
+    <datalist id="m-provs">${[...new Set([...(PV.lista||[]).map(x=>x.nombre),...M.lista.map(p=>(p.proveedor||'').trim())].filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
     <datalist id="m-mats">${hist.map(h=>`<option value="${esc(h.desc)}">`).join('')}</datalist>
     <datalist id="m-uds">${[...new Set(['Unidad','Kg','m3','m2','ml','Metros','Bolsa','Paquete','Caja','Rollo','Litros',...hist.map(h=>h.ud)].filter(Boolean))].map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
     <div class="m-items">
@@ -2290,8 +2393,8 @@ function render(){
   if(oid!==M.oid){root.innerHTML='<p class="sub">Cargando pedidos…</p>';cargar(oid);return}
   const foco=document.activeElement;const fid=foco&&foco.id,fmf=foco&&foco.dataset&&foco.dataset.mf,fk=foco&&foco.dataset&&foco.dataset.k;
   const enForm=M.vista==='editar';
-  const sub=enForm?'':`<div class="subnav-p no-print">${[['pedidos','Pedidos'],['faltantes','Faltantes']].map(([k,t])=>`<button class="chip-p" data-mtab="${k}" aria-pressed="${M.tab===k&&M.vista!=='ver'||(k==='pedidos'&&M.vista==='ver')}">${t}</button>`).join('')}</div>`;
-  root.innerHTML=sub+(enForm?vForm():M.vista==='ver'?vVer():M.tab==='faltantes'?vFaltantes():vLista());
+  const sub=enForm?'':`<div class="subnav-p no-print">${[['pedidos','Pedidos'],['faltantes','Faltantes'],['proveedores','Proveedores']].map(([k,t])=>`<button class="chip-p" data-mtab="${k}" aria-pressed="${M.tab===k&&M.vista!=='ver'||(k==='pedidos'&&M.vista==='ver')}">${t}</button>`).join('')}</div>`;
+  root.innerHTML=sub+(enForm?vForm():M.vista==='ver'?vVer():M.tab==='faltantes'?vFaltantes():M.tab==='proveedores'?vProveedores():vLista());
   if(fid){const el=document.getElementById(fid);if(el&&root.contains(el)){el.focus();if(el.setSelectionRange&&el.type==='text')el.setSelectionRange(el.value.length,el.value.length)}}
   else if(fmf){const el=root.querySelector(`[data-mf="${fmf}"][data-k="${fk}"]`);if(el)el.focus()}
 }
@@ -2357,6 +2460,13 @@ document.addEventListener('click',async e=>{
   if(!dentro(e))return;
   const tb=e.target.closest('[data-mtab]');if(tb){M.tab=tb.dataset.mtab;M.vista='lista';M.confirm=false;render();return}
   const t=e.target.closest('[data-mact]');if(!t)return;const a=t.dataset.mact;const p=M.lista.find(x=>x.id===(t.dataset.id||M.sel));
+  if(a==='pv-nuevo'){PV.edit={nombre:t.dataset.n||'',rubros:t.dataset.r&&t.dataset.r!=='Otros'?[t.dataset.r]:[]};if(M.vista==='ver'){M.vista='lista';M.tab='proveedores'}else M.tab='proveedores';render();window.scrollTo(0,0);return}
+  if(a==='pv-editar'){PV.edit={...(PV.lista.find(x=>x.id===t.dataset.pv)||{})};render();window.scrollTo(0,0);return}
+  if(a==='pv-cancelar'){PV.edit=null;return render()}
+  if(a==='pv-rubro'){PV.rubro=t.dataset.r;return render()}
+  if(a==='pv-conf'){PV.confirm=t.dataset.pv;return render()}
+  if(a==='pv-borrar'){try{await window.PVB.del(t.dataset.pv);PV.lista=PV.lista.filter(x=>x.id!==t.dataset.pv);PV.confirm=null;render();toast('Proveedor borrado')}catch(err){toast('No se pudo borrar')}return}
+  if(a==='asignar'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.proveedor=pv.nombre;render();await guardar(p);return toast('Proveedor asignado al pedido')}
   if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();window.scrollTo(0,0);return}
   if(a==='filtro'){M.filtro=t.dataset.f;return render()}
   if(a==='ver'){M.sel=t.dataset.id;M.vista='ver';M.confirm=false;M.abierto={};render();window.scrollTo(0,0);return}
@@ -2390,12 +2500,19 @@ document.addEventListener('change',async e=>{
 document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
   if(t.id==='m-buscar'){M.q=t.value;render();return}
+  if(t.id==='pv-q'){PV.q=t.value;render();return}
   if(t.dataset.mf&&M.form){const it=M.form.items[+t.dataset.k];const k=t.dataset.mf;
     if(k==='cant')it.cant=num(t.value);else if(k==='precio')it.precio=num(t.value)||0;else it[k]=t.value;
     const el=document.getElementById('m-total');if(el)el.textContent='Gs '+gs(total(M.form));return}
 });
 document.addEventListener('submit',async e=>{
-  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;if(f.id!=='m-form')return;
+  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;
+  if(f.id==='pv-f'){const fd=new FormData(f);const v={...PV.edit,nombre:(fd.get('nombre')||'').trim(),contacto:(fd.get('contacto')||'').trim(),telefono:(fd.get('telefono')||'').trim(),whatsapp:(fd.get('whatsapp')||'').trim(),
+      email:(fd.get('email')||'').trim(),direccion:(fd.get('direccion')||'').trim(),notas:(fd.get('notas')||'').trim(),rubros:fd.getAll('rubros'),favorito:!!fd.get('favorito')};
+    if(!v.nombre)return toast('Poné el nombre del proveedor');if(!v.id)v.id=nid();
+    try{await window.PVB.save(v)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 09 en Supabase?')}
+    const i=PV.lista.findIndex(x=>x.id===v.id);if(i>=0)PV.lista[i]=v;else PV.lista.push(v);PV.edit=null;render();return toast('Proveedor guardado')}
+  if(f.id!=='m-form')return;
   const quiere=e.submitter&&e.submitter.value||'';const F=M.form;F.numero=f.numero.value.trim();F.fecha=f.fecha.value;F.ref=f.ref.value.trim();F.proveedor=f.proveedor.value.trim();F.nota=f.nota.value.trim();
   F.items=F.items.filter(i=>(i.desc||'').trim()).map(i=>({...i,desc:i.desc.trim(),ud:(i.ud||'').trim()}));
   if(!F.items.length)return toast('Cargá al menos un material');
@@ -2416,6 +2533,21 @@ const css=document.createElement('style');css.textContent=`
 .m-card:hover{border-color:var(--muted)}
 .m-abrir{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px 6px;text-align:left;width:100%;cursor:pointer;background:none;border:0}
 .m-acc{display:flex;gap:6px;align-items:center;padding:0 14px 10px;flex-wrap:wrap}
+.pv-sug{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
+.pv-sug:first-of-type{border-top:0}
+.pv-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+.pv-items{font-size:12.5px}
+.pv-btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#ped-root a.btn{text-decoration:none;color:inherit;display:inline-block}
+.pv-wa{background:#25d366!important;border-color:#25d366!important;color:#fff!important}
+.pv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.pv-card{padding:12px 14px;display:flex;flex-direction:column;gap:5px}
+.pv-card .pv-btns{justify-content:flex-start;margin-top:4px}
+.pv-chips{display:flex;gap:4px;flex-wrap:wrap}.pv-chips span{font-size:11.5px;background:var(--chip);border-radius:99px;padding:2px 8px}
+.pv-rub{border:1px solid var(--line);border-radius:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;padding:8px 12px}
+.pv-rub legend{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 4px}
+.pv-rub label{flex-direction:row!important;align-items:center;gap:6px;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important}
+@media (max-width:760px){.pv-sug{grid-template-columns:1fr}.pv-btns{justify-content:flex-start}#pv-q{width:100%!important;flex:1 1 100%}}
 .m-desc{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;padding-top:10px;border-top:1px solid var(--line)}
 .m-n{font-weight:700;font-size:15px;min-width:52px}
 .m-info{display:flex;flex-direction:column;gap:3px;min-width:0}
