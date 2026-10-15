@@ -2285,10 +2285,21 @@ function sugerencias4(p){
   return{res,rub,sinProv,viejos}}
 const snap=pv=>({id:pv.id,nombre:pv.nombre,contacto:pv.contacto||'',telefono:pv.telefono||pv.whatsapp||'',email:pv.email||'',obs:''});
 const esSug=(p,id)=>(p.sugeridos||[]).some(x=>x.id===id);
+function picker(ctx,L){
+  if(PV.lista===null){cargarPV();return '<p class="sub">Cargando tu lista…</p>'}
+  if(!PV.lista.length)return `<p class="sub" style="margin:4px 0">Tu lista de proveedores está vacía. <button type="button" class="btn sm" data-mact="pv-nuevo">+ Agregar proveedor</button></p>`;
+  const q=(M.pq||'').trim().toLowerCase();const ids=new Set((L||[]).map(x=>x.id));
+  const vis=PV.lista.filter(pv=>!q||[pv.nombre,pv.contacto,(pv.rubros||[]).join(' ')].some(v=>(v||'').toLowerCase().includes(q))).sort((a,b)=>(ids.has(b.id)?1:0)-(ids.has(a.id)?1:0)||(b.favorito?1:0)-(a.favorito?1:0)||a.nombre.localeCompare(b.nombre));
+  return `<div class="pv-pick">
+    <input type="text" id="pick-q" placeholder="Buscar en mi lista (nombre o rubro)" value="${esc(M.pq||'')}">
+    <div class="pv-pick-l">${vis.map(pv=>`<label class="${ids.has(pv.id)?'on':''}"><input type="checkbox" data-mpick="${pv.id}" data-ctx="${ctx}" ${ids.has(pv.id)?'checked':''}>
+      <span><b>${esc(pv.nombre)}</b>${pv.favorito?' ★':''}<small>${[pv.contacto,pv.telefono].filter(Boolean).map(esc).join(' · ')}${(pv.rubros||[]).length?' · '+(pv.rubros||[]).map(r=>esc(r.split(' (')[0])).join(', '):''}</small></span></label>`).join('')||'<span class="sub">Ninguno coincide.</span>'}</div>
+    <span class="sub">${ids.size} seleccionado${ids.size===1?'':'s'}</span></div>`}
 function vParaCliente(p){const L=p.sugeridos||[];
   return `<div class="pv-cli">
     <div class="bar between"><div><b>Proveedores sugeridos al cliente</b> <span class="sub">· salen abajo del pedido (PDF y Excel) para que el cliente elija</span></div>
-      <button class="btn sm ghost" data-mact="sug-otro">+ Agregar otro</button></div>
+      <div class="bar"><button class="btn sm ${M.elegir?'primary':''}" data-mact="sug-lista">${M.elegir?'Listo':'Elegir de mi lista'}</button><button class="btn sm ghost" data-mact="sug-otro">+ Agregar otro</button></div></div>
+    ${M.elegir?picker('ver',p.sugeridos):''}
     ${M.sugOtro?`<form class="pv-otro" id="sug-f"><input type="text" name="nombre" placeholder="Proveedor" required><input type="text" name="contacto" placeholder="Contacto"><input type="text" name="telefono" placeholder="Teléfono"><input type="text" name="obs" placeholder="Precio / plazo / obs."><button class="btn sm primary">Agregar</button><button type="button" class="btn sm ghost" data-mact="sug-otro">Cancelar</button></form>`:''}
     ${L.length?`<ol class="pv-lista">${L.map((x,k)=>`<li><div class="pv-info"><div class="bar" style="gap:6px"><b>${esc(x.nombre)}</b>${p.proveedor&&p.proveedor.trim().toLowerCase()===x.nombre.trim().toLowerCase()?'<span class="m-badge ok">Elegido por el cliente</span>':''}</div><span class="sub">${[x.contacto,x.telefono,x.email].filter(Boolean).map(esc).join(' · ')||'sin contacto'}</span></div>
       <input type="text" data-sobs="${k}" value="${esc(x.obs||'')}" placeholder="Precio, plazo u observación para el cliente">
@@ -2390,6 +2401,7 @@ function vForm(){
         <button type="button" class="btn sm ghost" data-mact="quitar" data-k="${k}" aria-label="Quitar ítem ${k+1}">×</button>
       </div>`).join('')}
     </div>
+    <div class="pv-cli" style="border-top:1px solid var(--line);border-bottom:0"><b>Proveedores sugeridos al cliente <span class="sub" style="font-weight:400">(opcional · salen abajo del pedido)</span></b>${picker('form',f.sugeridos)}</div>
     <div class="bar between" style="padding:12px 14px;border-top:1px solid var(--line)">
       <button type="button" class="btn" data-mact="agregar">+ Agregar material</button>
       <span class="sub">Total: <b class="num" id="m-total">Gs ${gs(total(f))}</b></span>
@@ -2493,6 +2505,7 @@ document.addEventListener('click',async e=>{
   if(a==='sug-quitar'&&p){p.sugeridos.splice(+t.dataset.k,1);render();return guardar(p)}
   if(a==='sug-up'&&p){const k=+t.dataset.k;const L=p.sugeridos;[L[k-1],L[k]]=[L[k],L[k-1]];render();return guardar(p)}
   if(a==='sug-otro'){M.sugOtro=!M.sugOtro;return render()}
+  if(a==='sug-lista'){M.elegir=!M.elegir;M.pq='';return render()}
   if(a==='elegido'&&p){const x=p.sugeridos[+t.dataset.k];p.proveedor=p.proveedor===x.nombre?'':x.nombre;render();await guardar(p);return toast(p.proveedor?'Proveedor elegido por el cliente: '+x.nombre:'Elección quitada')}
   if(a==='asignar'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.proveedor=pv.nombre;render();await guardar(p);return toast('Proveedor asignado al pedido')}
   if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();window.scrollTo(0,0);return}
@@ -2516,6 +2529,11 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   if(!dentro(e))return;const t=e.target;
+  if(t.dataset.mpick){const pv=PV.lista.find(x=>x.id===t.dataset.mpick);if(!pv)return;
+    const obj=t.dataset.ctx==='form'?M.form:M.lista.find(x=>x.id===M.sel);if(!obj)return;
+    if(t.dataset.ctx==='form'){const fm=document.getElementById('m-form');if(fm){['numero','fecha','ref','proveedor','nota'].forEach(k=>{if(fm[k])obj[k]=fm[k].value})}}
+    obj.sugeridos=obj.sugeridos||[];if(t.checked){if(!obj.sugeridos.some(x=>x.id===pv.id))obj.sugeridos.push(snap(pv))}else obj.sugeridos=obj.sugeridos.filter(x=>x.id!==pv.id);
+    render();if(t.dataset.ctx==='ver')await guardar(obj);return}
   if(t.dataset.mchk){const p=M.lista.find(x=>x.id===t.dataset.mchk);const i=p&&p.items.find(x=>x.id===t.dataset.iid);if(!i)return;
     marcar(p,i,t.checked);render();await guardar(p);if(t.checked&&estPed(p)==='ok')toast(`Pedido N° ${p.numero} completo`);return}
   if(t.dataset.mrec){const p=M.lista.find(x=>x.id===t.dataset.pid);const i=p&&p.items.find(x=>x.id===t.dataset.iid);if(!i)return;
@@ -2529,6 +2547,7 @@ document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
   if(t.id==='m-buscar'){M.q=t.value;render();return}
   if(t.id==='pv-q'){PV.q=t.value;render();return}
+  if(t.id==='pick-q'){M.pq=t.value;if(M.form){const fm=document.getElementById('m-form');if(fm)['numero','fecha','ref','proveedor','nota'].forEach(k=>{if(fm[k])M.form[k]=fm[k].value})}render();return}
   if(t.dataset.sobs!=null){const p=M.lista.find(x=>x.id===M.sel);if(!p)return;p.sugeridos[+t.dataset.sobs].obs=t.value;clearTimeout(M.ks);M.ks=setTimeout(()=>guardar(p),600);return}
   if(t.dataset.mf&&M.form){const it=M.form.items[+t.dataset.k];const k=t.dataset.mf;
     if(k==='cant')it.cant=num(t.value);else if(k==='precio')it.precio=num(t.value)||0;else it[k]=t.value;
@@ -2564,6 +2583,12 @@ const css=document.createElement('style');css.textContent=`
 .m-card:hover{border-color:var(--muted)}
 .m-abrir{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px 6px;text-align:left;width:100%;cursor:pointer;background:none;border:0}
 .m-acc{display:flex;gap:6px;align-items:center;padding:0 14px 10px;flex-wrap:wrap}
+.pv-pick{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.pv-pick-l{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px;max-height:300px;overflow:auto}
+.pv-pick-l label{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
+.pv-pick-l label.on{border-color:var(--ok);background:var(--ok-bg)}
+.pv-pick-l input{margin-top:3px;width:18px;height:18px;flex:none}
+.pv-pick-l span{display:flex;flex-direction:column;min-width:0}.pv-pick-l small{color:var(--muted);font-size:12px}
 .pv-cli{padding:12px 14px;background:color-mix(in srgb,var(--accent) 9%,var(--panel));border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .pv-lista{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 .pv-lista li{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:center}
