@@ -419,7 +419,7 @@ function backendNube(sb){
       return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
     async savePresupuesto(p){ok(await sb.from('presupuestos').upsert({obra_id:p.obra_id,items:p.items,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},base_hasta:p.baseHasta||null,m2:p.m2||null,usd:p.usd||null,indice:p.indice||1},{onConflict:'obra_id'}))},
     async pedidos(oid){if(!oid)return[];return ok(await sb.from('pedidos').select('*').eq('obra_id',oid).order('numero')).map(p=>({...p,items:p.items||[]}))},
-    async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items}))},
+    async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items,sugeridos:p.sugeridos||[]}))},
     async delPedido(id){ok(await sb.from('pedidos').delete().eq('id',id))},
     async proveedores(){return ok(await sb.from('proveedores').select('*').order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
     async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
@@ -2231,7 +2231,7 @@ function vVer(){
       ${M.confirm?`<button class="btn sm" style="color:var(--bad)" data-mact="borrar">¿Borrar el pedido?</button>`:`<button class="btn sm ghost" data-mact="conf" aria-label="Borrar pedido">×</button>`}</div></div>
   <div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:6px">
     <div class="bar between"><h2>Pedido N° ${esc(p.numero)}</h2>${badge(e)}</div>
-    <div class="m-meta"><span><small>Fecha</small>${fch(p.fecha)}</span><span><small>Referencia</small>${esc(p.ref||'—')}</span>${p.proveedor?`<span><small>Proveedor</small>${esc(p.proveedor)}</span>`:''}<span><small>Llegaron</small><b class="num">${ok} de ${n}</b></span>${t?`<span><small>Total</small><b class="num">Gs ${gs(t)}</b></span>`:''}</div>
+    <div class="m-meta"><span><small>Fecha</small>${fch(p.fecha)}</span><span><small>Referencia</small>${esc(p.ref||'—')}</span>${p.proveedor?`<span><small>Proveedor elegido</small>${esc(p.proveedor)}</span>`:''}<span><small>Llegaron</small><b class="num">${ok} de ${n}</b></span>${t?`<span><small>Total</small><b class="num">Gs ${gs(t)}</b></span>`:''}</div>
     ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
     <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
   </div>
@@ -2274,7 +2274,7 @@ function contactos(pv,p,items){const wa=telWA(pv.whatsapp||pv.telefono);const tx
     ${pv.direccion?`<a class="btn sm ghost" target="_blank" rel="noopener" href="https://www.google.com/maps/search/${encodeURIComponent(pv.direccion)}">Ubicación</a>`:''}`}
 function sugerencias4(p){
   const L=PV.lista||[];const rub={};p.items.forEach(i=>{const r=rubroDe(i.desc);(rub[r]=rub[r]||[]).push(i)});
-  const usados={};M.lista.forEach(q=>{if(!q.proveedor)return;q.items.forEach(i=>{const k=(i.desc||'').trim().toLowerCase();(usados[k]=usados[k]||new Set()).add(q.proveedor.trim().toLowerCase())})});
+  const usados={};M.lista.forEach(q=>{if(!q.proveedor||q.id===p.id)return;q.items.forEach(i=>{const k=(i.desc||'').trim().toLowerCase();(usados[k]=usados[k]||new Set()).add(q.proveedor.trim().toLowerCase())})});
   const res=L.map(pv=>{const rs=pv.rubros||[];const nom=(pv.nombre||'').trim().toLowerCase();
     const cubre=p.items.filter(i=>rs.includes(rubroDe(i.desc))||(usados[(i.desc||'').trim().toLowerCase()]||new Set()).has(nom));
     const hist=p.items.filter(i=>(usados[(i.desc||'').trim().toLowerCase()]||new Set()).has(nom)).length;
@@ -2283,17 +2283,30 @@ function sugerencias4(p){
   const enDir=new Set(L.map(x=>(x.nombre||'').trim().toLowerCase()));
   const viejos=[...new Set(M.lista.filter(q=>q.proveedor&&!enDir.has(q.proveedor.trim().toLowerCase())).map(q=>q.proveedor.trim()))];
   return{res,rub,sinProv,viejos}}
+const snap=pv=>({id:pv.id,nombre:pv.nombre,contacto:pv.contacto||'',telefono:pv.telefono||pv.whatsapp||'',email:pv.email||'',obs:''});
+const esSug=(p,id)=>(p.sugeridos||[]).some(x=>x.id===id);
+function vParaCliente(p){const L=p.sugeridos||[];
+  return `<div class="pv-cli">
+    <div class="bar between"><div><b>Proveedores sugeridos al cliente</b> <span class="sub">· salen abajo del pedido (PDF y Excel) para que el cliente elija</span></div>
+      <button class="btn sm ghost" data-mact="sug-otro">+ Agregar otro</button></div>
+    ${M.sugOtro?`<form class="pv-otro" id="sug-f"><input type="text" name="nombre" placeholder="Proveedor" required><input type="text" name="contacto" placeholder="Contacto"><input type="text" name="telefono" placeholder="Teléfono"><input type="text" name="obs" placeholder="Precio / plazo / obs."><button class="btn sm primary">Agregar</button><button type="button" class="btn sm ghost" data-mact="sug-otro">Cancelar</button></form>`:''}
+    ${L.length?`<ol class="pv-lista">${L.map((x,k)=>`<li><div class="pv-info"><div class="bar" style="gap:6px"><b>${esc(x.nombre)}</b>${p.proveedor&&p.proveedor.trim().toLowerCase()===x.nombre.trim().toLowerCase()?'<span class="m-badge ok">Elegido por el cliente</span>':''}</div><span class="sub">${[x.contacto,x.telefono,x.email].filter(Boolean).map(esc).join(' · ')||'sin contacto'}</span></div>
+      <input type="text" data-sobs="${k}" value="${esc(x.obs||'')}" placeholder="Precio, plazo u observación para el cliente">
+      <div class="pv-btns"><button class="btn sm ghost" data-mact="elegido" data-k="${k}">Eligió el cliente</button><button class="btn sm ghost" data-mact="sug-up" data-k="${k}" ${k?'':'disabled'} aria-label="Subir">↑</button><button class="btn sm ghost" data-mact="sug-quitar" data-k="${k}" aria-label="Quitar">×</button></div></li>`).join('')}</ol>`
+      :'<p class="sub" style="margin:4px 0 0">Todavía no elegiste proveedores para sugerir. Tocá “Sugerir al cliente” en los de abajo o agregá otro.</p>'}
+  </div>`}
 function vSugeridos(p){
   if(PV.lista===null){cargarPV();return '<div class="panel" style="padding:14px"><span class="sub">Buscando proveedores…</span></div>'}
   const{res,rub,sinProv,viejos}=sugerencias4(p);
   return `<div class="panel">
     <div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div><h3>Proveedores sugeridos</h3><span class="sub">Según los materiales del pedido: ${Object.entries(rub).map(([r,i])=>esc(r)+' ('+i.length+')').join(' · ')}</span></div>
       <button class="btn sm" data-mtab="proveedores">Ver todos los proveedores</button></div>
-    ${res.slice(0,5).map(({pv,cubre,hist})=>`<div class="pv-sug">
-      <div class="pv-info"><div class="bar" style="gap:6px"><b>${esc(pv.nombre)}</b>${pv.favorito?'<span class="m-badge ok">Preferido</span>':''}${p.proveedor&&p.proveedor.trim().toLowerCase()===pv.nombre.trim().toLowerCase()?'<span class="m-badge warn">Asignado</span>':''}</div>
+    ${vParaCliente(p)}
+    ${res.slice(0,6).map(({pv,cubre,hist})=>`<div class="pv-sug">
+      <div class="pv-info"><div class="bar" style="gap:6px"><b>${esc(pv.nombre)}</b>${pv.favorito?'<span class="m-badge ok">Preferido</span>':''}${p.proveedor&&p.proveedor.trim().toLowerCase()===pv.nombre.trim().toLowerCase()?'<span class="m-badge warn">Elegido</span>':''}</div>
         <span class="sub">${pv.contacto?esc(pv.contacto)+' · ':''}${pv.telefono?esc(pv.telefono)+' · ':''}tiene ${cubre.length} de ${p.items.length} materiales${hist?' · ya le compraste '+hist:''}</span>
         <span class="sub pv-items">${cubre.slice(0,4).map(i=>esc(i.desc)).join(' · ')}${cubre.length>4?' · …':''}</span></div>
-      <div class="pv-btns">${contactos(pv,p,cubre)}<button class="btn sm ghost" data-mact="asignar" data-pv="${pv.id}">Asignar al pedido</button></div></div>`).join('')
+      <div class="pv-btns">${contactos(pv,p,cubre)}${esSug(p,pv.id)?`<button class="btn sm" data-mact="sug-quitarpv" data-pv="${pv.id}">✓ Sugerido</button>`:`<button class="btn sm primary" data-mact="sugerir" data-pv="${pv.id}">Sugerir al cliente</button>`}</div></div>`).join('')
       ||`<p class="sub" style="padding:12px 14px">Todavía no tenés proveedores cargados para estos materiales.</p>`}
     ${sinProv.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>Sin proveedor en tu lista para:</b> ${sinProv.map(esc).join(', ')}
       <div class="bar" style="margin-top:6px">${sinProv.filter(r=>r!=='Otros').map(r=>`<a class="btn sm" target="_blank" rel="noopener" href="${mapa(r.split(' (')[0])}">Buscar ${esc(r.split(' (')[0].toLowerCase())} en el mapa</a>`).join('')}<button class="btn sm primary" data-mact="pv-nuevo" data-r="${esc(sinProv[0])}">+ Agregar proveedor</button></div></div></div>`:''}
@@ -2359,7 +2372,7 @@ function vForm(){
       <label>N° de pedido<input type="text" inputmode="numeric" name="numero" value="${esc(f.numero)}" required></label>
       <label>Fecha<input type="date" name="fecha" value="${esc(f.fecha)}" required></label>
       <label class="wide">Referencia (rubro / destino)<input type="text" name="ref" value="${esc(f.ref)}" placeholder="Ej.: VIGA INFERIOR, VALLADO DE OBRA 152 ML" list="m-refs"></label>
-      <label>Proveedor (opcional)<input type="text" name="proveedor" value="${esc(f.proveedor||'')}" list="m-provs"></label>
+      <label>Proveedor elegido por el cliente<input type="text" name="proveedor" value="${esc(f.proveedor||'')}" list="m-provs"></label>
       <label class="wide">Nota (opcional)<input type="text" name="nota" value="${esc(f.nota||'')}"></label>
     </div>
     <datalist id="m-refs">${[...new Set(M.lista.map(p=>(p.ref||'').trim()).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
@@ -2411,7 +2424,13 @@ function pdfPedido(p){
   const cs=conP?{0:{halign:'center',cellWidth:10},2:{cellWidth:20},3:{halign:'right',cellWidth:18},4:{cellWidth:38},5:{halign:'right',cellWidth:22},6:{halign:'right',cellWidth:24}}:{0:{halign:'center',cellWidth:12},2:{cellWidth:24},3:{halign:'right',cellWidth:22},4:{cellWidth:55}};
   y=PDFK.tabla(doc,{startY:y,head:[head],body:body.length?body:[[{content:'Sin materiales.',colSpan:head.length}]],foot:conP?[[{content:'TOTAL Gs',colSpan:6,styles:{halign:'right'}},{content:gs(total(p)),styles:{halign:'right'}}]]:undefined,columnStyles:cs});
   if(p.nota){doc.setFont('times','italic');doc.setFontSize(9.5);doc.text('Nota: '+p.nota,PDFK.ML,y+6,{maxWidth:180});y+=6}
-  PDFK.firmas(doc,y+2,['Solicitado por\nDirección de Obra','Autorizado por']);
+  if((p.sugeridos||[]).length){if(y>230){doc.addPage();y=PDFK.TOP}
+    doc.setFont('times','bold');doc.setFontSize(11);doc.setTextColor(0);doc.text('PROVEEDORES SUGERIDOS',PDFK.ML,y+9);
+    doc.setFont('times','italic');doc.setFontSize(9);doc.text('Sugerencia de la Dirección de Obra. El proveedor lo elige el cliente.',PDFK.ML,y+13.5);
+    y=PDFK.tabla(doc,{startY:y+16,head:[['N°','Proveedor','Contacto','Teléfono','Observación']],body:p.sugeridos.map((x,k)=>[k+1,x.nombre+(p.proveedor&&p.proveedor===x.nombre?' (elegido)':''),x.contacto||'',x.telefono||'',[x.obs,x.email].filter(Boolean).join(' · ')]),
+      columnStyles:{0:{halign:'center',cellWidth:10},2:{cellWidth:32},3:{cellWidth:30}}});
+    doc.setFont('times','normal');doc.setFontSize(10);doc.text('Proveedor elegido por el cliente: '+(p.proveedor||'______________________________'),PDFK.ML,y+7);y+=7}
+  PDFK.firmas(doc,y+2,(p.sugeridos||[]).length?['Solicitado por\nDirección de Obra','Conformidad del cliente']:['Solicitado por\nDirección de Obra','Autorizado por']);
   PDFK.cerrar(doc,`Pedido_${p.numero}_${(p.ref||'').trim()}_${p.fecha}`);
 }
 function pdfRecepcion(p){
@@ -2444,7 +2463,10 @@ function xlsPedido(p){
   p.items.forEach((i,k)=>A.push([k+1,i.desc,i.ud||'',i.cant==null?'':Number(i.cant),cantLetras(i.cant),Number(i.precio)||0,(Number(i.precio)||0)*(Number(i.cant)||0)]));
   A.push(['','TOTAL','','','','',total(p)]);
   if(p.nota)A.push([],['Nota: '+p.nota]);
-  A.push([],[],['','Solicitado por: Dirección de Obra','','','Autorizado por']);
+  if((p.sugeridos||[]).length){A.push([],['PROVEEDORES SUGERIDOS (el proveedor lo elige el cliente)'],['N°','Proveedor','Contacto','Teléfono','Observación']);
+    p.sugeridos.forEach((x,k)=>A.push([k+1,x.nombre+(p.proveedor&&p.proveedor===x.nombre?' (elegido)':''),x.contacto||'',x.telefono||'',[x.obs,x.email].filter(Boolean).join(' · ')]));
+    A.push([],['','Proveedor elegido por el cliente: '+(p.proveedor||'')])}
+  A.push([],[],['','Solicitado por: Dirección de Obra','','',(p.sugeridos||[]).length?'Conformidad del cliente':'Autorizado por']);
   const ws=XLSX.utils.aoa_to_sheet(A);ws['!cols']=[{wch:6},{wch:48},{wch:12},{wch:10},{wch:28},{wch:13},{wch:14}];
   const r0=10;for(let r=r0;r<r0+p.items.length+1;r++)['F','G'].forEach(c=>{const x=ws[c+(r+1)];if(x&&typeof x.v==='number')x.z='#,##0'});
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Pedido '+p.numero);
@@ -2454,7 +2476,7 @@ function xlsPedido(p){
 /* ---------- eventos ---------- */
 const dentro=e=>{const r=document.getElementById('ped-root');return r&&r.contains(e.target)};
 const nuevoForm=base=>({id:nid(),obra_id:M.oid,numero:String(proximo()),fecha:hoyM(),ref:base?base.ref:'',proveedor:base?base.proveedor||'':'',nota:'',
-  items:base?base.items.map(i=>({id:nid(),desc:i.desc,ud:i.ud,cant:i.cant,precio:i.precio||0})):[1,2,3].map(()=>({id:nid(),desc:'',ud:'',cant:null,precio:0}))});
+  sugeridos:base&&base.sugeridos?JSON.parse(JSON.stringify(base.sugeridos)).map(x=>({...x,obs:''})):[],items:base?base.items.map(i=>({id:nid(),desc:i.desc,ud:i.ud,cant:i.cant,precio:i.precio||0})):[1,2,3].map(()=>({id:nid(),desc:'',ud:'',cant:null,precio:0}))});
 function marcar(p,i,ok){if(ok){i.rec={cant:i.cant!=null?Number(i.cant):null,fecha:(i.rec&&i.rec.fecha)||hoyM(),obs:(i.rec&&i.rec.obs)||''}}else{if(i.rec&&i.rec.obs)i.rec={cant:0,fecha:'',obs:i.rec.obs};else delete i.rec}}
 document.addEventListener('click',async e=>{
   if(!dentro(e))return;
@@ -2466,6 +2488,12 @@ document.addEventListener('click',async e=>{
   if(a==='pv-rubro'){PV.rubro=t.dataset.r;return render()}
   if(a==='pv-conf'){PV.confirm=t.dataset.pv;return render()}
   if(a==='pv-borrar'){try{await window.PVB.del(t.dataset.pv);PV.lista=PV.lista.filter(x=>x.id!==t.dataset.pv);PV.confirm=null;render();toast('Proveedor borrado')}catch(err){toast('No se pudo borrar')}return}
+  if(a==='sugerir'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.sugeridos=p.sugeridos||[];if(!esSug(p,pv.id))p.sugeridos.push(snap(pv));render();await guardar(p);return toast('Va en el pedido como sugerencia al cliente')}
+  if(a==='sug-quitarpv'&&p){p.sugeridos=(p.sugeridos||[]).filter(x=>x.id!==t.dataset.pv);render();return guardar(p)}
+  if(a==='sug-quitar'&&p){p.sugeridos.splice(+t.dataset.k,1);render();return guardar(p)}
+  if(a==='sug-up'&&p){const k=+t.dataset.k;const L=p.sugeridos;[L[k-1],L[k]]=[L[k],L[k-1]];render();return guardar(p)}
+  if(a==='sug-otro'){M.sugOtro=!M.sugOtro;return render()}
+  if(a==='elegido'&&p){const x=p.sugeridos[+t.dataset.k];p.proveedor=p.proveedor===x.nombre?'':x.nombre;render();await guardar(p);return toast(p.proveedor?'Proveedor elegido por el cliente: '+x.nombre:'Elección quitada')}
   if(a==='asignar'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.proveedor=pv.nombre;render();await guardar(p);return toast('Proveedor asignado al pedido')}
   if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();window.scrollTo(0,0);return}
   if(a==='filtro'){M.filtro=t.dataset.f;return render()}
@@ -2501,6 +2529,7 @@ document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
   if(t.id==='m-buscar'){M.q=t.value;render();return}
   if(t.id==='pv-q'){PV.q=t.value;render();return}
+  if(t.dataset.sobs!=null){const p=M.lista.find(x=>x.id===M.sel);if(!p)return;p.sugeridos[+t.dataset.sobs].obs=t.value;clearTimeout(M.ks);M.ks=setTimeout(()=>guardar(p),600);return}
   if(t.dataset.mf&&M.form){const it=M.form.items[+t.dataset.k];const k=t.dataset.mf;
     if(k==='cant')it.cant=num(t.value);else if(k==='precio')it.precio=num(t.value)||0;else it[k]=t.value;
     const el=document.getElementById('m-total');if(el)el.textContent='Gs '+gs(total(M.form));return}
@@ -2512,6 +2541,8 @@ document.addEventListener('submit',async e=>{
     if(!v.nombre)return toast('Poné el nombre del proveedor');if(!v.id)v.id=nid();
     try{await window.PVB.save(v)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 09 en Supabase?')}
     const i=PV.lista.findIndex(x=>x.id===v.id);if(i>=0)PV.lista[i]=v;else PV.lista.push(v);PV.edit=null;render();return toast('Proveedor guardado')}
+  if(f.id==='sug-f'){const p=M.lista.find(x=>x.id===M.sel);if(!p)return;const fd=Object.fromEntries(new FormData(f));p.sugeridos=p.sugeridos||[];
+    p.sugeridos.push({id:'x'+nid(),nombre:fd.nombre.trim(),contacto:fd.contacto.trim(),telefono:fd.telefono.trim(),email:'',obs:fd.obs.trim()});M.sugOtro=false;render();await guardar(p);return toast('Proveedor agregado a las sugerencias')}
   if(f.id!=='m-form')return;
   const quiere=e.submitter&&e.submitter.value||'';const F=M.form;F.numero=f.numero.value.trim();F.fecha=f.fecha.value;F.ref=f.ref.value.trim();F.proveedor=f.proveedor.value.trim();F.nota=f.nota.value.trim();
   F.items=F.items.filter(i=>(i.desc||'').trim()).map(i=>({...i,desc:i.desc.trim(),ud:(i.ud||'').trim()}));
@@ -2533,6 +2564,11 @@ const css=document.createElement('style');css.textContent=`
 .m-card:hover{border-color:var(--muted)}
 .m-abrir{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 14px 6px;text-align:left;width:100%;cursor:pointer;background:none;border:0}
 .m-acc{display:flex;gap:6px;align-items:center;padding:0 14px 10px;flex-wrap:wrap}
+.pv-cli{padding:12px 14px;background:color-mix(in srgb,var(--accent) 9%,var(--panel));border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.pv-lista{margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.pv-lista li{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:center}
+.pv-otro{display:flex;gap:6px;flex-wrap:wrap}.pv-otro input{flex:1 1 140px}
+@media (max-width:760px){.pv-lista li{grid-template-columns:1fr}}
 .pv-sug{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
 .pv-sug:first-of-type{border-top:0}
 .pv-info{display:flex;flex-direction:column;gap:2px;min-width:0}
