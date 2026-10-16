@@ -311,6 +311,19 @@ async function BAJAR(nombre,blob){
     try{await d.save({filename:nombre,data:blob});toast('Archivo descargado');return true}catch(e){if(e&&e.code!=='declined')toast('No se pudo descargar');return false}}
   const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=nombre;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000);toast('Archivo descargado');return true}
 window.BAJAR=BAJAR;
+/* lee cantidades escritas como 14,5 · 14.5 · 1.234,5 · 1,234.5 */
+function numES(v){if(v==null)return null;if(typeof v==='number')return isFinite(v)?v:null;let t=String(v).trim().replace(/\s|Gs\.?/gi,'');if(!t)return null;
+  const c=t.lastIndexOf(','),d=t.lastIndexOf('.');
+  if(c>=0&&d>=0){if(c>d)t=t.replace(/\./g,'').replace(',','.');else t=t.replace(/,/g,'')}
+  else if(c>=0){t=(t.match(/,/g).length>1)?t.replace(/,/g,''):t.replace(',','.')}
+  else if(d>=0&&(t.match(/\./g).length>1||/^\d{1,3}(\.\d{3})+$/.test(t)&&t.length>5))t=t.replace(/\./g,'');
+  const n=Number(t);return isFinite(n)?n:null}
+window.numES=numES;
+/* caracteres que la letra del PDF no tiene */
+const pdfTxt=x=>typeof x==='string'?x.replace(/[\u2033\u201C\u201D\u201E\u02DD]/g,'"').replace(/[\u2032\u2018\u2019\u201A]/g,"'").replace(/[\u2013\u2014\u2212]/g,'-').replace(/\u2026/g,'...').replace(/\u00A0/g,' ').replace(/[\u2264]/g,'<=').replace(/[\u2265]/g,'>=').replace(/[^\x00-\xFF]/g,''):x;
+const pdfCel=c=>c&&typeof c==='object'&&!Array.isArray(c)?{...c,content:pdfTxt(c.content)}:pdfTxt(c);
+const pdfFil=rows=>Array.isArray(rows)?rows.map(r=>Array.isArray(r)?r.map(pdfCel):r):rows;
+window.pdfTxt=pdfTxt;
 const BAJAR_XLSX=(wb,n)=>BAJAR(n,new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));window.BAJAR_XLSX=BAJAR_XLSX;
 
 /* ---------- utilidades ---------- */
@@ -643,11 +656,12 @@ const PDFK={
   nuevo(orient){const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:orient||'portrait'});doc.__o=orient||'portrait';return doc},
   dims(doc){return doc.__o==='landscape'?{W:297,H:210}:{W:210,H:297}},
   TOP:40,ML:14,MR:14,
-  titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);doc.text(t,this.ML,y);y+=6;doc.setFontSize(10);
-    (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{doc.setFont('times','bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(String(v),this.ML+kw,y);y+=4.8});return y+2},
+  titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);doc.text(pdfTxt(t),this.ML,y);y+=6;doc.setFontSize(10);
+    (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{v=pdfTxt(String(v));doc.setFont('times','bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(String(v),this.ML+kw,y);y+=4.8});return y+2},
   tabla(doc,opts){const base={margin:{left:this.ML,right:this.MR,top:this.TOP,bottom:18},theme:'grid',showFoot:'lastPage',
       styles:{font:'times',fontSize:8.5,cellPadding:1.4,textColor:0,lineColor:[150,150,150],lineWidth:0.15,valign:'middle'},
       headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold'},footStyles:{fillColor:[240,240,240],textColor:0,fontStyle:'bold'}};
+    opts={...opts,head:pdfFil(opts.head),body:pdfFil(opts.body),foot:pdfFil(opts.foot)};
     doc.autoTable(Object.assign(base,opts,{styles:Object.assign(base.styles,opts.styles||{})}));return doc.lastAutoTable.finalY},
   firmas(doc,y,lista){const{W,H}=this.dims(doc);if(y>H-45){doc.addPage();y=this.TOP+10}y+=22;const n=lista.length,ancho=(W-this.ML-this.MR)/n;
     doc.setFont('times','normal');doc.setFontSize(9.5);lista.forEach((l,i)=>{const x=this.ML+ancho*i+8,w=ancho-16;doc.setLineWidth(0.3);doc.line(x,y,x+w,y);
@@ -1386,7 +1400,7 @@ function vCertificado(){
     rows.push(`<tr class="${ac>it.cant+1e-9?'over':''} ${p?'has':''}"><td class="num">${esc(it.n)}</td><td class="desc">${esc(it.desc)}</td><td>${esc(it.unidad)}</td>
       <td class="n">${qf(it.cant)}</td><td class="n">${gs(it.pu)}</td>
       <td class="n">${qf(a)}</td>
-      <td class="n pres">${nuevo?`<input type="number" step="any" min="0" id="p-${it.id}" data-id="${it.id}" value="${p||''}" aria-label="Presente ${esc(it.desc)}">`:qf(p)}</td>
+      <td class="n pres">${nuevo?`<input type="text" inputmode="decimal" autocomplete="off" id="p-${it.id}" data-id="${it.id}" value="${esc(S.raw&&S.raw[it.id]!=null?S.raw[it.id]:qf(p))}" aria-label="Presente ${esc(it.desc)}">`:qf(p)}</td>
       <td class="n">${qf(ac)}</td><td class="n">${it.cant?pct(ac/it.cant):''}</td>
       <td class="n">${gs(mA)}</td><td class="n">${gs(mP)}</td><td class="n">${gs(mAc)}</td>
       <td class="n">${gs(it.cant*it.pu)}</td></tr>`);
@@ -1474,8 +1488,8 @@ function vContrato(){
     <label>N°<input id="o-n" name="n" placeholder="15.28"></label>
     <label class="wide">Descripción<input id="o-desc" name="desc" required></label>
     <label>Unidad<input id="o-un" name="unidad" required></label>
-    <label>Cantidad<input id="o-cant" name="cant" type="number" step="any" min="0" required></label>
-    <label>Precio unitario Gs<input id="o-pu" name="pu" type="number" step="any" min="0" required></label>
+    <label>Cantidad<input id="o-cant" name="cant" type="text" inputmode="decimal" autocomplete="off" required></label>
+    <label>Precio unitario Gs<input id="o-pu" name="pu" type="text" inputmode="decimal" autocomplete="off" required></label>
     <button class="btn primary">Agregar ítem</button>
   </form>`:`<p class="sub">El contrato quedó cerrado con el certificado N°1. Cualquier trabajo extra o cambio se carga en <b>Adicionales</b>.</p>`}
   <form class="panel form" id="f-datos">
@@ -1507,8 +1521,8 @@ function vAdicionales(){
     <label class="wide">Motivo<input id="a-mot" name="motivo" placeholder="Ej.: pedido del cliente, lluvia, cambio de proyecto"></label>
     <label>Aprobado el<input id="a-apr" name="aprobado" type="date" value="${hoy}"></label>
     <label>Unidad<input id="a-un" name="unidad" required placeholder="gl"></label>
-    <label>Cantidad<input id="a-cant" name="cant" type="number" step="any" min="0" required></label>
-    <label>Precio unitario Gs<input id="a-pu" name="pu" type="number" step="any" min="0" required></label>
+    <label>Cantidad<input id="a-cant" name="cant" type="text" inputmode="decimal" autocomplete="off" required></label>
+    <label>Precio unitario Gs<input id="a-pu" name="pu" type="text" inputmode="decimal" autocomplete="off" required></label>
     <button class="btn primary">Agregar adicional</button>
   </form>
   <p class="sub">Los adicionales aparecen en cada certificado debajo del contrato original, en su propio rubro, y se suman aparte como "Total adicional".</p>`;
@@ -1537,8 +1551,8 @@ function pdfCertificado(n,modo){
   }
   cierra();
   const R=(()=>{const s0=resumen();return s0})();
-  y=P.tabla(doc,{startY:y,head:[[{content:'N°'},{content:'Rubro'},{content:'Unid.'},{content:'Cant.'},{content:'P. unit.'},{content:'P. total'},{content:'Anterior'},{content:'Presente'},{content:'Acumulado'},{content:'% av.'},{content:'Monto anterior'},{content:'Monto presente'},{content:'Monto acumulado'}]],
-    body,styles:{fontSize:7.2,cellPadding:1},columnStyles:{0:{cellWidth:10},1:{cellWidth:72},2:{cellWidth:11},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right',fontStyle:'bold'},8:{halign:'right'},9:{halign:'right'},10:{halign:'right'},11:{halign:'right',fontStyle:'bold'},12:{halign:'right'}}});
+  y=P.tabla(doc,{startY:y,head:[[{content:'N°'},{content:'Descripción'},{content:'Unid.'},{content:'Cant.'},{content:'P. unit.'},{content:'P. total'},{content:'Anterior'},{content:'Presente'},{content:'Acumulado'},{content:'% av.'},{content:'Monto anterior'},{content:'Monto presente'},{content:'Monto acumulado'}]],
+    body,styles:{fontSize:7.2,cellPadding:1.1,overflow:'linebreak',valign:'middle'},headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold',halign:'center',valign:'middle'},columnStyles:{0:{cellWidth:10},1:{cellWidth:'auto',minCellWidth:80},2:{cellWidth:10,halign:'center'},3:{cellWidth:13,halign:'right'},4:{cellWidth:16,halign:'right'},5:{cellWidth:19,halign:'right'},6:{cellWidth:14,halign:'right'},7:{cellWidth:14,halign:'right',fontStyle:'bold'},8:{cellWidth:16,halign:'right'},9:{cellWidth:11,halign:'right'},10:{cellWidth:19,halign:'right'},11:{cellWidth:19,halign:'right',fontStyle:'bold'},12:{cellWidth:20,halign:'right'}}});
   const total=tO+tA;
   if(y>150){doc.addPage();y=P.TOP}
   y=P.tabla(doc,{startY:y+5,theme:'plain',tableWidth:110,margin:{left:297-P.MR-110,right:P.MR,top:P.TOP},body:[['TOTAL CERTIFICADO',gs(tO)],['TOTAL ADICIONAL',gs(tA)],['TOTAL A PAGAR EN GS.',gs(total)]],
@@ -1619,7 +1633,7 @@ function render(){
     <div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ctab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>
     ${S.tab!=='contratistas'?`<select id="sel" aria-label="Contratista">${ALL.contratistas.map((c,i)=>`<option value="${i}" ${i===S.sel?'selected':''}>${esc(c.nombre)} · ${esc(c.tipo.replace('Mano de obra · ',''))}</option>`).join('')}</select>`:''}
   </div>${V()}`;
-  if(foco){const el=document.getElementById(foco);if(el&&ROOT.contains(el))el.focus()}
+  if(foco){const el=document.getElementById(foco);if(el&&ROOT.contains(el)){el.focus();if(el.type==='text'&&el.setSelectionRange){const n=el.value.length;el.setSelectionRange(n,n)}}}
   if(S.tab==='contratistas')llenarMO();
   if(S.tab==='resumen'&&D.cuadrilla)cruceHTML().then(h=>{const e=document.getElementById('cruce');if(e)e.innerHTML=h});
 }
@@ -1636,14 +1650,14 @@ document.addEventListener('click',e=>{
   if(a==='pdfadic'){return pdfAdicionales()}
   if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;return render()}
   if(a==='emitir'){const ult=D.certs.length?D.certs[D.certs.length-1].n:0;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
-    D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.per=null;S.cert=ult+1;guardar();render();return toast(`Certificado N°${ult+1} emitido`)}
+    D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.raw={};S.per=null;S.cert=ult+1;guardar();render();return toast(`Certificado N°${ult+1} emitido`)}
   if(a==='pagar'){const c=D.certs.find(x=>x.n===+t.dataset.n);const m=montoCert(c);D.des.push({sem:D.des.length+1,fecha:c.hasta?addDay(c.hasta,1):hoy,orig:m.o,adic:m.ad,total:m.t,cert:c.n});D.des.sort((a,b)=>a.fecha<b.fecha?-1:1);guardar();render();return toast('Pago registrado en Desembolsos')}
 
 });
 document.addEventListener('input',e=>{
   if(!document.getElementById('cert-root'))return;const t=e.target;
   if(t.id==='buscar'){S.buscar=t.value;return render()}
-  if(t.dataset.id){S.borrador[t.dataset.id]=t.value===''?0:Number(t.value);clearTimeout(S.k);S.k=setTimeout(render,350)}
+  if(t.dataset.id){S.raw=S.raw||{};S.raw[t.dataset.id]=t.value;const v=window.numES(t.value);S.borrador[t.dataset.id]=v==null?0:v;clearTimeout(S.k);S.k=setTimeout(render,500)}
 });
 document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas')S.tab='resumen';render()}});
 document.addEventListener('submit',e=>{
@@ -1651,9 +1665,9 @@ document.addEventListener('submit',e=>{
   e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
   if(f.id==='f-datos'){D.nombre=fd.nombre.trim();D.tipo=fd.tipo.trim();guardar();render();return toast('Datos guardados')}
   if(f.id==='f-nuevo'){ALL.contratistas.push({id:(crypto.randomUUID?crypto.randomUUID():'c'+Date.now()),obra_id:OBRA_CARGADA,nombre:fd.nombre.trim(),tipo:fd.tipo.trim(),cuadrilla:false,items:[],certs:[],des:[]});usar(ALL.contratistas.length-1);S.tab='contrato';guardar();render();return toast('Contratista agregado: cargá su contrato')}
-  if(f.id==='f-item'){D.items.push({id:'o'+Date.now(),sec:'ORIG',rubro:fd.rubro.trim(),sector:'',n:fd.n.trim(),desc:fd.desc.trim(),unidad:fd.unidad.trim(),cant:Number(fd.cant),pu:Number(fd.pu)});guardar();render();return toast('Ítem agregado al contrato')}
+  if(f.id==='f-item'){D.items.push({id:'o'+Date.now(),sec:'ORIG',rubro:fd.rubro.trim(),sector:'',n:fd.n.trim(),desc:fd.desc.trim(),unidad:fd.unidad.trim(),cant:window.numES(fd.cant)||0,pu:window.numES(fd.pu)||0});guardar();render();return toast('Ítem agregado al contrato')}
   if(f.id==='f-adic'){const ad=D.items.filter(i=>i.sec==='ADIC');const n='1.'+(ad.length+1);
-    D.items.push({id:'a'+Date.now(),sec:'ADIC',rubro:'ADICIONALES',sector:'',n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant:Number(fd.cant),pu:Number(fd.pu)});guardar();render();toast('Adicional '+n+' agregado')}
+    D.items.push({id:'a'+Date.now(),sec:'ADIC',rubro:'ADICIONALES',sector:'',n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant:window.numES(fd.cant)||0,pu:window.numES(fd.pu)||0});guardar();render();toast('Adicional '+n+' agregado')}
 });
 
 })();
@@ -1673,7 +1687,7 @@ async function cargar(oid){
   if(ES.cargando)return;ES.cargando=true;
   try{ES.doc=await window.PDB.get(oid)}catch(e){ES.doc=null;toast('No se pudo leer el presupuesto')}
   try{ES.con=window.CDB?await window.CDB.list(oid):[]}catch(e){ES.con=[]}
-  ES.oid=oid;ES.cargando=false;ES.cert=null;ES.borr={};ES.corte=null;ES.cargado=null;render();
+  ES.oid=oid;ES.cargando=false;ES.cert=null;ES.borr={};ES.raw={};ES.corte=null;ES.cargado=null;ES.raw={};render();
 }
 const guardar=()=>{if(ES.doc&&window.PDB)window.PDB.save(ES.doc).catch(()=>toast('No se pudo guardar en la base. Revisá la conexión.'))};
 
@@ -1831,7 +1845,7 @@ function vAvance(){
     const lleno=ac>=i.cant-1e-9;
     rows.push(`<tr class="${p?'has':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(pu)}</td>
       ${nuevo?`<td class="n">${q2(ej)||'—'}</td>`:''}<td class="n">${q2(a)}</td>
-      <td class="n pres">${nuevo?`<input type="number" step="any" min="0" max="${tope(i,ant)}" id="pp-${i.id}" data-pid="${i.id}" data-max="${tope(i,ant)}" value="${p||''}" ${tope(i,ant)<=1e-9?'disabled title="Ítem al 100%"':''}>`:q2(p)}</td>
+      <td class="n pres">${nuevo?`<input type="text" inputmode="decimal" autocomplete="off" id="pp-${i.id}" data-pid="${i.id}" data-max="${tope(i,ant)}" value="${esc(ES.raw&&ES.raw[i.id]!=null?ES.raw[i.id]:q2(p))}" ${tope(i,ant)<=1e-9?'disabled title="Ítem al 100%"':''}>`:q2(p)}</td>
       <td class="n">${q2(ac)}</td><td class="n">${pc(i.cant?ac/i.cant:0)}${lleno?' ✓':''}</td><td class="n">${gs(p*pu)}</td><td class="n">${gs(ac*pu)}</td></tr>`);
   }
   const T=totales();
@@ -1951,7 +1965,7 @@ function render(){
   if(!ES.doc){root.innerHTML=sub+`<div class="panel" style="padding:16px"><h3>Esta obra todavía no tiene presupuesto</h3><p class="sub">El presupuesto se carga desde tu planilla de Excel. Pedile a Claude que lo cargue para esta obra.</p></div>`;return}
   const V={resumen:vResumen,detalle:vDetalle,avance:vAvance}[ES.tab];
   root.innerHTML=sub+V();
-  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
+  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'||el.type==='text'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
 }
 window.PRES={mount:()=>{ES.refrescar=true;render()}};
 const dentro=e=>{const r=document.getElementById('pres-root');return r&&r.contains(e.target)};
@@ -1960,14 +1974,14 @@ document.addEventListener('click',e=>{
   if(t.dataset.ptab){ES.tab=t.dataset.ptab;ES.buscar='';return render()}
   const a=t.dataset.pact;
   if(a==='ver'){ES.cert=+t.dataset.n;return render()}
-  if(a==='hoy'){ES.corte=hoy;ES.cargado=null;return render()}
-  if(a==='basecob'){ES.doc.vinculos=ES.doc.vinculos||{};if(t.dataset.v==='si')ES.doc.vinculos._base_cobrada='si';else delete ES.doc.vinculos._base_cobrada;ES.cargado=null;guardar();render();return toast(t.dataset.v==='si'?'La planilla cuenta como ya certificada':'La planilla se incluye en el próximo certificado')}
-  if(a==='traer'){ES.cargado=null;render();return toast('Recalculado desde los certificados de contratistas')}
-  if(a==='anular'){const n=+t.dataset.n;if(ES.anular!==n){ES.anular=n;return render()}ES.doc.certs=(ES.doc.certs||[]).filter(x=>x.n!==n);ES.anular=null;ES.cert=null;ES.cargado=null;guardar();render();return toast(`Certificado N°${n} anulado`)}
+  if(a==='hoy'){ES.corte=hoy;ES.cargado=null;ES.raw={};return render()}
+  if(a==='basecob'){ES.doc.vinculos=ES.doc.vinculos||{};if(t.dataset.v==='si')ES.doc.vinculos._base_cobrada='si';else delete ES.doc.vinculos._base_cobrada;ES.cargado=null;ES.raw={};guardar();render();return toast(t.dataset.v==='si'?'La planilla cuenta como ya certificada':'La planilla se incluye en el próximo certificado')}
+  if(a==='traer'){ES.cargado=null;ES.raw={};render();return toast('Recalculado desde los certificados de contratistas')}
+  if(a==='anular'){const n=+t.dataset.n;if(ES.anular!==n){ES.anular=n;return render()}ES.doc.certs=(ES.doc.certs||[]).filter(x=>x.n!==n);ES.anular=null;ES.cert=null;ES.cargado=null;ES.raw={};guardar();render();return toast(`Certificado N°${n} anulado`)}
   if(a==='emitir'){const certs=ES.doc.certs=ES.doc.certs||[];const n=(certs.length?certs[certs.length-1].n:0)+1;const ant=acum(n-1);const pres={};
     for(const i of ES.doc.items){const v=Math.min(Number(ES.borr[i.id])||0,tope(i,ant));if(v>1e-9)pres[i.id]=v}
     const E=ejecutado(ES.corte);
-    certs.push({n,fecha:hoy,desde:desdeNuevo(ES.corte),hasta:ES.corte,pres,contratistas:E.lista.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.cargado=null;ES.corte=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
+    certs.push({n,fecha:hoy,desde:desdeNuevo(ES.corte),hasta:ES.corte,pres,contratistas:E.lista.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.raw={};ES.cargado=null;ES.raw={};ES.corte=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
   if(a==='pdfres')return pdfResumen();
   if(a==='pdfdet')return pdfDetalle();
   if(a==='pdfav')return pdfAvance(+t.dataset.n,modoP());
@@ -1976,13 +1990,13 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{
   if(!dentro(e))return;const t=e.target;
   if(t.id==='p-buscar'){ES.buscar=t.value;return render()}
-  if(t.dataset.pid){let v=t.value===''?0:Number(t.value);const mx=Number(t.dataset.max);if(v>mx+1e-9){v=mx;t.value=String(mx);toast('Máximo 100% del ítem')}if(v<0){v=0;t.value=''}ES.borr[t.dataset.pid]=v;clearTimeout(ES.k);ES.k=setTimeout(render,350)}
+  if(t.dataset.pid){ES.raw=ES.raw||{};let v=window.numES(t.value);if(v==null)v=0;const mx=Number(t.dataset.max);if(v>mx+1e-9){v=mx;t.value=q2(mx);toast('Máximo 100% del ítem')}if(v<0){v=0;t.value=''}ES.raw[t.dataset.pid]=t.value;ES.borr[t.dataset.pid]=v;clearTimeout(ES.k);ES.k=setTimeout(render,500)}
 });
 document.addEventListener('change',e=>{
   if(!dentro(e))return;const t=e.target;
-  if(t.id==='pp-corte'&&t.value){ES.corte=t.value;ES.cargado=null;render()}
+  if(t.id==='pp-corte'&&t.value){ES.corte=t.value;ES.cargado=null;ES.raw={};render()}
   if(t.dataset.vinc){ES.doc.vinculos=ES.doc.vinculos||{};if(t.value)ES.doc.vinculos[t.dataset.vinc]=t.value;else delete ES.doc.vinculos[t.dataset.vinc];guardar();
-    ES.cargado=null;render();toast('Vínculo guardado')}
+    ES.cargado=null;ES.raw={};render();toast('Vínculo guardado')}
 });
 document.addEventListener('submit',e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
@@ -2150,7 +2164,7 @@ const hoyM=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth(
 const fch=s=>s?`${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)}`:'';
 const fdm=s=>s?`${s.slice(8,10)}/${s.slice(5,7)}`:'';
 const fq=v=>{if(v==null||v==='')return '—';const[a,b]=String(Math.round(Number(v)*100)/100).split('.');return gs(+a)+(b?','+b:'')};
-const num=v=>{if(v==null)return null;const s=String(v).trim().replace(/\./g,'').replace(',','.');if(s==='')return null;const n=Number(s);return isFinite(n)?n:null};
+const num=v=>window.numES?window.numES(v):null;
 const nid=()=>(crypto.randomUUID?crypto.randomUUID():'m'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
 const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
 const total=p=>p.items.reduce((s,i)=>s+(Number(i.cant)||0)*(Number(i.precio)||0),0);
