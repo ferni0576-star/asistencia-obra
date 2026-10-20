@@ -225,7 +225,7 @@ button.cell{cursor:pointer}
 .ns{display:none}
 .cli-banner{background:color-mix(in srgb,var(--ok) 16%,var(--panel));color:var(--ink)}
 .cli-banner .btn{margin-left:8px;padding:3px 10px;font-size:12.5px}
-.modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="corregir"],.modo-cliente [data-cact="anularcert"],.modo-cliente [data-cact="guardared"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
+.modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente .imp-btn,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="corregir"],.modo-cliente [data-cact="anularcert"],.modo-cliente [data-cact="guardared"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
 .modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
 .modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
 .modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
@@ -1823,7 +1823,7 @@ function vDetalle(){
   }
   const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;
   return `
-  <div class="bar between"><div><h2>Presupuesto detallado</h2><div class="sub">${ES.doc.items.length} ítems · índice aplicado ${q2(ES.doc.indice||1)||'1'}</div></div><button class="btn primary" data-pact="pdfdet">Descargar PDF</button></div>
+  <div class="bar between"><div><h2>Presupuesto detallado</h2><div class="sub">${ES.doc.items.length} ítems · índice aplicado ${q2(ES.doc.indice||1)||'1'}</div></div><div class="bar"><button class="btn imp-btn" data-pact="imp-abrir">Reemplazar desde Excel</button><button class="btn primary" data-pact="pdfdet">Descargar PDF</button></div></div>
   <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">
   <div class="panel tw"><table>
     <thead><tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Costo material</th><th class="n">Costo M.O.</th><th class="n">Total material</th><th class="n">Total M.O.</th><th class="n">Precio unit.</th><th class="n">Precio total</th></tr></thead>
@@ -1984,6 +1984,72 @@ function pdfAvance(n,modo,borrador){
   PDFK.cerrar(doc,`${borrador?'Borrador_':''}Avance_cliente_${n}_${o.obra}_${c.desde||hoy}${modo==='ejec'?'_ejecutados':''}`);
 }
 
+
+/* ---------- importar presupuesto desde Excel ---------- */
+const IM={};
+const nrm=t=>String(t??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const nnum=v=>{if(v==null||v==='')return null;if(typeof v==='number')return v;return window.numES?window.numES(v):Number(v)};
+function hojasExcel(wb){return wb.SheetNames.map(n=>({n,rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null})}))}
+function encabezado(rows){
+  for(let i=0;i<Math.min(rows.length,40);i++){const r=rows[i]||[];const t=r.map(nrm);
+    const c={};t.forEach((x,k)=>{if(!x)return;
+      if(c.n==null&&/^(n[°ºo.]*|item|nro\.?|n°)$/.test(x))c.n=k;
+      else if(c.desc==null&&/(rubro|descrip|detalle|concepto)/.test(x))c.desc=k;
+      else if(c.un==null&&/^unid|^ud\.?$|^u\.?m/.test(x))c.un=k;
+      else if(c.cant==null&&/^cant/.test(x))c.cant=k;
+      else if(c.mat==null&&/costo ?mat|^material|c\.? ?mat|precio mat/.test(x)&&!/^t\.|total/.test(x))c.mat=k;
+      else if(c.mo==null&&/(m\.? ?de ?obra|mano de obra|^m\.?o\.?$|costo m\.? ?o)/.test(x)&&!/^t\.|total/.test(x))c.mo=k;
+      else if(c.pu==null&&/precio unit|p\.? ?unit|costo unit/.test(x)&&!/total/.test(x))c.pu=k;
+      else if(c.ind==null&&/^indice/.test(x))c.ind=k;
+      else if(c.acum==null&&/^acumulado/.test(x))c.acum=k;});
+    if(c.desc!=null&&c.cant!=null&&(c.mat!=null||c.pu!=null)){
+      if(c.acum==null)for(let j=i;j<Math.min(rows.length,i+8);j++){const k=(rows[j]||[]).findIndex(x=>/^acumulado/.test(nrm(x)));if(k>=0){c.acum=k;break}}
+      return{fila:i,c}}}
+  return null}
+function leerHoja(h){
+  const e=encabezado(h.rows);if(!e)return null;const c=e.c;const items=[];let rubro='',sector='',ind=null,num=0,txt=h.rows.slice(0,e.fila).flat().filter(Boolean).map(String).join(' ');
+  const acums={};
+  for(let i=e.fila+1;i<h.rows.length;i++){const r=h.rows[i]||[];const n=String(r[c.n]??'').trim(),d=String(r[c.desc]??'').trim();const cant=nnum(r[c.cant]);
+    const low=nrm(n+' '+d);if(!n&&!d)continue;if(/^(sub ?total|total|precio total|costo total)/.test(nrm(n))||/^(sub ?total|total general|total)$/.test(nrm(d)))continue;
+    if(!(cant>0)){if(n&&/^\d+$/.test(n)&&d){rubro=n+'. '+d.toUpperCase();sector=''}else if(d&&!n){sector=d}else if(n&&d&&!/\./.test(n)){rubro=n+'. '+d.toUpperCase();sector=''}continue}
+    let mat=c.mat!=null?nnum(r[c.mat])||0:0,mo=c.mo!=null?nnum(r[c.mo])||0:0;
+    if(c.mat==null&&c.mo==null&&c.pu!=null)mat=nnum(r[c.pu])||0;
+    if(c.ind!=null&&ind==null){const v=nnum(r[c.ind]);if(v>0)ind=v}
+    const id='p'+(++num);items.push({id,rubro:rubro||'SIN RUBRO',sector,n,desc:d,unidad:String(r[c.un]??'').trim(),cant:Math.round(cant*10000)/10000,mat,mo});
+    if(c.acum!=null){const a=nnum(r[c.acum]);if(a>0)acums[id]=Math.min(a,cant)}}
+  const m2=(txt.match(/superficie a construir[^0-9]*([\d.,]*\d)/i)||[])[1];
+  return{hoja:h.n,items,ind:ind||1,acums,m2:m2?window.numES(m2):null,cols:c}}
+async function leerArchivo(file){
+  if(!window.XLSX)return toast('No se pudo cargar el lector de Excel');
+  try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});IM.hojas=hojasExcel(wb);IM.nombre=file.name;
+    const cand=IM.hojas.map(leerHoja);let k=cand.findIndex(x=>x&&x.items.length);if(k<0){IM.err='No encontré una tabla de presupuesto en este Excel. Tiene que tener columnas de Rubro o Descripción, Cantidad y Costo material / mano de obra o Precio unitario.';IM.res=null}
+    else{IM.err=null;IM.hoja=k;IM.res=cand[k];IM.base=Object.keys(IM.res.acums).length>0}}
+  catch(e){IM.err='No se pudo leer el archivo. Guardalo como .xlsx e intentá de nuevo.';IM.res=null}
+  render()}
+function vImportar(){const R=IM.res;const ind=R?R.ind:1;
+  const tot=R?R.items.reduce((s,i)=>s+i.cant*(i.mat+i.mo)*ind,0):0;const rub=R?[...new Set(R.items.map(i=>i.rubro))]:[];
+  const sinP=R?R.items.filter(i=>!(i.mat+i.mo)).length:0;const mb=R?R.items.reduce((s,i)=>s+(R.acums[i.id]||0)*(i.mat+i.mo)*ind,0):0;
+  return `<div class="panel" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+    <div><h3>${ES.doc?'Reemplazar el presupuesto con un Excel':'Cargar el presupuesto desde Excel'}</h3>
+    <p class="sub" style="margin:4px 0 0">Subí tu planilla de presupuesto (.xlsx). La app busca la tabla con las columnas <b>N°, Rubros, Unidad, Cantidad, Costo material, Costo M. de obra</b> (o Precio unitario) y arma rubros, sectores e ítems solos.</p></div>
+    <label class="btn" style="align-self:flex-start;cursor:pointer">Elegir archivo Excel<input type="file" id="pi-file" accept=".xlsx,.xls,.xlsm" hidden></label>
+    ${IM.err?`<div class="hint rojo">${esc(IM.err)}</div>`:''}
+    ${R?`<div class="sub">Archivo <b>${esc(IM.nombre)}</b> · hoja <select id="pi-hoja">${IM.hojas.map((h,k)=>`<option value="${k}" ${k===IM.hoja?'selected':''}>${esc(h.n)}</option>`).join('')}</select></div>
+      <div class="kpis"><div class="kpi"><small>Ítems</small><b>${R.items.length}</b><em>${rub.length} rubros</em></div><div class="kpi"><small>Total del presupuesto</small><b>${ml(tot)}</b><em>índice ${q2(ind)||1}</em></div>${R.m2?`<div class="kpi"><small>Superficie</small><b>${q2(R.m2)} m²</b><em>${gs(tot/R.m2)} Gs/m²</em></div>`:''}</div>
+      ${sinP?`<div class="hint amarillo">${sinP} ítem${sinP>1?'s':''} sin precio (quedan en 0; los podés revisar después).</div>`:''}
+      ${Object.keys(R.acums).length?`<label class="bar sub"><input type="checkbox" id="pi-base" ${IM.base?'checked':''}> Importar también el avance ya ejecutado (columna ACUMULADO: ${ml(mb)}) hasta el <input type="date" id="pi-bh" value="${IM.bh||hoy}"></label>`:''}
+      <div class="tw" style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>N°</th><th>Rubro / ítem</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Material</th><th class="n">M. de obra</th><th class="n">Total</th></tr></thead><tbody>
+        ${(()=>{let lr=null;return R.items.map(i=>{const h=i.rubro!==lr?`<tr class="rubro"><td colspan="7">${esc(i.rubro)}</td></tr>`:'';lr=i.rubro;return h+`<tr><td class="num">${esc(i.n)}</td><td class="desc">${i.sector?`<span class="sub">${esc(i.sector)} · </span>`:''}${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(i.mat)}</td><td class="n">${gs(i.mo)}</td><td class="n">${gs(i.cant*(i.mat+i.mo)*ind)}</td></tr>`}).join('')})()}
+      </tbody></table></div>
+      <div class="bar"><button class="btn primary" data-pact="imp-guardar">${ES.doc?'Reemplazar presupuesto':'Guardar presupuesto'}</button>${ES.doc?'<button class="btn ghost" data-pact="imp-cancelar">Cancelar</button>':''}</div>`:''}
+    ${ES.doc&&!R?'<div class="bar"><button class="btn ghost" data-pact="imp-cancelar">Cancelar</button></div>':''}
+  </div>`}
+async function guardarImport(){const R=IM.res;if(!R||!R.items.length)return;const o=window.ASIS_OBRA&&window.ASIS_OBRA();
+  const base=IM.base?{...R.acums}:{};
+  const doc={obra_id:o.id,items:R.items,base,certs:[],vinculos:{},baseHasta:IM.base?(IM.bh||hoy):'',m2:R.m2||(ES.doc&&ES.doc.m2)||0,usd:(ES.doc&&ES.doc.usd)||0,indice:R.ind||1};
+  try{await window.PDB.save(doc)}catch(e){return toast('No se pudo guardar el presupuesto')}
+  ES.doc=doc;ES.importar=false;Object.keys(IM).forEach(k=>delete IM[k]);ES.tab='detalle';render();toast(`Presupuesto cargado: ${doc.items.length} ítems`)}
+
 const OBRA_P=()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();return{obra:o?o.nombre:'',cliente:o?o.cliente||'':'',ubicacion:o?o.ubicacion||'':''}};
 const TABS=[['resumen','Resumen'],['detalle','Presupuesto'],['avance','Avance al cliente']];
 function render(){
@@ -1993,7 +2059,7 @@ function render(){
   if(ES.refrescar){ES.refrescar=false;if(window.CDB)window.CDB.list(oid).then(l=>{ES.con=l;render()}).catch(()=>{})}
   const foco=document.activeElement&&document.activeElement.id;
   const sub=`<div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ptab="${k}" aria-pressed="${ES.tab===k}">${t}</button>`).join('')}</div>`;
-  if(!ES.doc){root.innerHTML=sub+`<div class="panel" style="padding:16px"><h3>Esta obra todavía no tiene presupuesto</h3><p class="sub">El presupuesto se carga desde tu planilla de Excel. Pedile a Claude que lo cargue para esta obra.</p></div>`;return}
+  if(!ES.doc||ES.importar){if(window.CLI){root.innerHTML='<div class="panel" style="padding:16px">Esta obra todavía no tiene presupuesto cargado.</div>';return}root.innerHTML=(ES.doc?sub:'')+vImportar();return}
   const V={resumen:vResumen,detalle:vDetalle,avance:vAvance}[ES.tab];
   root.innerHTML=sub+V();
   if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'||el.type==='text'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
@@ -2013,6 +2079,9 @@ document.addEventListener('click',e=>{
     for(const i of ES.doc.items){const v=Math.min(Number(ES.borr[i.id])||0,tope(i,ant));if(v>1e-9)pres[i.id]=v}
     const E=ejecutado(ES.corte);
     certs.push({n,fecha:hoy,desde:desdeNuevo(ES.corte),hasta:ES.corte,pres,contratistas:E.lista.map(x=>({id:x.c.id,nombre:x.c.nombre,n:x.x.n,monto:x.monto}))});ES.borr={};ES.raw={};ES.cargado=null;ES.raw={};ES.corte=null;ES.cert=n;guardar();render();return toast(`Certificado de avance N°${n} emitido`)}
+  if(a==='imp-abrir'){if((ES.doc.certs||[]).length)return toast('Esta obra ya tiene certificados de avance al cliente emitidos: anulalos antes de reemplazar el presupuesto');ES.importar=true;return render()}
+  if(a==='imp-cancelar'){ES.importar=false;Object.keys(IM).forEach(k=>delete IM[k]);return render()}
+  if(a==='imp-guardar')return guardarImport();
   if(a==='pdfres')return pdfResumen();
   if(a==='pdfdet')return pdfDetalle();
   if(a==='pdfav')return pdfAvance(+t.dataset.n,modoP());
@@ -2025,6 +2094,10 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   if(!dentro(e))return;const t=e.target;
+  if(t.id==='pi-file'&&t.files[0])return leerArchivo(t.files[0]);
+  if(t.id==='pi-hoja'){const k=+t.value;const res=leerHoja(IM.hojas[k]);if(!res||!res.items.length){toast('En esa hoja no encontré la tabla del presupuesto');return render()}IM.hoja=k;IM.res=res;IM.base=Object.keys(res.acums).length>0;return render()}
+  if(t.id==='pi-base'){IM.base=t.checked;return render()}
+  if(t.id==='pi-bh'){IM.bh=t.value;return}
   if(t.id==='pp-corte'&&t.value){ES.corte=t.value;ES.cargado=null;ES.raw={};render()}
   if(t.dataset.vinc){ES.doc.vinculos=ES.doc.vinculos||{};if(t.value)ES.doc.vinculos[t.dataset.vinc]=t.value;else delete ES.doc.vinculos[t.dataset.vinc];guardar();
     ES.cargado=null;ES.raw={};render();toast('Vínculo guardado')}
