@@ -225,7 +225,7 @@ button.cell{cursor:pointer}
 .ns{display:none}
 .cli-banner{background:color-mix(in srgb,var(--ok) 16%,var(--panel));color:var(--ink)}
 .cli-banner .btn{margin-left:8px;padding:3px 10px;font-size:12.5px}
-.modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
+.modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="corregir"],.modo-cliente [data-cact="anularcert"],.modo-cliente [data-cact="guardared"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
 .modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
 .modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
 .modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
@@ -1400,8 +1400,10 @@ function vCertificado(){
   if(S.cert==null||S.cert<1)S.cert=ult||1;
   const nuevo=S.cert===ult+1;
   if(nuevo&&!S.per)S.per=propuestaPeriodo();
-  const c=nuevo?{n:ult+1,pres:S.borrador}:D.certs.find(x=>x.n===S.cert);
-  const ant=acumHasta(c.n-1);
+  const cv=nuevo?null:D.certs.find(x=>x.n===S.cert);
+  const ed=!nuevo&&!window.CLI&&S.ed===S.cert;
+  const c=nuevo?{n:ult+1,pres:S.borrador}:ed?{...cv,pres:S.borrador}:cv;
+  const ant=acumHasta(c.n-1);const fin=ed?acumHasta(ult):null;const carga=nuevo||ed;
   const pago=!nuevo&&D.des.find(d=>d.cert===c.n);
   const solapa=nuevo&&D.certs.find(x=>x.desde&&!(addDay(S.per,6)<x.desde||S.per>x.hasta));
   const q=(S.buscar||'').toLowerCase();
@@ -1412,15 +1414,15 @@ function vCertificado(){
     const mA=a*it.pu,mP=p*it.pu,mAc=ac*it.pu;
     if(it.sec==='ADIC'){tA+=mP;aA+=mAc}else{tO+=mP;aO+=mAc}
     sub[it.rubro]=sub[it.rubro]||{mA:0,mP:0,mAc:0,tot:0};const s=sub[it.rubro];s.mA+=mA;s.mP+=mP;s.mAc+=mAc;s.tot+=it.cant*it.pu;
-    if(ac>it.cant+1e-9)over.push(it);
-    const visible=(q?(it.desc+' '+it.n+' '+it.rubro).toLowerCase().includes(q):true)&&(S.soloAvance?(nuevo?it.pu>0:(ac>0||p>0)):true);
+    const tope=ed?(fin[it.id]||0)-Number(cv.pres[it.id]||0)+p:ac;if(tope>it.cant+1e-9)over.push(it);
+    const visible=(q?(it.desc+' '+it.n+' '+it.rubro).toLowerCase().includes(q):true)&&(S.soloAvance?(carga?it.pu>0:(ac>0||p>0)):true);
     if(!visible)continue;
     if(it.rubro!==lastR){rows.push(`<tr class="rubro"><td colspan="13">${esc(it.rubro)}</td></tr>`);lastR=it.rubro;lastS=null}
     if(it.sector&&it.sector!==lastS){rows.push(`<tr class="sector"><td></td><td colspan="12">${esc(it.sector)}</td></tr>`);lastS=it.sector}
     rows.push(`<tr class="${ac>it.cant+1e-9?'over':''} ${p?'has':''}"><td class="num">${esc(it.n)}</td><td class="desc">${esc(it.desc)}</td><td>${esc(it.unidad)}</td>
       <td class="n">${qf(it.cant)}</td><td class="n">${gs(it.pu)}</td>
       <td class="n">${qf(a)}</td>
-      <td class="n pres">${nuevo?`<input type="text" inputmode="decimal" autocomplete="off" id="p-${it.id}" data-id="${it.id}" value="${esc(S.raw&&S.raw[it.id]!=null?S.raw[it.id]:qf(p))}" aria-label="Presente ${esc(it.desc)}">`:qf(p)}</td>
+      <td class="n pres">${carga?`<input type="text" inputmode="decimal" autocomplete="off" id="p-${it.id}" data-id="${it.id}" value="${esc(S.raw&&S.raw[it.id]!=null?S.raw[it.id]:qf(p))}" aria-label="Presente ${esc(it.desc)}">`:qf(p)}</td>
       <td class="n">${qf(ac)}</td><td class="n">${it.cant?pct(ac/it.cant):''}</td>
       <td class="n">${gs(mA)}</td><td class="n">${gs(mP)}</td><td class="n">${gs(mAc)}</td>
       <td class="n">${gs(it.cant*it.pu)}</td></tr>`);
@@ -1430,17 +1432,18 @@ function vCertificado(){
     `<button class="chip nuevo" data-cact="vercert" data-n="${ult+1}" aria-pressed="${nuevo}">+ Nuevo N°${ult+1}</button>`;
   return `
   <div class="bar between"><div><h2>Certificado N°${c.n}</h2><div class="sub">${esc(D.nombre)} · ${esc(D.tipo)} · ${esc(OBRA.obra)}</div>
-    ${!nuevo&&c.desde?`<div class="sub">Período <b>${ddm(c.desde)} al ${ddm(c.hasta)}</b>${pago?` · pagado el <b>${ddm(pago.fecha)}</b>`:` · pago previsto el <b>${ddm(addDay(c.hasta,1))}</b>`}</div>`:''}</div><div class="chips">${chips}</div></div>
+    ${!nuevo&&c.desde?`<div class="sub">Período <b>${ddm(c.desde)} al ${ddm(c.hasta)}</b>${pago?` · pagado el <b>${ddm(pago.fecha)}</b>`:` · pago previsto el <b>${ddm(addDay(c.hasta,1))}</b>`}${c.corregido?` · corregido el ${ddm(c.corregido)}`:''}</div>`:''}</div><div class="chips">${chips}</div></div>
   ${nuevo?`<div class="panel form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
     <label>Desde (sábado)<input type="date" id="c-desde" value="${S.per}"></label>
     <label>Hasta (viernes)<input type="date" value="${addDay(S.per,6)}" disabled></label>
     <label>Pago (sábado)<input type="date" value="${addDay(S.per,7)}" disabled></label>
     ${solapa?`<div class="hint rojo" style="grid-column:1/-1">Este período se superpone con el certificado N°${solapa.n} (${ddm(solapa.desde)} al ${ddm(solapa.hasta)}). Elegí la semana siguiente.</div>`:''}
   </div>`:''}
+  ${ed?`<div class="hint amarillo"><b>Estás corrigiendo el certificado N°${c.n}.</b> Cambiá la columna <b>Presente</b> y tocá <b>Guardar corrección</b>. Los certificados siguientes se recalculan solos (su Anterior y Acumulado).${pago?` Tiene un pago registrado de ${gs(pago.total)} Gs: al guardar se actualiza al nuevo monto.`:''}</div>`:''}
   ${nuevo?`<div class="hint amarillo">Cargá solo la columna <b>Presente</b> (lo medido esta semana). Anterior y Acumulado se calculan de los certificados ya emitidos, así no se pueden desfasar.</div>`:''}
   <div class="bar">
     <input type="search" id="buscar" placeholder="Buscar ítem o rubro" value="${esc(S.buscar)}" style="flex:1;min-width:200px">
-    <label class="bar sub"><input type="checkbox" id="solo" ${S.soloAvance?'checked':''}> ${nuevo?'Solo ítems con precio':'Solo ítems con avance'}</label>
+    <label class="bar sub"><input type="checkbox" id="solo" ${S.soloAvance?'checked':''}> ${carga?'Solo ítems con precio':'Solo ítems con avance'}</label>
   </div>
   <div class="panel tw"><table>
     <thead>
@@ -1454,9 +1457,9 @@ function vCertificado(){
     <div><small>Total adicional</small><b>${gs(tA)}</b></div>
     <div><small>Total a pagar Gs</small><b>${gs(total)}</b></div>
     <div><small>Acumulado contrato</small><b>${pct(aO/(resumen().orig||1))}</b></div>
-    ${nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`${selModo()}<button class="btn primary" data-cact="pdfcert" data-n="${c.n}">Descargar PDF</button><button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}
+    ${ed?`<button class="btn primary" data-cact="guardared" ${over.length?'disabled':''}>Guardar corrección</button><button class="btn ghost" data-cact="cancelared">Cancelar</button>`:nuevo?`<button class="btn primary" data-cact="emitir" ${(!total||over.length||solapa)?'disabled':''}>Emitir certificado N°${c.n}</button>`:`${selModo()}<button class="btn primary" data-cact="pdfcert" data-n="${c.n}">Descargar PDF</button><button class="btn" data-cact="pagar" data-n="${c.n}" ${pago?'disabled':''}>${pago?'Pagado el '+ddm(pago.fecha):'Registrar pago'+(c.hasta?' del '+ddm(addDay(c.hasta,1)):'')}</button>`}${!nuevo&&!ed?`<button class="btn ghost" data-cact="corregir" data-n="${c.n}">Corregir</button>${c.n===ult?`<button class="btn ghost" data-cact="anularcert" data-n="${c.n}" ${S.anular===c.n?'style="color:var(--bad)"':''}>${S.anular===c.n?'¿Anular el N°'+c.n+'? Tocá otra vez':'Anular'}</button>`:''}`:''}
     <div class="letras">En letras: ${total?letras(total)+' guaraníes':'—'}</div>
-    ${over.length?`<div class="hint rojo letras">No se puede emitir: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
+    ${over.length?`<div class="hint rojo letras">No se puede ${ed?'guardar':'emitir'}: ${over.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
   </div>`;
 }
 
@@ -1668,7 +1671,14 @@ document.addEventListener('click',e=>{
   if(a==='pdfres'){return pdfResumen()}
   if(a==='pdfcontrato'){return pdfContrato()}
   if(a==='pdfadic'){return pdfAdicionales()}
-  if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;return render()}
+  if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;if(S.ed){S.ed=null;S.borrador={};S.raw={}}S.anular=null;return render()}
+  if(a==='corregir'){const c=D.certs.find(x=>x.n===+t.dataset.n);if(!c)return;S.ed=c.n;S.borrador={...c.pres};S.raw={};S.soloAvance=true;S.anular=null;return render()}
+  if(a==='cancelared'){S.ed=null;S.borrador={};S.raw={};return render()}
+  if(a==='guardared'){const c=D.certs.find(x=>x.n===S.ed);if(!c)return;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
+    c.pres=pres;c.corregido=hoy;const pg=D.des.find(d=>d.cert===c.n);if(pg){const m=montoCert(c);pg.orig=m.o;pg.adic=m.ad;pg.total=m.t}
+    S.ed=null;S.borrador={};S.raw={};guardar();render();return toast(`Certificado N°${c.n} corregido`+(pg?' · pago actualizado':''))}
+  if(a==='anularcert'){const n=+t.dataset.n;if(S.anular!==n){S.anular=n;return render()}
+    D.certs=D.certs.filter(x=>x.n!==n);D.des=D.des.filter(d=>d.cert!==n);S.anular=null;S.cert=null;S.ed=null;guardar();render();return toast(`Certificado N°${n} anulado`)}
   if(a==='emitir'){const ult=D.certs.length?D.certs[D.certs.length-1].n:0;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
     D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.raw={};S.per=null;S.cert=ult+1;guardar();render();return toast(`Certificado N°${ult+1} emitido`)}
   if(a==='pagar'){const c=D.certs.find(x=>x.n===+t.dataset.n);const m=montoCert(c);D.des.push({sem:D.des.length+1,fecha:c.hasta?addDay(c.hasta,1):hoy,orig:m.o,adic:m.ad,total:m.t,cert:c.n});D.des.sort((a,b)=>a.fecha<b.fecha?-1:1);guardar();render();return toast('Pago registrado en Desembolsos')}
