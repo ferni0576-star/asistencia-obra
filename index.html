@@ -223,6 +223,14 @@ button.cell{cursor:pointer}
 .chip-p{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:6px 14px;font-weight:600;font-size:14px}
 .chip-p[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .ns{display:none}
+.cli-banner{background:color-mix(in srgb,var(--ok) 16%,var(--panel));color:var(--ink)}
+.cli-banner .btn{margin-left:8px;padding:3px 10px;font-size:12.5px}
+.modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
+.modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
+.modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
+.modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
+.modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"]{display:none!important}
+.modo-cliente .m-box{pointer-events:none}
 @media (max-width:760px){nav.tabs{justify-content:space-around;gap:2px}header.top nav.tabs button{flex:1 1 0;font-size:11px;padding:8px 0;letter-spacing:0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.nl{display:none}.ns{display:inline}}
 </style>
 
@@ -401,6 +409,9 @@ function backendLocal(){
     async proveedores(){if(!d.proveedores){d.proveedores=[];save()}return JSON.parse(JSON.stringify(d.proveedores))},
     async saveProveedor(v){const x=JSON.parse(JSON.stringify(v));const i=d.proveedores.findIndex(y=>y.id===v.id);if(i>=0)d.proveedores[i]=x;else d.proveedores.push(x);save()},
     async delProveedor(id){d.proveedores=d.proveedores.filter(x=>x.id!==id);save()},
+    async perfiles(){return JSON.parse(JSON.stringify(d.perfiles||[]))},
+    async asignarUsuario(v){d.perfiles=d.perfiles||[];const i=d.perfiles.findIndex(x=>x.email===v.email.toLowerCase());const row={user_id:i>=0?d.perfiles[i].user_id:uid(),email:v.email.toLowerCase(),nombre:v.nombre,rol:v.rol,obras:v.obras,modulos:v.modulos};if(i>=0)d.perfiles[i]=row;else d.perfiles.push(row);save()},
+    async quitarPerfil(id){d.perfiles=(d.perfiles||[]).filter(x=>x.user_id!==id);save()},
   };
 }
 function backendNube(sb){
@@ -437,6 +448,9 @@ function backendNube(sb){
     async proveedores(){return ok(await sb.from('proveedores').select('*').order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
     async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
     async delProveedor(id){ok(await sb.from('proveedores').delete().eq('id',id))},
+    async perfiles(){return ok(await sb.from('perfiles').select('*').order('creado'))},
+    async asignarUsuario(v){const{error}=await sb.rpc('asignar_usuario',{p_email:v.email,p_nombre:v.nombre||null,p_rol:v.rol,p_obras:v.obras,p_modulos:v.modulos});if(error)throw error},
+    async quitarPerfil(id){ok(await sb.from('perfiles').delete().eq('user_id',id))},
   };
 }
 
@@ -964,13 +978,14 @@ const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidac
 const MODS=[['inicio','← Obras'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales']];
 const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio';
 function render(){
+  if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
   const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
     ${S.tab==='inicio'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${S.tab==='inicio'?'':`<nav class="tabs">${MODS.map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'← Obras','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos'})[k]}</span></button>`}).join('')}</nav>`}</header>
-  ${NUBE?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
+    ${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>!window.CLI||k==='inicio'||window.CLI.mods.includes(k)).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'← Obras','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos'})[k]}</span></button>`}).join('')}</nav>`}</header>
+  ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?'Vista previa: así ve la obra tu cliente (solo lectura) · <button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':'Acceso de cliente'+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+' · solo lectura'}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
   if(S.tab==='presupuesto'&&window.PRES)window.PRES.mount();
@@ -1120,6 +1135,7 @@ window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
 window.PVB={list:()=>DB.proveedores(),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
+window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
 const SEMILLA_PEDIDOS=[];
 window.PLB=(()=>{
   if(NUBE)return{
@@ -1167,6 +1183,9 @@ window.ASIS_MO=async()=>{
 async function iniciar(session){
   if(session)S.email=session.user.email;
   document.getElementById('app').innerHTML='<main><p class="sub">Cargando…</p></main>';
+  if(NUBE&&session){let pr;try{const r=await SB.from('perfiles').select('*').eq('user_id',session.user.id).maybeSingle();pr=r.error?null:(r.data||'sin')}catch(e){pr=null}
+    if(pr==='sin'){document.getElementById('app').innerHTML=`<main><div class="panel" style="padding:20px;max-width:520px;margin:40px auto"><h2>Sin acceso todavía</h2><p class="sub">Tu usuario (${esc(session.user.email)}) existe pero la dirección de obra todavía no te dio acceso a ninguna obra.</p><button class="btn" data-act="salir">Cerrar sesión</button></div></main>`;return}
+    if(pr&&pr.rol==='cliente'){window.CLI={mods:(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m)),nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}}
   S.aj={...AJ_DEF,...(await DB.ajustes()||{})};
   S.obras=await DB.obras();
   let guardada=null;try{guardada=localStorage.getItem('obra_sel')}catch(e){}
@@ -1377,6 +1396,7 @@ function vResumen(){
 
 function vCertificado(){
   const ult=D.certs.length?D.certs[D.certs.length-1].n:0;
+  if(window.CLI){if(!ult)return `<div class="panel" style="padding:16px">${esc(D.nombre)} todavía no tiene certificados emitidos.</div>`;if(S.cert==null||S.cert>ult)S.cert=ult}
   if(S.cert==null||S.cert<1)S.cert=ult||1;
   const nuevo=S.cert===ult+1;
   if(nuevo&&!S.per)S.per=propuestaPeriodo();
@@ -1771,7 +1791,7 @@ function vResumen(){
     <div class="kpi"><small>Mano de obra contratada</small><b>${ml(tc)}</b><em>${pc(tmo?tc/tmo:0)} de la presupuestada · faltan contratar ${ml(pend)}</em></div>
     <div class="kpi"><small>Avance certificado al cliente</small><b>${ml(T.av)}</b><em>${pc(T.av/T.tot)} de la obra</em></div>
   </div>
-  <div class="panel"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Controles</h3><span class="sub">Presupuesto contra contratos de mano de obra</span></div>
+  <div class="panel p-controles"><div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h3>Controles</h3><span class="sub">Presupuesto contra contratos de mano de obra</span></div>
     ${al.map(([n,h])=>`<div class="alerta">${dot(n)}<div>${h}</div></div>`).join('')||'<div class="alerta"><i class="dot verde"></i><div>Todo dentro de lo presupuestado.</div></div>'}</div>
   <div class="panel tw"><table>
     <thead><tr><th></th><th>Rubro</th><th class="n">Materiales</th><th class="n">Mano de obra</th><th class="n">Total rubro</th><th class="n">Incid.</th><th class="n">M.O. contratada</th><th class="n">Diferencia</th><th>Contratista</th><th>Avance cliente</th></tr></thead>
@@ -1827,6 +1847,7 @@ function pendienteMonto(){const certs=ES.doc.certs||[];const ult=certs.length?ce
 
 function vAvance(){
   const certs=ES.doc.certs||[];const ult=certs.length?certs[certs.length-1].n:0;
+  if(window.CLI){if(!ult)return `<h2>Avance al cliente</h2><div class="panel" style="padding:16px">Todavía no hay certificados de avance emitidos para esta obra.</div>`;if(ES.cert==null||ES.cert>ult)ES.cert=ult}
   if(ES.cert==null)ES.cert=ult+1;
   const nuevo=ES.cert===ult+1;
   if(!ES.corte)ES.corte=hoy;
@@ -2249,7 +2270,7 @@ function vVer(){
     ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
     <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
   </div>
-  ${vSugeridos(p)}
+  ${window.CLI?'':vSugeridos(p)}
   <div class="panel">
     <div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div><h3>Control de llegada a obra</h3><span class="sub">Tildá cada material cuando llega. Si llegó una parte, cargá la cantidad en “Parcial / nota”.</span></div>
       ${e!=='ok'?`<button class="btn sm" data-mact="todo">Llegó todo</button>`:`<button class="btn sm ghost" data-mact="nada">Desmarcar todo</button>`}</div>
@@ -2673,7 +2694,40 @@ const css=document.createElement('style');css.textContent=`
 /* ============ Inicio: todas las obras en una pantalla + respaldo ============ */
 const TIPOS=['Residencial','Comercial','Interiorismo','Industrial','Institucional','Otro'];
 const ESTADOS=[['activo','Activo'],['planificacion','Planificación'],['pausada','Pausada'],['terminada','Terminada']];
-const I={q:'',edit:null,stats:{},cargando:false,filtro:'todas',ocupado:false};
+const I={q:'',edit:null,stats:{},cargando:false,filtro:'todas',ocupado:false,cli:false,usr:null,uedit:null};
+const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra']];
+async function cargarUsr(){try{I.usr=await window.USR.list()}catch(e){I.usr=[];toast('No se pudieron leer los accesos. ¿Ejecutaste el SQL 11?')}render()}
+function vClientes(){
+  if(I.usr===null){cargarUsr();return '<div class="panel" style="padding:14px"><span class="sub">Cargando accesos…</span></div>'}
+  const nube=window.USR.nube();const ob=id=>(S.obras.find(o=>o.id===id)||{}).nombre||'obra borrada';
+  const cl=I.usr.filter(u=>u.rol==='cliente'),eq=I.usr.filter(u=>u.rol==='equipo');const u=I.uedit;
+  return `<div class="panel ini-cli">
+    <div class="bar between"><div><h3>Accesos de clientes</h3><span class="sub">El cliente entra con su correo y contraseña y solo ve las obras y secciones que elijas, sin poder modificar nada. Nunca ve personal, asistencia ni sueldos.</span></div><button class="btn sm ghost" data-iact="clientes">Cerrar</button></div>
+    ${nube?`<ol class="sub ini-pasos"><li>Creá su usuario en <b>Supabase → Authentication → Users → Add user</b> (correo y contraseña; marcá "Auto Confirm User").</li><li>Acá abajo escribí ese correo, elegí sus obras y qué secciones ve, y guardá.</li><li>Pasale al cliente la dirección de tu página, su correo y su contraseña.</li></ol>`
+      :`<p class="sub" style="margin:0">En el modo prueba no se crean usuarios reales: guardá un acceso y usá <b>Vista previa</b> para ver exactamente lo que vería el cliente.</p>`}
+    <div class="tw"><table><thead><tr><th>Cliente</th><th>Obras</th><th>Ve</th><th></th></tr></thead><tbody>
+      ${cl.map(x=>`<tr><td><b>${esc(x.nombre||'')}</b><div class="sub">${esc(x.email||'')}</div></td><td>${(x.obras||[]).map(id=>esc(ob(id))).join('<br>')||'<span class="sub">ninguna</span>'}</td>
+        <td>${(x.modulos||[]).map(m=>`<span class="ini-chip">${esc((MODC.find(c=>c[0]===m)||[0,m])[1])}</span>`).join(' ')}</td>
+        <td><div class="bar" style="justify-content:flex-end"><button class="btn sm" data-iact="prev" data-u="${x.user_id}">Vista previa</button><button class="btn sm ghost" data-iact="uedit" data-u="${x.user_id}">Editar</button>
+          ${I.uconf===x.user_id?`<button class="btn sm" style="color:var(--bad)" data-iact="uquitar" data-u="${x.user_id}">¿Quitar acceso?</button>`:`<button class="btn sm ghost" data-iact="uconf" data-u="${x.user_id}">Quitar</button>`}</div></td></tr>`).join('')
+        ||'<tr><td colspan="4" class="sub">Todavía no diste acceso a ningún cliente.</td></tr>'}
+    </tbody></table></div>
+    <form class="ini-uf" id="ini-uf" autocomplete="off">
+      <h4>${u&&u.user_id?'Editar acceso':'Dar acceso'}</h4>
+      <div class="form" style="padding:0">
+        <label>Correo del usuario<input type="text" inputmode="email" name="email" value="${esc(u&&u.email||'')}" required placeholder="cliente@correo.com"></label>
+        <label>Nombre<input type="text" name="nombre" value="${esc(u&&u.nombre||'')}" placeholder="Ej.: Vanguard S.A"></label>
+        <label>Tipo de acceso<select name="rol"><option value="cliente" ${!u||u.rol!=='equipo'?'selected':''}>Cliente (solo lectura)</option><option value="equipo" ${u&&u.rol==='equipo'?'selected':''}>Equipo (ve y edita todo)</option></select></label>
+      </div>
+      <fieldset><legend>Obras que ve</legend>${S.obras.map(o=>`<label><input type="checkbox" name="obras" value="${o.id}" ${u?((u.obras||[]).includes(o.id)?'checked':''):(o.id===S.obra?'checked':'')}> ${esc(o.nombre)}</label>`).join('')}</fieldset>
+      <fieldset><legend>Secciones que ve</legend>${MODC.map(([k,t,d])=>`<label><input type="checkbox" name="modulos" value="${k}" ${u?((u.modulos||[]).includes(k)?'checked':''):(['contratistas','presupuesto'].includes(k)?'checked':'')}> <span>${t}<small class="sub" style="display:block;font-size:12px">${d}</small></span></label>`).join('')}</fieldset>
+      <div class="bar"><button class="btn primary">Guardar acceso</button><button type="button" class="btn" data-iact="prevform">Vista previa</button>${u?'<button type="button" class="btn ghost" data-iact="unuevo">Cancelar</button>':''}</div>
+    </form>
+    ${eq.length?`<p class="sub" style="margin:0">Equipo con acceso total: ${eq.map(x=>esc(x.email||x.nombre||'')).join(', ')}.</p>`:''}
+  </div>`}
+function entrarPreview(v){window.CLI={mods:v.modulos||[],obras:v.obras||[],nombre:v.nombre||v.email||'',preview:true};document.body.classList.add('modo-cliente');
+  if(v.obras&&v.obras.length&&!v.obras.includes(S.obra))elegirObra(v.obras[0]);S.tab='inicio';I.cli=false;window.render();window.scrollTo(0,0)}
+function salirPreview(){delete window.CLI;document.body.classList.remove('modo-cliente');S.tab='inicio';I.cli=true;window.render();window.scrollTo(0,0)}
 const estadoDe=o=>o.estado||(o.activa===false?'terminada':'activo');
 const nomEst=e=>(ESTADOS.find(x=>x[0]===e)||ESTADOS[0])[1];
 const pct=v=>v==null?'—':Math.round(v)+'%';
@@ -2702,7 +2756,7 @@ function tarjeta(o){const e=estadoDe(o);const st=I.stats[o.id]||{};const av=st.a
       <div class="ini-img">${portada(o)}<span class="ini-est e-${e}"><i></i>${nomEst(e)}</span>${o.id===S.obra?'<span class="ini-actual">Última abierta</span>':''}</div>
       <div class="ini-body"><b class="ini-nom">${esc(o.nombre)}</b><span class="sub">${esc(o.ubicacion||o.cliente||'Sin ubicación')}</span>
         <div class="ini-av"><span>${esc(o.tipo||'Obra')}</span><span class="ini-bar"><i style="width:${av==null?0:Math.max(2,Math.min(100,av))}%"></i></span><b class="num">${I.listo||av!=null?pct(av):'…'}</b></div>
-        <span class="ini-mini sub">${pers} persona${pers===1?'':'s'} activa${pers===1?'':'s'}${st.ped?` · ${st.ped} pedido${st.ped===1?'':'s'} por llegar`:''}${o.cliente?' · '+esc(o.cliente):''}</span>
+        <span class="ini-mini sub">${window.CLI?(o.cliente?esc(o.cliente):''):`${pers} persona${pers===1?'':'s'} activa${pers===1?'':'s'}${st.ped?` · ${st.ped} pedido${st.ped===1?'':'s'} por llegar`:''}${o.cliente?' · '+esc(o.cliente):''}`}</span>
       </div></button>
     <div class="ini-acc"><button class="btn sm ghost" data-iact="editar" data-id="${o.id}">Editar</button><button class="btn sm ghost" data-iact="respaldo" data-id="${o.id}">Respaldo</button></div>
   </article>`}
@@ -2729,14 +2783,17 @@ function render(){
   const q=I.q.trim().toLowerCase();
   const cuenta=e=>S.obras.filter(o=>estadoDe(o)===e).length;
   const F=[['todas','Todas',S.obras.length],...ESTADOS.map(([k,t])=>[k,t,cuenta(k)]).filter(x=>x[2])];
-  const vis=S.obras.filter(o=>(I.filtro==='todas'||estadoDe(o)===I.filtro)&&(!q||[o.nombre,o.cliente,o.ubicacion,o.tipo].some(v=>(v||'').toLowerCase().includes(q))))
+  const vis=S.obras.filter(o=>(!window.CLI||!window.CLI.preview||!(window.CLI.obras||[]).length||window.CLI.obras.includes(o.id))&&(I.filtro==='todas'||estadoDe(o)===I.filtro)&&(!q||[o.nombre,o.cliente,o.ubicacion,o.tipo].some(v=>(v||'').toLowerCase().includes(q))))
     .sort((a,b)=>ESTADOS.findIndex(x=>x[0]===estadoDe(a))-ESTADOS.findIndex(x=>x[0]===estadoDe(b)));
   const foco=document.activeElement&&document.activeElement.id;
   root.innerHTML=`
   <div class="bar between"><div><h2>Obras</h2><div class="sub">Todas tus obras en una sola pantalla: estado, tipo y avance real de cada proyecto.</div></div>
     <div class="bar"><input type="text" id="ini-q" placeholder="Buscar obra…" value="${esc(I.q)}" style="width:180px">
+      ${window.CLI&&!window.CLI.preview?'<button class="btn" data-act="salir">Cerrar sesión</button>':''}
+      <button class="btn" data-iact="clientes">Accesos de clientes</button>
       <button class="btn" data-iact="respaldo-todo" ${I.ocupado?'disabled':''}>${I.ocupado?'Preparando…':'Respaldo de todo'}</button>
       <button class="btn primary" data-iact="nueva">+ Nueva obra</button></div></div>
+  ${I.cli&&!window.CLI?vClientes():''}
   ${I.edit?vForm():''}
   ${S.obras.length>1?`<div class="subnav-p">${F.map(([k,t,n])=>`<button class="chip-p" data-iact="filtro" data-f="${k}" aria-pressed="${I.filtro===k}">${t} <span class="num">${n}</span></button>`).join('')}</div>`:''}
   <div class="ini-grid">${vis.map(tarjeta).join('')||`<div class="panel" style="padding:16px">${S.obras.length?'Ninguna obra coincide con la búsqueda.':'Todavía no hay obras. Creá la primera con “+ Nueva obra”.'}</div>`}</div>
@@ -2793,7 +2850,7 @@ async function respaldo(lista){
 const dentro=e=>{const r=document.getElementById('ini-root');return r&&r.contains(e.target)};
 document.addEventListener('click',async e=>{
   if(!dentro(e))return;const t=e.target.closest('[data-iact]');if(!t)return;const a=t.dataset.iact;const o=S.obras.find(x=>x.id===t.dataset.id);
-  if(a==='entrar'&&o){elegirObra(o.id);S.tab=S.lastP||'cargar';S.edit=null;S.abierto=null;render();window.scrollTo(0,0);return refrescar()}
+  if(a==='entrar'&&o){elegirObra(o.id);S.tab=window.CLI?(window.CLI.mods[0]||'inicio'):(S.lastP||'cargar');S.edit=null;S.abierto=null;render();window.scrollTo(0,0);return refrescar()}
   if(a==='nueva'){I.edit={nombre:'',tipo:'Residencial',estado:'planificacion'};render();window.scrollTo(0,0);return}
   if(a==='editar'&&o){I.edit={...o};render();window.scrollTo(0,0);return}
   if(a==='cancelar'){I.edit=null;return render()}
@@ -2801,7 +2858,15 @@ document.addEventListener('click',async e=>{
   if(a==='filtro'){I.filtro=t.dataset.f;return render()}
   if(a==='respaldo'&&o)return respaldo([o]);
   if(a==='respaldo-todo')return respaldo(S.obras);
+  if(a==='clientes'){I.cli=!I.cli;I.uedit=null;if(I.cli)I.usr=null;return render()}
+  if(a==='uedit'){I.uedit={...(I.usr.find(x=>x.user_id===t.dataset.u)||{})};return render()}
+  if(a==='unuevo'){I.uedit=null;return render()}
+  if(a==='uconf'){I.uconf=t.dataset.u;return render()}
+  if(a==='uquitar'){try{await window.USR.quitar(t.dataset.u);I.usr=I.usr.filter(x=>x.user_id!==t.dataset.u);I.uconf=null;render();toast('Acceso quitado')}catch(err){toast('No se pudo quitar el acceso')}return}
+  if(a==='prev'){const u=I.usr.find(x=>x.user_id===t.dataset.u);if(u)entrarPreview(u);return}
+  if(a==='prevform'){const fd=new FormData(document.getElementById('ini-uf'));const m=fd.getAll('modulos');if(!m.length)return toast('Elegí al menos una sección');entrarPreview({nombre:fd.get('nombre')||fd.get('email'),obras:fd.getAll('obras'),modulos:m});return}
 });
+document.addEventListener('click',e=>{const t=e.target.closest('[data-iact="salirprev"]');if(t)salirPreview()});
 document.addEventListener('input',e=>{if(e.target.id==='ini-q'&&dentro(e)){I.q=e.target.value;render()}});
 document.addEventListener('change',async e=>{
   if(e.target.id!=='ini-foto'||!dentro(e))return;const f=e.target.files[0];if(!f)return;
@@ -2809,7 +2874,11 @@ document.addEventListener('change',async e=>{
   try{I.edit.foto=await achicar(f);render()}catch(err){toast('No se pudo leer la imagen')}
 });
 document.addEventListener('submit',async e=>{
-  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;if(f.id!=='ini-f')return;
+  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;
+  if(f.id==='ini-uf'){const fd=new FormData(f);const v={email:(fd.get('email')||'').trim(),nombre:(fd.get('nombre')||'').trim(),rol:fd.get('rol'),obras:fd.getAll('obras'),modulos:fd.getAll('modulos')};
+    if(!/^\S+@\S+\.\S+$/.test(v.email))return toast('Escribí un correo válido');if(v.rol==='cliente'&&!v.obras.length)return toast('Elegí al menos una obra');if(v.rol==='cliente'&&!v.modulos.length)return toast('Elegí al menos una sección');
+    try{await window.USR.asignar(v);I.uedit=null;I.usr=null;render();toast(v.rol==='cliente'?'Acceso del cliente guardado':'Acceso de equipo guardado')}catch(err){toast(err&&err.message?err.message:'No se pudo guardar el acceso')}return}
+  if(f.id!=='ini-f')return;
   const fd=Object.fromEntries(new FormData(f));
   const o={...I.edit,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),ubicacion:fd.ubicacion.trim(),tipo:fd.tipo,estado:fd.estado,inicio:fd.inicio||null,
     avance:fd.avance===''?null:Math.max(0,Math.min(100,Number(fd.avance))),activa:fd.estado!=='terminada'};
@@ -2823,6 +2892,14 @@ document.addEventListener('submit',async e=>{
 const css=document.createElement('style');css.textContent=`
 #ini-root{display:flex;flex-direction:column;gap:14px}
 #ini-root .btn.sm{padding:5px 10px;font-size:13px}
+.ini-cli{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.ini-pasos{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.ini-chip{display:inline-block;font-size:12px;background:var(--chip);border-radius:99px;padding:2px 8px;margin:1px 0}
+.ini-uf{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
+.ini-uf h4{margin:0;font-family:var(--f-display);font-size:18px}
+.ini-uf fieldset{border:1px solid var(--line);border-radius:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 12px;padding:8px 12px;margin:0}
+.ini-uf legend{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:0 4px}
+.ini-uf fieldset label{display:flex;gap:8px;align-items:flex-start;font-size:14px}.ini-uf fieldset input{margin-top:3px}
 .ini-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
 .ini-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,transform .15s}
 .ini-card:hover{border-color:var(--muted);transform:translateY(-2px)}
