@@ -231,7 +231,7 @@ button.cell{cursor:pointer}
 .modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
 .modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"]{display:none!important}
 .modo-cliente .m-box{pointer-events:none}
-@media (max-width:760px){nav.tabs{justify-content:space-around;gap:2px}header.top nav.tabs button{flex:1 1 0;font-size:11px;padding:8px 0;letter-spacing:0;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.nl{display:none}.ns{display:inline}}
+@media (max-width:760px){nav.tabs{justify-content:space-around;gap:2px}header.top nav.tabs button:first-child{flex:0 0 30px;font-size:16px}header.top nav.tabs button{flex:1 1 0;font-size:11px;padding:8px 0;letter-spacing:-.03em;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.nl{display:none}.ns{display:inline}}
 </style>
 
 <style>
@@ -410,6 +410,9 @@ function backendLocal(){
     async saveProveedor(v){const x=JSON.parse(JSON.stringify(v));const i=d.proveedores.findIndex(y=>y.id===v.id);if(i>=0)d.proveedores[i]=x;else d.proveedores.push(x);save()},
     async delProveedor(id){d.proveedores=d.proveedores.filter(x=>x.id!==id);save()},
     async perfiles(){return JSON.parse(JSON.stringify(d.perfiles||[]))},
+    async tareas(oid){return JSON.parse(JSON.stringify((d.tareas||[]).filter(t=>t.obra_id===oid)))},
+    async saveTarea(t){d.tareas=d.tareas||[];const v=JSON.parse(JSON.stringify(t));const i=d.tareas.findIndex(x=>x.id===t.id);if(i>=0)d.tareas[i]=v;else d.tareas.push(v);save()},
+    async delTarea(id){d.tareas=(d.tareas||[]).filter(x=>x.id!==id);save()},
     async asignarUsuario(v){d.perfiles=d.perfiles||[];const i=d.perfiles.findIndex(x=>x.email===v.email.toLowerCase());const row={user_id:i>=0?d.perfiles[i].user_id:uid(),email:v.email.toLowerCase(),nombre:v.nombre,rol:v.rol,obras:v.obras,modulos:v.modulos};if(i>=0)d.perfiles[i]=row;else d.perfiles.push(row);save()},
     async quitarPerfil(id){d.perfiles=(d.perfiles||[]).filter(x=>x.user_id!==id);save()},
   };
@@ -449,6 +452,9 @@ function backendNube(sb){
     async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
     async delProveedor(id){ok(await sb.from('proveedores').delete().eq('id',id))},
     async perfiles(){return ok(await sb.from('perfiles').select('*').order('creado'))},
+    async tareas(oid){if(!oid)return[];return ok(await sb.from('tareas').select('*').eq('obra_id',oid).order('creado'))},
+    async saveTarea(t){ok(await sb.from('tareas').upsert({id:t.id,obra_id:t.obra_id,titulo:t.titulo,fecha:t.fecha||null,prioridad:t.prioridad||'media',responsable:t.responsable||null,nota:t.nota||null,hecha:!!t.hecha,hecha_el:t.hecha_el||null}))},
+    async delTarea(id){ok(await sb.from('tareas').delete().eq('id',id))},
     async asignarUsuario(v){const{error}=await sb.rpc('asignar_usuario',{p_email:v.email,p_nombre:v.nombre||null,p_rol:v.rol,p_obras:v.obras,p_modulos:v.modulos});if(error)throw error},
     async quitarPerfil(id){ok(await sb.from('perfiles').delete().eq('user_id',id))},
   };
@@ -975,16 +981,16 @@ function vLogin(err=''){
 }
 
 const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['personal','Personal'],['ajustes','Ajustes']];
-const MODS=[['inicio','← Obras'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales']];
-const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio';
+const MODS=[['inicio','← Obras'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['tareas','Tareas']];
+const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas';
 function render(){
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',tareas:()=>'<div id="tar-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
     ${S.tab==='inicio'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>!window.CLI||k==='inicio'||window.CLI.mods.includes(k)).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'← Obras','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos'})[k]}</span></button>`}).join('')}</nav>`}</header>
+    ${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>!window.CLI||k==='inicio'||window.CLI.mods.includes(k)).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?'Vista previa: así ve la obra tu cliente (solo lectura) · <button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':'Acceso de cliente'+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+' · solo lectura'}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
@@ -992,6 +998,7 @@ function render(){
   if(S.tab==='planos'&&window.PLANOS)window.PLANOS.mount();
   if(S.tab==='materiales'&&window.MATERIALES)window.MATERIALES.mount();
   if(S.tab==='inicio'&&window.INICIO)window.INICIO.mount();
+  if(S.tab==='tareas'&&window.TAREAS)window.TAREAS.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
 }
 
@@ -1135,6 +1142,7 @@ window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
 window.PVB={list:()=>DB.proveedores(),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
+window.TDB={list:oid=>DB.tareas(oid),save:t=>DB.saveTarea(t),del:id=>DB.delTarea(id)};
 window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
 const SEMILLA_PEDIDOS=[];
 window.PLB=(()=>{
@@ -2826,6 +2834,7 @@ async function cargarStats(){if(I.cargando)return;I.cargando=true;
   await Promise.all(S.obras.map(async o=>{const st={};
     try{st.av=avancePres(window.PDB?await window.PDB.get(o.id):null)}catch(e){}
     try{const ps=window.MDB?await window.MDB.list(o.id):[];st.ped=ps.filter(p=>p.items.some(i=>{const r=i.rec;return !r||(i.cant&&r.cant!=null&&Number(r.cant)<Number(i.cant))})).length}catch(e){}
+    if(!window.CLI&&window.TAREAS){const c=await window.TAREAS.contar(o.id);if(c){st.tar=c.pend;st.venc=c.venc}}
     I.stats[o.id]=st}));
   I.cargando=false;I.listo=true;render()}
 
@@ -2839,7 +2848,7 @@ function tarjeta(o){const e=estadoDe(o);const st=I.stats[o.id]||{};const av=st.a
       <div class="ini-img">${portada(o)}<span class="ini-est e-${e}"><i></i>${nomEst(e)}</span>${o.id===S.obra?'<span class="ini-actual">Última abierta</span>':''}</div>
       <div class="ini-body"><b class="ini-nom">${esc(o.nombre)}</b><span class="sub">${esc(o.ubicacion||o.cliente||'Sin ubicación')}</span>
         <div class="ini-av"><span>${esc(o.tipo||'Obra')}</span><span class="ini-bar"><i style="width:${av==null?0:Math.max(2,Math.min(100,av))}%"></i></span><b class="num">${I.listo||av!=null?pct(av):'…'}</b></div>
-        <span class="ini-mini sub">${window.CLI?(o.cliente?esc(o.cliente):''):`${pers} persona${pers===1?'':'s'} activa${pers===1?'':'s'}${st.ped?` · ${st.ped} pedido${st.ped===1?'':'s'} por llegar`:''}${o.cliente?' · '+esc(o.cliente):''}`}</span>
+        <span class="ini-mini sub">${window.CLI?(o.cliente?esc(o.cliente):''):`${pers} persona${pers===1?'':'s'} activa${pers===1?'':'s'}${st.ped?` · ${st.ped} pedido${st.ped===1?'':'s'} por llegar`:''}${st.venc?` · <b style="color:var(--bad)">${st.venc} tarea${st.venc===1?'':'s'} vencida${st.venc===1?'':'s'}</b>`:st.tar?` · ${st.tar} tarea${st.tar===1?'':'s'}`:''}${o.cliente?' · '+esc(o.cliente):''}`}</span>
       </div></button>
     <div class="ini-acc"><button class="btn sm ghost" data-iact="editar" data-id="${o.id}">Editar</button><button class="btn sm ghost" data-iact="respaldo" data-id="${o.id}">Respaldo</button></div>
   </article>`}
@@ -3016,6 +3025,129 @@ const css=document.createElement('style');css.textContent=`
 .ini-fimg label.btn{text-align:center;cursor:pointer}
 @media (max-width:760px){.ini-form{grid-template-columns:1fr}.ini-grid{grid-template-columns:1fr 1fr;gap:10px}.ini-nom{font-size:14.5px}.ini-body{padding:10px 10px 6px}.ini-av{grid-template-columns:1fr auto}.ini-av>span:first-child{grid-column:1/-1}#ini-q{width:100%!important;flex:1 1 100%}}
 @media (max-width:420px){.ini-grid{grid-template-columns:1fr}}
+`;document.head.appendChild(css);
+})();
+
+(function(){
+/* ============ Tareas pendientes por obra ============ */
+const T={oid:undefined,lista:[],cargando:false,edit:null,verHechas:false,q:'',conf:null};
+const hoyT=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const sumD=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const DS=['dom','lun','mar','mié','jue','vie','sáb'];
+const fTxt=s=>{if(!s)return '';const h=hoyT();if(s===h)return 'hoy';if(s===sumD(h,1))return 'mañana';if(s===sumD(h,-1))return 'ayer';const d=new Date(s+'T12:00:00');return `${DS[d.getDay()]} ${s.slice(8,10)}/${s.slice(5,7)}`};
+const PRI={alta:['Alta','bad'],media:['Media','warn'],baja:['Baja','ok']};
+const nid=()=>(crypto.randomUUID?crypto.randomUUID():'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
+
+async function cargar(oid){if(T.cargando)return;T.cargando=true;
+  try{T.lista=await window.TDB.list(oid)}catch(e){T.lista=[];toast('No se pudieron leer las tareas. ¿Ejecutaste el SQL 12?')}
+  T.oid=oid;T.cargando=false;render()}
+async function guardar(t){try{await window.TDB.save(t)}catch(e){toast('No se pudo guardar la tarea. Revisá la conexión.')}}
+
+function grupos(L){const h=hoyT(),sem=sumD(h,7);const G=[['vencidas','Vencidas',[]],['hoy','Hoy',[]],['semana','Próximos 7 días',[]],['luego','Más adelante',[]],['sin','Sin fecha',[]]];
+  const g=k=>G.find(x=>x[0]===k)[2];
+  L.forEach(t=>{if(!t.fecha)g('sin').push(t);else if(t.fecha<h)g('vencidas').push(t);else if(t.fecha===h)g('hoy').push(t);else if(t.fecha<=sem)g('semana').push(t);else g('luego').push(t)});
+  const pr={alta:0,media:1,baja:2};G.forEach(x=>x[2].sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9')||(pr[a.prioridad]??1)-(pr[b.prioridad]??1)));return G}
+
+function fila(t){const e=T.edit===t.id;const h=hoyT();const venc=!t.hecha&&t.fecha&&t.fecha<h;
+  if(e)return `<form class="tk-edit" id="tk-ef" data-id="${t.id}">
+    <input type="text" name="titulo" value="${esc(t.titulo)}" required aria-label="Tarea">
+    <label>Para el<input type="date" name="fecha" value="${t.fecha||''}"></label>
+    <label>Prioridad<select name="prioridad">${Object.entries(PRI).map(([k,[n]])=>`<option value="${k}" ${k===(t.prioridad||'media')?'selected':''}>${n}</option>`).join('')}</select></label>
+    <label>Responsable<input type="text" name="responsable" value="${esc(t.responsable||'')}" placeholder="opcional"></label>
+    <label class="wide">Nota<input type="text" name="nota" value="${esc(t.nota||'')}" placeholder="detalle, a quién llamar, qué pedir…"></label>
+    <div class="bar"><button class="btn sm primary">Guardar</button><button type="button" class="btn sm ghost" data-tact="noedit">Cancelar</button>
+      ${T.conf===t.id?`<button type="button" class="btn sm" style="color:var(--bad)" data-tact="borrar" data-id="${t.id}">¿Borrar la tarea?</button>`:`<button type="button" class="btn sm ghost" data-tact="conf" data-id="${t.id}">Borrar</button>`}</div></form>`;
+  return `<div class="tk ${t.hecha?'hecha':''} ${venc?'venc':''}">
+    <label class="m-box"><input type="checkbox" data-tchk="${t.id}" ${t.hecha?'checked':''} aria-label="Hecha: ${esc(t.titulo)}"><span></span></label>
+    <button class="tk-txt" data-tact="editar" data-id="${t.id}"><b>${esc(t.titulo)}</b>
+      <span class="sub">${t.fecha?`<span class="tk-f">${venc?'venció ':''}${fTxt(t.fecha)}</span>`:''}${t.prioridad&&t.prioridad!=='media'?` · <span class="tk-p ${PRI[t.prioridad][1]}">${PRI[t.prioridad][0]}</span>`:''}${t.responsable?' · '+esc(t.responsable):''}${t.nota?' · '+esc(t.nota):''}${t.hecha&&t.hecha_el?' · hecha '+fTxt(t.hecha_el):''}</span></button>
+  </div>`}
+
+function render(){
+  const root=document.getElementById('tar-root');if(!root)return;
+  const o=OB();const oid=o?o.id:null;
+  if(!oid){root.innerHTML='<div class="panel" style="padding:16px">Elegí una obra.</div>';return}
+  if(oid!==T.oid){root.innerHTML='<p class="sub">Cargando tareas…</p>';cargar(oid);return}
+  const foco=document.activeElement&&document.activeElement.id;
+  const q=T.q.trim().toLowerCase();const filt=t=>!q||[t.titulo,t.nota,t.responsable].some(v=>(v||'').toLowerCase().includes(q));
+  const pend=T.lista.filter(t=>!t.hecha&&filt(t)),hechas=T.lista.filter(t=>t.hecha&&filt(t)).sort((a,b)=>(b.hecha_el||'').localeCompare(a.hecha_el||''));
+  const G=grupos(pend);const nv=G[0][2].length,nh=G[1][2].length;
+  root.innerHTML=`
+  <div class="bar between"><div><h2>Tareas pendientes</h2><div class="sub">${esc(o.nombre)} · ${pend.length} pendiente${pend.length===1?'':'s'}${nv?` · <b style="color:var(--bad)">${nv} vencida${nv>1?'s':''}</b>`:''}${nh?` · ${nh} para hoy`:''}</div></div>
+    <div class="bar"><input type="text" id="tk-q" placeholder="Buscar tarea" value="${esc(T.q)}" style="width:170px">${T.lista.length?'<button class="btn" data-tact="pdf">PDF</button>':''}</div></div>
+  <form class="panel tk-nueva" id="tk-nf" autocomplete="off">
+    <input type="text" id="tk-titulo" name="titulo" placeholder="Nueva tarea… ej.: Pedir hormigón para viga, llamar al electricista" required>
+    <input type="date" name="fecha" value="${T.ultFecha||''}" aria-label="Para el">
+    <select name="prioridad" aria-label="Prioridad"><option value="media">Prioridad media</option><option value="alta">Alta</option><option value="baja">Baja</option></select>
+    <div class="tk-rap"><button type="button" class="chip-p" data-tact="f" data-d="0">Hoy</button><button type="button" class="chip-p" data-tact="f" data-d="1">Mañana</button><button type="button" class="chip-p" data-tact="f" data-d="7">En 1 semana</button><button type="button" class="chip-p" data-tact="f" data-d="">Sin fecha</button></div>
+    <button class="btn primary">Agregar</button>
+  </form>
+  ${G.filter(x=>x[2].length).map(([k,n,L])=>`<div class="panel tk-g g-${k}"><div class="tk-h"><b>${n}</b><span class="sub">${L.length}</span></div>${L.map(fila).join('')}</div>`).join('')
+    ||`<div class="panel" style="padding:16px">${T.lista.length?(q?'Ninguna tarea coincide.':'No hay tareas pendientes. 👍'):'Todavía no hay tareas. Escribí la primera arriba y tocá Agregar.'}</div>`}
+  ${hechas.length?`<div class="panel tk-g"><button class="tk-h tk-tog" data-tact="hechas"><b>Hechas</b><span class="sub">${hechas.length} · ${T.verHechas?'ocultar':'ver'}</span></button>${T.verHechas?hechas.map(fila).join(''):''}</div>`:''}`;
+  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='text'&&el.setSelectionRange)el.setSelectionRange(el.value.length,el.value.length)}}
+}
+window.TAREAS={mount:render,contar:async oid=>{try{const L=await window.TDB.list(oid);const h=hoyT();return{pend:L.filter(t=>!t.hecha).length,venc:L.filter(t=>!t.hecha&&t.fecha&&t.fecha<h).length}}catch(e){return null}}};
+
+function pdf(){
+  if(!PDFK.ok())return;const o=OB()||{};const doc=PDFK.nuevo('portrait');
+  let y=PDFK.titulo(doc,'TAREAS PENDIENTES',[['Obra:',o.nombre],['Al:',hoyT().split('-').reverse().join('/')]]);
+  const body=[];grupos(T.lista.filter(t=>!t.hecha)).filter(x=>x[2].length).forEach(([k,n,L])=>{body.push([{content:n.toUpperCase(),colSpan:5,styles:{fontStyle:'bold',fillColor:[240,240,240]}}]);
+    L.forEach(t=>body.push(['☐'.replace('☐',''),t.titulo+(t.nota?' — '+t.nota:''),t.fecha?t.fecha.split('-').reverse().join('/'):'',PRI[t.prioridad||'media'][0],t.responsable||'']))});
+  PDFK.tabla(doc,{startY:y,head:[['','Tarea','Fecha','Prioridad','Responsable']],body:body.length?body:[[{content:'Sin tareas pendientes.',colSpan:5}]],
+    columnStyles:{0:{cellWidth:7},2:{cellWidth:22},3:{cellWidth:20},4:{cellWidth:32}},
+    didDrawCell:d=>{if(d.section==='body'&&d.column.index===0&&d.row.raw.length===5){d.doc.setDrawColor(90);d.doc.rect(d.cell.x+1.6,d.cell.y+d.cell.height/2-1.8,3.6,3.6)}}});
+  PDFK.cerrar(doc,`Tareas_${o.nombre||''}_${hoyT()}`);
+}
+
+const dentro=e=>{const r=document.getElementById('tar-root');return r&&r.contains(e.target)};
+document.addEventListener('click',async e=>{
+  if(!dentro(e))return;const b=e.target.closest('[data-tact]');if(!b)return;const a=b.dataset.tact;const t=T.lista.find(x=>x.id===b.dataset.id);
+  if(a==='f'){const f=document.querySelector('#tk-nf [name=fecha]');T.ultFecha=b.dataset.d===''?'':sumD(hoyT(),+b.dataset.d);if(f)f.value=T.ultFecha;document.getElementById('tk-titulo').focus();return}
+  if(a==='editar'&&t){T.edit=t.id;T.conf=null;return render()}
+  if(a==='noedit'){T.edit=null;return render()}
+  if(a==='conf'){T.conf=b.dataset.id;return render()}
+  if(a==='borrar'&&t){try{await window.TDB.del(t.id);T.lista=T.lista.filter(x=>x.id!==t.id);T.edit=null;render();toast('Tarea borrada')}catch(err){toast('No se pudo borrar')}return}
+  if(a==='hechas'){T.verHechas=!T.verHechas;return render()}
+  if(a==='pdf')return pdf();
+});
+document.addEventListener('change',async e=>{
+  if(!dentro(e))return;const c=e.target;if(!c.dataset.tchk)return;const t=T.lista.find(x=>x.id===c.dataset.tchk);if(!t)return;
+  t.hecha=c.checked;t.hecha_el=c.checked?hoyT():null;render();await guardar(t);if(c.checked)toast('Tarea hecha ✓')});
+document.addEventListener('input',e=>{if(e.target.id==='tk-q'&&dentro(e)){T.q=e.target.value;render()}});
+document.addEventListener('submit',async e=>{
+  if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
+  if(f.id==='tk-nf'){const titulo=(fd.titulo||'').trim();if(!titulo)return;
+    const t={id:nid(),obra_id:T.oid,titulo,fecha:fd.fecha||null,prioridad:fd.prioridad||'media',responsable:'',nota:'',hecha:false,hecha_el:null};
+    T.lista.push(t);T.ultFecha=fd.fecha||'';render();const i=document.getElementById('tk-titulo');if(i)i.focus();await guardar(t);return}
+  if(f.id==='tk-ef'){const t=T.lista.find(x=>x.id===f.dataset.id);if(!t)return;
+    Object.assign(t,{titulo:(fd.titulo||'').trim()||t.titulo,fecha:fd.fecha||null,prioridad:fd.prioridad,responsable:(fd.responsable||'').trim(),nota:(fd.nota||'').trim()});
+    T.edit=null;render();await guardar(t);toast('Tarea guardada')}
+},true);
+
+const css=document.createElement('style');css.textContent=`
+#tar-root{display:flex;flex-direction:column;gap:12px}
+#tar-root .btn.sm{padding:5px 10px;font-size:13px}
+.tk-nueva{display:grid;grid-template-columns:1fr 150px 150px auto;gap:8px;padding:12px;align-items:center}
+.tk-nueva .tk-rap{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;order:5}
+.tk-nueva .chip-p{padding:3px 11px;font-size:13px}
+.tk-g{overflow:hidden}
+.tk-h{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--chip);width:100%;border-left:0;border-right:0;border-top:0;text-align:left}
+.tk-tog{cursor:pointer;border-bottom:0}
+.g-vencidas .tk-h{background:var(--bad-bg);color:var(--bad)}
+.g-hoy .tk-h{background:var(--warn-bg);color:var(--warn)}
+.tk{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:9px 14px;border-top:1px solid var(--line)}
+.tk-h+.tk{border-top:0}
+.tk-txt{display:flex;flex-direction:column;gap:2px;text-align:left;background:none;border:0;padding:0;cursor:pointer;min-width:0}
+.tk.hecha .tk-txt b{text-decoration:line-through;color:var(--muted);font-weight:500}
+.tk.venc .tk-f{color:var(--bad);font-weight:600}
+.tk-p.bad{color:var(--bad);font-weight:600}.tk-p.ok{color:var(--ok)}
+.tk-edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
+.tk-edit>input[name=titulo]{grid-column:1/-1;font-weight:600}
+.tk-edit label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.tk-edit .wide,.tk-edit .bar{grid-column:1/-1}
+@media (max-width:760px){.tk-nueva{grid-template-columns:1fr 1fr}.tk-nueva #tk-titulo{grid-column:1/-1}.tk-nueva .btn.primary{grid-column:1/-1}#tk-q{width:100%!important;flex:1 1 100%}}
 `;document.head.appendChild(css);
 })();
 </script>
