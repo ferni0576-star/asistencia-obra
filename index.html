@@ -230,7 +230,7 @@ button.cell{cursor:pointer}
 .modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
 .modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
 .modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
-.modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"]{display:none!important}
+.modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"],.modo-cliente .ci-panel{display:none!important}
 .modo-cliente .m-box{pointer-events:none}
 @media (max-width:760px){nav.tabs{justify-content:space-around;gap:2px}header.top nav.tabs button:first-child{flex:0 0 30px;font-size:16px}header.top nav.tabs button{flex:1 1 0;font-size:11px;padding:8px 0;letter-spacing:-.03em;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.nl{display:none}.ns{display:inline}}
 </style>
@@ -1380,6 +1380,168 @@ async function cruceHTML(){
   <p class="sub" style="padding:0 14px 12px">Costo cuadrilla = horas cargadas × costo hora de cada persona. Cada certificado se compara con su período (sábado a viernes) y se paga el sábado siguiente. Verde entre 1 y 2; rojo si el certificado no cubre la cuadrilla; amarillo si la supera más del doble.</p>`;
 }
 
+/* ===== Importar contratista desde Excel (presupuesto de M.O, certificados y desembolsos) ===== */
+let CI=null; // {archivo,hojas:[{nombre,tipo,n}],base,nombre,tipo,conCerts,res}
+const ciNz=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+const ciTitulo=s=>String(s||'').toLowerCase().replace(/(^|[\s(/-])([a-zñáéíóú])/g,(m,a,b)=>a+b.toUpperCase()).trim();
+function ciCelda(ws,r,c){const x=ws[XLSX.utils.encode_cell({r,c})];return x||null}
+function ciTxt(ws,r,c){const x=ciCelda(ws,r,c);if(!x||x.v==null)return '';return String(x.t==='n'&&x.w?x.w:x.v).trim()}
+function ciNum(ws,r,c){const x=ciCelda(ws,r,c);if(!x||x.v==null||x.v==='')return null;if(typeof x.v==='number')return x.v;const t=String(x.v).trim();if(!t||!/\d/.test(t))return null;return window.numES(t.replace(/\s|gs\.?|₲/gi,''))}
+function ciNumero(ws,r,c){ // N° del ítem tal como se ve (1.10 no debe volverse 1.1)
+  const x=ciCelda(ws,r,c);if(!x||x.v==null)return '';if(x.t==='n'){const w=String(x.w||x.v).trim();return /^[\d.,]+$/.test(w)?w.replace(',','.'):String(x.v)}return String(x.v).trim()}
+function ciEncabezado(ws,desde,hasta){
+  for(let r=desde;r<=hasta;r++){let cD=-1,cC=-1,cP=-1,cU=-1,cN=-1,cT=-1;
+    for(let c=0;c<=12;c++){const t=ciNz(ciTxt(ws,r,c));if(!t)continue;
+      if(cD<0&&/rubro|descrip|detalle/.test(t))cD=c;else if(cU<0&&/^unid|^u\.?$|^und/.test(t))cU=c;else if(cC<0&&/^cant/.test(t))cC=c;
+      else if(cP<0&&/unit|^p\.? ?u\.?$/.test(t))cP=c;else if(cT<0&&/total|importe|monto/.test(t))cT=c;else if(cN<0&&/^n|^item|^it\.?$/.test(t))cN=c}
+    if(cD>=0&&cC>=0&&cP>=0)return{r,cN:cN>=0?cN:(cD>0?cD-1:-1),cD,cU,cC,cP,cT}}
+  return null}
+function ciLeerHoja(ws){
+  const R=XLSX.utils.decode_range(ws['!ref']||'A1');const H=ciEncabezado(ws,R.s.r,Math.min(R.e.r,40));if(!H)return null;
+  let cPres=-1,cAnt=-1;
+  for(let r=H.r;r<=Math.min(R.e.r,H.r+12)&&cPres<0;r++)for(let c=H.cP+1;c<=H.cP+10;c++){const t=ciNz(ciTxt(ws,r,c));if(t==='presente'&&cPres<0){cPres=c}if(t==='anterior'&&cAnt<0)cAnt=c}
+  const items=[];let rubro='',sector='',sec='ORIG',totalHoja=null,totalAdic=null;
+  for(let r=H.r+1;r<=R.e.r;r++){
+    const n=ciNumero(ws,r,H.cN>=0?H.cN:H.cD),d=ciTxt(ws,r,H.cD),u=H.cU>=0?ciTxt(ws,r,H.cU):'';
+    const nN=ciNz(H.cN>=0?n:''),nD=ciNz(d);
+    if(/^(n|n°|item)$/.test(nN)&&/rubro|descrip/.test(nD))continue; // encabezado repetido
+    if(nN==='adicionales'||(nD==='adicionales'&&!u)){sec='ADIC';rubro='ADICIONALES';sector='';continue}
+    if(/^(sub ?total|total)/.test(nN)||/^(sub ?total|total)/.test(nD)){
+      if(/^total/.test(nN)||/^total/.test(nD)){const v=ciNum(ws,r,H.cT>=0?H.cT:H.cP+1);if(v!=null){if(sec==='ORIG'&&totalHoja==null)totalHoja=v}}continue}
+    const cant=ciNum(ws,r,H.cC);let pu=ciNum(ws,r,H.cP);const tot=H.cT>=0?ciNum(ws,r,H.cT):null;
+    if(!d&&!n){if(sec==='ADIC'&&totalAdic==null){const v=ciNum(ws,r,H.cT>=0?H.cT:H.cP+1);if(v!=null&&items.some(i=>i.sec==='ADIC'))totalAdic=v}continue}
+    if(!d)continue;
+    const esItem=(cant!=null&&cant!==0)||(!!u&&(cant!=null||pu!=null));
+    if(!esItem){
+      if(sec==='ADIC')continue;
+      if(/^\d+$/.test(n)){rubro=n+'. '+d.replace(/\s+/g,' ').trim();sector=''}
+      else if(!u&&d.length<60)sector=ciTitulo(d);
+      continue}
+    const it={sec,rubro:rubro||(sec==='ADIC'?'ADICIONALES':'GENERAL'),sector:sec==='ADIC'?'':sector,n:n.replace(/\s/g,''),desc:d.replace(/\s+/g,' ').trim(),unidad:u,cant:cant||0,pu:pu||0};
+    if(tot!=null&&cant&&Math.abs(cant*(pu||0)-tot)>1){it.pu=tot/cant;it.ajPu=true}
+    if(cPres>=0)it.pres=ciNum(ws,r,cPres)||0;if(cAnt>=0)it.ant=ciNum(ws,r,cAnt)||0;
+    items.push(it)}
+  let nombre='',certN=null;
+  for(let r=R.s.r;r<H.r;r++)for(let c=0;c<=6;c++){const t=ciTxt(ws,r,c);if(!t)continue;
+    const m=t.match(/^\s*(profesional|contratista|sub ?contratista|responsable)\s*:\s*(.+)$/i);if(m&&!nombre)nombre=ciTitulo(m[2].replace(/\s+/g,' '));
+    const k=t.match(/cert\w*\s*n[°ºo.]*\s*(\d+)/i);if(k&&certN==null)certN=+k[1]}
+  return{items,cPres,cAnt,nombre,certN,totalHoja,totalAdic}}
+function ciDesembolsos(ws){
+  const R=XLSX.utils.decode_range(ws['!ref']||'A1');
+  for(let r=R.s.r;r<=R.e.r;r++){let cS=-1,cF=-1,cO=-1,cA=-1,cT=-1;
+    for(let c=0;c<=14;c++){const t=ciNz(ciTxt(ws,r,c));if(!t)continue;
+      if(/^sem/.test(t))cS=c;else if(/^fecha/.test(t))cF=c;else if(/desembolso.*orig/.test(t))cO=c;else if(/desembolso.*adic/.test(t))cA=c;else if(/desembolso.*total|^desembolso$|^monto|^importe/.test(t))cT=c}
+    if(cF<0||(cO<0&&cT<0))continue;
+    const out=[];
+    for(let q=r+1;q<=R.e.r;q++){const x=ciCelda(ws,q,cF);if(!x||x.v==null||x.v==='')continue;
+      let f=null;if(x.v instanceof Date)f=x.v;else if(typeof x.v==='number'){const p=XLSX.SSF.parse_date_code(x.v);if(p)f=new Date(p.y,p.m-1,p.d)}
+      else{const m=String(x.v).match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(m)f=new Date(+(m[3].length===2?'20'+m[3]:m[3]),+m[2]-1,+m[1])}
+      if(!f||isNaN(f))continue;
+      const o=cO>=0?(ciNum(ws,q,cO)||0):(ciNum(ws,q,cT)||0),a=cA>=0?(ciNum(ws,q,cA)||0):0;if(!o&&!a)continue;
+      const fecha=f.getFullYear()+'-'+String(f.getMonth()+1).padStart(2,'0')+'-'+String(f.getDate()).padStart(2,'0');
+      out.push({sem:cS>=0?(ciNum(ws,q,cS)||out.length+1):out.length+1,fecha,orig:o,adic:a,total:o+a})}
+    return out}
+  return[]}
+function ciTipo(hoja,items){
+  let t=ciNz(hoja).replace(/presupuesto|certificado|cert\.?|planilla|contrato|n[°º]?\s*\d+|m\.?\s?o\.?(?=\s|$)|\bmo\b|mano de obra/g,' ').replace(/[^a-zñ ]/g,' ').replace(/\s+/g,' ').trim();
+  if((!t||t.length<3)&&new Set(items.filter(i=>i.sec==='ORIG'&&i.pu).map(i=>i.rubro)).size>=4)t='obra civil';
+  if(!t||t.length<3){const c={};items.filter(i=>i.sec==='ORIG').forEach(i=>{const r=i.rubro.replace(/^\d+\.\s*/,'');c[r]=(c[r]||0)+i.cant*i.pu});const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];t=top?ciNz(top[0]).replace(/\(.*\)/,'').trim():''}
+  return 'Mano de obra'+(t?' · '+t:'')}
+function ciAnalizar(){
+  const wb=CI.wb;const certH=[],presH=[];let desH=null;
+  wb.SheetNames.forEach(nm=>{const ws=wb.Sheets[nm];const z=ciNz(nm);
+    if(/desembols|pagos/.test(z)){desH=nm;return}
+    const L=ciLeerHoja(ws);if(!L||!L.items.length)return;
+    if(/certif/.test(z)||(L.cPres>=0&&L.items.some(i=>i.pres||i.ant))){const m=nm.match(/(\d+)\s*$/)||nm.match(/n[°º]?\s*(\d+)/i);certH.push({nm,L,n:L.certN||(m?+m[1]:certH.length+1)})}
+    else presH.push({nm,L})});
+  certH.sort((a,b)=>a.n-b.n);
+  CI.opciones=[...(certH.length?[{v:'@cert',t:`Último certificado (${certH[certH.length-1].nm.trim()})`}]:[]),...presH.map(p=>({v:p.nm,t:p.nm.trim()}))];
+  if(CI.base==null){const mo=presH.find(p=>/\bm\.?\s?o\b|mano de obra/i.test(p.nm));CI.base=certH.length?'@cert':(mo||presH.slice().sort((a,b)=>b.L.items.filter(i=>i.pu).length-a.L.items.filter(i=>i.pu).length)[0]||{nm:null}).nm}
+  const B=CI.base==='@cert'?certH[certH.length-1]:presH.find(p=>p.nm===CI.base);
+  if(!B){CI.res=null;return}
+  let k=0;const items=B.L.items.map(i=>({id:'x'+(++k),sec:i.sec,rubro:i.rubro,sector:i.sector,n:i.n,desc:i.desc,unidad:i.unidad,cant:i.cant,pu:i.pu}));
+  const clave=i=>i.sec+'|'+i.n+'|'+ciNz(i.desc).slice(0,50);const porClave={};items.forEach(i=>{porClave[clave(i)]=porClave[clave(i)]||i.id});
+  const porN={};items.forEach(i=>{const c=i.sec+'|'+i.n;porN[c]=porN[c]===undefined?i.id:null});
+  const buscar=i=>porClave[clave(i)]||(i.n&&porN[i.sec+'|'+i.n])||null;
+  const certs=[];let sueltos=0;const CI_corr=new Set();
+  if(certH.length){
+    /* acumulado que declara cada hoja (anterior + presente); si una hoja vieja suma de más y la siguiente lo corrige, manda la última */
+    const pasos=[];const prim=certH[0];
+    const antP={};prim.L.items.forEach(i=>{if(i.ant){const id=buscar(i);if(id)antP[id]=(antP[id]||0)+i.ant}});
+    if(Object.keys(antP).length&&prim.n>1)pasos.push({n:prim.n-1,acum:antP,acumulado:true});
+    let run={...antP};
+    certH.forEach(h=>{const ac={};const tieneAnt=h.L.cAnt>=0;const vistos=new Set();
+      h.L.items.forEach(i=>{const id=buscar(i);if(!id){if(i.pres)sueltos++;return}vistos.add(id);ac[id]=(ac[id]||0)+(tieneAnt?(i.ant||0)+(i.pres||0):(i.pres||0))});
+      if(!tieneAnt)Object.keys(run).forEach(k=>{ac[k]=(ac[k]||0)+run[k]});
+      Object.keys(run).forEach(k=>{if(!vistos.has(k)&&ac[k]==null)ac[k]=run[k]});
+      run=ac;if(!pasos.some(p=>p.n===h.n))pasos.push({n:h.n,acum:ac})});
+    const ids=new Set(pasos.flatMap(p=>Object.keys(p.acum)));let tope={};
+    for(let j=pasos.length-1;j>=0;j--){const a=pasos[j].acum;const m={};ids.forEach(k=>{const v=a[k]||0;const t=j===pasos.length-1?v:Math.min(v,tope[k]);if(t<v-1e-9)CI_corr.add(k);m[k]=t});pasos[j].aj=m;tope=m}
+    let prev={};pasos.forEach(p=>{const pres={};ids.forEach(k=>{const d=(p.aj[k]||0)-(prev[k]||0);if(Math.abs(d)>1e-9)pres[k]=Math.round(d*1e6)/1e6});prev=p.aj;certs.push({n:p.n,fecha:null,desde:null,hasta:null,pres,acumulado:!!p.acumulado})})}
+  const des=desH?ciDesembolsos(wb.Sheets[desH]):[];
+  des.forEach((d,i)=>{const c=certs.find(x=>x.n===d.sem)||certs[i];if(c){d.cert=c.n;if(!c.fecha)c.fecha=d.fecha}else d.cert=null});
+  const nombre=(certH.concat(presH).map(h=>h.L.nombre).find(Boolean))||'';
+  if(!CI.nombreTocado)CI.nombre=nombre;if(!CI.tipoTocado)CI.tipo=ciTipo(B.nm,items);
+  CI.res={hoja:B.nm,items,certs,des,sueltos,corr:[...CI_corr].map(k=>items.find(i=>i.id===k)).filter(Boolean),ajPu:B.L.items.filter(i=>i.ajPu).length,totalHoja:B.L.totalHoja,totalAdic:B.L.totalAdic,nCertH:certH.length,desH}}
+function ciMonto(R){const I=Object.fromEntries(R.items.map(i=>[i.id,i]));let o=0,a=0;R.certs.forEach(c=>Object.entries(c.pres).forEach(([k,q])=>{const it=I[k];if(it){if(it.sec==='ADIC')a+=q*it.pu;else o+=q*it.pu}}));return{o,a}}
+function vImpContr(){
+  if(!CI)return `<div class="panel ci-panel" style="padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+    <div><h3 style="margin:0">Importar contratista desde Excel</h3><div class="sub">Subí la planilla de presupuesto de mano de obra (o sus certificados). Se crea el contratista con sus ítems y, si los trae, los certificados y pagos ya hechos. Después todo se maneja desde acá.</div></div>
+    <label class="btn primary" style="cursor:pointer">Elegir Excel<input type="file" id="c-imp" accept=".xlsx,.xls,.xlsm" hidden></label></div>`;
+  const R=CI.res;
+  if(!R)return `<div class="panel ci-panel" style="padding:16px"><h3>No encontré ítems en ${esc(CI.archivo)}</h3><p class="sub">La hoja tiene que tener una fila de títulos con N°, RUBROS (o DESCRIPCIÓN), UNIDAD, CANTIDAD y PRECIO UNIT.</p><button class="btn" data-cimp="cancelar">Cerrar</button></div>`;
+  const O=R.items.filter(i=>i.sec==='ORIG'),A=R.items.filter(i=>i.sec==='ADIC');
+  const tO=O.reduce((s,i)=>s+i.cant*i.pu,0),tA=A.reduce((s,i)=>s+i.cant*i.pu,0);const M=ciMonto(R);
+  const pagos=R.des.reduce((s,d)=>s+d.total,0);
+  const rub={};O.forEach(i=>{rub[i.rubro]=rub[i.rubro]||{n:0,t:0};rub[i.rubro].n++;rub[i.rubro].t+=i.cant*i.pu});
+  const cuadra=R.totalHoja!=null?Math.abs(R.totalHoja-tO)<=Math.max(5,tO*1e-6):null;
+  const repe=ALL.contratistas.some(c=>ciNz(c.nombre)===ciNz(CI.nombre));
+  const usaCerts=CI.conCerts&&(R.certs.length||R.des.length);
+  return `<div class="panel ci-panel" style="padding:0">
+  <div class="bar between" style="padding:12px 16px;border-bottom:1px solid var(--line)"><div><h3 style="margin:0">Revisá antes de crear</h3><div class="sub">${esc(CI.archivo)}</div></div><button class="btn ghost sm" data-cimp="cancelar">Cancelar</button></div>
+  <div class="form" style="padding:14px 16px;border-bottom:1px solid var(--line)">
+    <label>Nombre del contratista<input id="ci-nom" value="${esc(CI.nombre)}" placeholder="Nombre y apellido"></label>
+    <label class="wide">Trabajo<input id="ci-tipo" value="${esc(CI.tipo)}"></label>
+    ${CI.opciones.length>1?`<label class="wide">Leer ítems de<select id="ci-hoja">${CI.opciones.map(o=>`<option value="${esc(o.v)}" ${o.v===CI.base?'selected':''}>${esc(o.t)}</option>`).join('')}</select></label>`:''}
+  </div>
+  ${repe?`<div class="alerta"><i class="dot amarillo"></i><div><b>Ya hay un contratista con ese nombre en esta obra.</b><div class="sub">Si lo creás, quedan los dos. Cambiá el nombre si es otro contrato.</div></div></div>`:''}
+  <div class="kpis" style="padding:14px 16px">
+    <div class="kpi"><small>Contrato original</small><b>${mill(tO)}</b><em>${O.length} ítems · ${O.filter(i=>!i.pu).length?O.filter(i=>!i.pu).length+' sin precio':'todos con precio'}</em></div>
+    <div class="kpi"><small>Adicionales</small><b>${mill(tA)}</b><em>${A.length} ítems</em></div>
+    <div class="kpi"><small>Certificados</small><b>${R.certs.length}</b><em>${R.certs.length?'Certificado '+mill(M.o+M.a):'Ninguno en la planilla'}</em></div>
+    <div class="kpi"><small>Pagos</small><b>${R.des.length}</b><em>${R.des.length?'Pagado '+mill(pagos):'Ninguno en la planilla'}</em></div>
+  </div>
+  ${cuadra!=null?`<div class="alerta"><i class="dot ${cuadra?'verde':'amarillo'}"></i><div><b>${cuadra?'El total coincide con la planilla':'El total no coincide con la planilla'}</b><div class="sub">Suma de ítems ${gs(tO)} · total de la planilla ${gs(R.totalHoja)}${cuadra?'':' · revisá ítems con precio o cantidad en celdas combinadas'}</div></div></div>`:''}
+  ${R.ajPu?`<div class="alerta"><i class="dot verde"></i><div><b>${R.ajPu} ítem${R.ajPu>1?'s':''} con precio total redondeado en la planilla</b><div class="sub">Se respetó el precio total del contrato (el unitario queda con decimales).</div></div></div>`:''}
+  ${R.corr.length&&CI.conCerts?`<div class="alerta"><i class="dot amarillo"></i><div><b>Certificados viejos corregidos por el último</b><div class="sub">${R.corr.map(i=>esc(i.n+' '+i.desc.slice(0,40))).join(' · ')}: un certificado anterior sumaba más de lo que después arrastra la planilla. Se tomó lo del último certificado.</div></div></div>`:''}
+  ${R.sueltos?`<div class="alerta"><i class="dot amarillo"></i><div><b>${R.sueltos} renglones de certificados no coinciden con ningún ítem</b><div class="sub">No se suman. Pasa cuando un certificado viejo tiene ítems que después se renumeraron.</div></div></div>`:''}
+  ${R.certs.length||R.des.length?`<label style="display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid var(--line)"><input type="checkbox" id="ci-certs" ${CI.conCerts?'checked':''}> Traer también ${[R.certs.length?R.certs.length+' certificados'+(R.certs.some(c=>c.acumulado)?' (el primero junta lo anterior)':''):'',R.des.length?R.des.length+' pagos':''].filter(Boolean).join(' y ')}</label>`:''}
+  <div class="tw" style="max-height:340px;overflow:auto;border-top:1px solid var(--line)"><table><thead><tr><th>Rubro</th><th class="n">Ítems</th><th class="n">Monto</th></tr></thead>
+    <tbody>${Object.entries(rub).map(([r,x])=>`<tr><td>${esc(r)}</td><td class="n">${x.n}</td><td class="n">${gs(x.t)}</td></tr>`).join('')}${A.length?`<tr><td>ADICIONALES</td><td class="n">${A.length}</td><td class="n">${gs(tA)}</td></tr>`:''}</tbody></table></div>
+  <div class="bar" style="padding:12px 16px;border-top:1px solid var(--line);justify-content:flex-end;gap:8px"><button class="btn" data-cimp="cancelar">Cancelar</button><button class="btn primary" data-cimp="crear" ${O.length+A.length?'':'disabled'}>Crear contratista${usaCerts?' con certificados':''}</button></div>
+  </div>`}
+async function ciArchivo(file){
+  try{const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});CI={archivo:file.name,wb,base:null,conCerts:true,nombre:'',tipo:''};ciAnalizar()}
+  catch(e){CI=null;toast('No se pudo leer el Excel');return}
+  render();const p=document.querySelector('#cert-root .ci-panel');if(p)p.scrollIntoView({block:'start',behavior:'smooth'})}
+function ciCrear(){
+  const R=CI.res;if(!R)return;const nombre=(CI.nombre||'').trim();if(!nombre){toast('Poné el nombre del contratista');const e=document.getElementById('ci-nom');if(e)e.focus();return}
+  const uid=()=>crypto.randomUUID?crypto.randomUUID():'i'+Date.now()+Math.random().toString(36).slice(2,7);
+  const mapa={};const items=R.items.map(i=>{const id=uid();mapa[i.id]=id;return{...i,id}});
+  const traer=CI.conCerts;
+  const certs=traer?R.certs.map(c=>({n:c.n,fecha:c.fecha||null,desde:null,hasta:null,pres:Object.fromEntries(Object.entries(c.pres).map(([k,q])=>[mapa[k],q]))})):[];
+  const des=traer?R.des.map(d=>({...d})):[];
+  ALL.contratistas.push({id:(crypto.randomUUID?crypto.randomUUID():'c'+Date.now()),obra_id:OBRA_CARGADA,nombre,tipo:(CI.tipo||'Mano de obra').trim(),cuadrilla:false,items,certs,des});
+  CI=null;usar(ALL.contratistas.length-1);S.tab='resumen';guardar();render();window.scrollTo(0,0);
+  toast(`${nombre} creado con ${items.length} ítems${certs.length?' y '+certs.length+' certificados':''}`)}
+document.addEventListener('change',async e=>{if(!document.getElementById('cert-root'))return;const t=e.target;
+  if(t.id==='c-imp'&&t.files&&t.files[0]){if(window.CLI)return;await ciArchivo(t.files[0]);t.value='';return}
+  if(t.id==='ci-hoja'&&CI){CI.base=t.value;ciAnalizar();render();return}
+  if(t.id==='ci-certs'&&CI){CI.conCerts=t.checked;render()}});
+document.addEventListener('input',e=>{if(!CI)return;const t=e.target;if(t.id==='ci-nom'){CI.nombre=t.value;CI.nombreTocado=true}if(t.id==='ci-tipo'){CI.tipo=t.value;CI.tipoTocado=true}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-cimp]');if(!b||!document.getElementById('cert-root'))return;
+  if(b.dataset.cimp==='cancelar'){CI=null;render()}if(b.dataset.cimp==='crear'&&!window.CLI)ciCrear()});
+
 function vContratistas(){
   const rs=ALL.contratistas.map((c,i)=>({c,i,R:conR(c)}));
   let T={o:0,a:0,ce:0,pa:0};
@@ -1400,6 +1562,7 @@ function vContratistas(){
     <tbody>${filas}</tbody>
     <tfoot><tr><td></td><td>Total</td><td class="n">${gs(T.o)}</td><td class="n">${gs(T.a)}</td><td></td><td class="n">${gs(T.ce)}</td><td></td><td class="n">${gs(T.pa)}</td><td class="n">${gs(T.o+T.a-T.pa)}</td><td></td></tr></tfoot>
   </table></div>
+  ${window.CLI?'':vImpContr()}
   <form class="panel form" id="f-nuevo">
     <h3 style="grid-column:1/-1">Agregar contratista</h3>
     <label>Nombre<input id="n-nom" name="nombre" required></label>
