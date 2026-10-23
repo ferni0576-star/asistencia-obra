@@ -397,6 +397,7 @@ function backendLocal(){
     async contratistas(oid){if(!d.contratistas){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];
         d.contratistas=SEMILLA_CONTRATISTAS.map(c=>({...JSON.parse(JSON.stringify(c)),id:uid(),obra_id:o?o.id:null}));save()}
       return d.contratistas.filter(c=>c.obra_id===oid).map(c=>JSON.parse(JSON.stringify(c)))},
+    async delContratista(id){d.contratistas=d.contratistas.filter(x=>x.id!==id);save()},
     async saveContratista(c){const v=JSON.parse(JSON.stringify(c));const i=d.contratistas.findIndex(x=>x.id===c.id);if(i>=0)d.contratistas[i]=v;else d.contratistas.push(v);save()},
     async presupuesto(oid){if(!d.presupuestos){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.presupuestos=[];
         if(SEMILLA_PRES&&o)d.presupuestos.push({...JSON.parse(JSON.stringify(SEMILLA_PRES)),obra_id:o.id});save()}
@@ -455,6 +456,7 @@ function backendNube(sb){
     async saveLluvia(r){const row={...r};delete row.id;ok(await sb.from('lluvias').upsert(row,{onConflict:'obra_id,fecha'}))},
     async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
     async contratistas(oid){if(!oid)return[];return ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'))},
+    async delContratista(id){ok(await sb.from('contratistas').delete().eq('id',id))},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
     async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
       return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
@@ -1166,7 +1168,7 @@ function exportarExcel(){
 
 /* ---------- puentes con el módulo de contratistas ---------- */
 window.ASIS_OBRA=()=>obraAct();
-window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
+window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
 window.PVB={list:oid=>DB.proveedores(oid),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
@@ -1541,6 +1543,20 @@ document.addEventListener('change',async e=>{if(!document.getElementById('cert-r
 document.addEventListener('input',e=>{if(!CI)return;const t=e.target;if(t.id==='ci-nom'){CI.nombre=t.value;CI.nombreTocado=true}if(t.id==='ci-tipo'){CI.tipo=t.value;CI.tipoTocado=true}});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-cimp]');if(!b||!document.getElementById('cert-root'))return;
   if(b.dataset.cimp==='cancelar'){CI=null;render()}if(b.dataset.cimp==='crear'&&!window.CLI)ciCrear()});
+/* ===== Eliminar contratista ===== */
+let CDEL=null;
+function vBorrarContr(){
+  if(window.CLI||!D)return '';
+  if(CDEL!==D.id)return `<button class="btn ghost sm ci-panel" data-cimp="del-pedir" style="color:var(--bad);border-color:var(--bad)">Eliminar contratista</button>`;
+  return `<div class="panel ci-panel" style="padding:12px 14px;border-color:var(--bad);background:var(--bad-bg);flex-basis:100%">
+    <b>¿Eliminar a ${esc(D.nombre)}?</b><div class="sub" style="color:var(--ink)">Se borran su contrato (${D.items.length} ítems), ${D.certs.length} certificado${D.certs.length===1?'':'s'} y ${D.des.length} pago${D.des.length===1?'':'s'} de esta obra. No se puede deshacer.</div>
+    <div class="bar" style="gap:8px;margin-top:10px"><button class="btn" data-cimp="del-cancelar">Cancelar</button><button class="btn" data-cimp="del-si" style="background:var(--bad);border-color:var(--bad);color:#fff">Sí, eliminar</button></div></div>`}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-cimp^="del-"]');if(!b||!document.getElementById('cert-root')||window.CLI)return;const a=b.dataset.cimp;
+  if(a==='del-pedir'){CDEL=D.id;render();return}
+  if(a==='del-cancelar'){CDEL=null;render();return}
+  if(a==='del-si'&&D&&CDEL===D.id){const c=D;b.disabled=true;
+    try{await window.CDB.del(c.id)}catch(err){b.disabled=false;toast('No se pudo eliminar. Revisá la conexión.');return}
+    ALL.contratistas=ALL.contratistas.filter(x=>x.id!==c.id);CDEL=null;usar(0);S.tab='contratistas';render();window.scrollTo(0,0);toast(c.nombre+' eliminado')}});
 
 function vContratistas(){
   const rs=ALL.contratistas.map((c,i)=>({c,i,R:conR(c)}));
@@ -1578,7 +1594,7 @@ function vResumen(){
   const filas=rubros.map(r=>{const its=D.items.filter(i=>i.rubro===r);const tot=its.reduce((s,i)=>s+i.cant*i.pu,0);const cert=its.reduce((s,i)=>s+(R.ac[i.id]||0)*i.pu,0);return{r,tot,cert}}).filter(x=>x.tot>0);
   const al=controles(R);
   return `
-  <div><h2>Contrato de ${esc(D.nombre)}</h2><div class="sub">${esc(D.tipo)} · ${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)} · ${esc(OBRA.superficie)}</div></div>
+  <div class="bar between" style="flex-wrap:wrap;gap:10px"><div><h2>Contrato de ${esc(D.nombre)}</h2><div class="sub">${esc(D.tipo)} · ${esc(OBRA.obra)} · ${esc(OBRA.cliente)} · ${esc(OBRA.direccion)} · ${esc(OBRA.superficie)}</div></div>${vBorrarContr()}</div>
   <div class="kpis">
     <div class="kpi"><small>Contrato original</small><b>${mill(R.orig)}</b><em>${D.items.filter(i=>i.sec==='ORIG'&&i.pu>0).length} ítems con precio</em></div>
     <div class="kpi"><small>Adicionales</small><b>${mill(R.adic)}</b><em>${pct(R.adic/R.orig)} sobre el original</em></div>
