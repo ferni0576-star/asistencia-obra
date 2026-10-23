@@ -3633,13 +3633,16 @@ const COND_DEF='A Cargo del Contratista: clavos, equipos de protección individu
 const O={oid:undefined,cargando:false,personas:[],ots:[],form:null,vista:'nueva',q:'',cargo:'Todos',pedit:null,pconf:null,cconf:null};
 const hoyO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fOT=s=>s?s.split('-').reverse().join('.'):'';
+const DSO=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];const fDia=s=>{if(!s)return '';const d=new Date(s+'T12:00:00');return DSO[d.getDay()]+' '+s.split('-').reverse().join('/')};
+const periodo=d=>d.desde&&d.hasta&&d.hasta!==d.desde?`Del ${fDia(d.desde)} al ${fDia(d.hasta)}`:d.desde?(d.hasta?`${fDia(d.desde)} (un día)`:`Desde el ${fDia(d.desde)}`):'';
+const dias=d=>d.desde&&d.hasta?Math.round((new Date(d.hasta)-new Date(d.desde))/864e5)+1:0;
 const ciTxt=c=>{const d=String(c||'').replace(/\D/g,'');return d?gs(+d):String(c||'')};
 const nid=()=>(crypto.randomUUID?crypto.randomUUID():'o'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
 const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
 
 function selDe(d){const busca=p=>{const ci=String(p.ci||'').replace(/\D/g,'');const x=O.personas.find(y=>y.id===p.pid)||O.personas.find(y=>ci&&String(y.ci||'').replace(/\D/g,'')===ci)||O.personas.find(y=>y.nombre.toLowerCase()===String(p.nombre||'').toLowerCase());return x?{pid:x.id,obs:p.obs||''}:null};return(d.personas||[]).map(busca).filter(Boolean)}
 function nuevoForm(base){const o=OB()||{};const ult=base||O.ots[0];const d=ult?JSON.parse(JSON.stringify(ult.datos)):null;
-  return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),
+  return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),desde:hoyO(),hasta:'',
     contratista:d?d.contratista:'VANGUARD S.A',ruc:d?d.ruc:'80095183-2',direccion:d?d.direccion:(o.ubicacion||''),obra:d?d.obra:(o.nombre||''),
     servicio:d?d.servicio:'',horario:d?d.horario:'07:00 a 18:00 hs.',cond:d?d.cond:COND_DEF,
     f1:d?d.f1:'',f2:d?d.f2:'Ing. Luis Oviedo',f3:d?d.f3:'Walter Benitez',logo:d&&d.logo?d.logo:OT_LOGO_DEF,
@@ -3650,9 +3653,9 @@ async function cargar(oid){if(O.cargando)return;O.cargando=true;
   O.oid=oid;O.cargando=false;O.form=nuevoForm(null);render()}
 const cargos=()=>[...new Set(O.personas.map(p=>p.cargo).filter(Boolean))];
 const selec=f=>f.sel.map(s=>({...(O.personas.find(p=>p.id===s.pid)||{}),obs:s.obs,pid:s.pid})).filter(p=>p.nombre);
-function datosForm(){const f=O.form;return{contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,logo:f.logo,
+function datosForm(){const f=O.form;return{desde:f.desde||'',hasta:f.hasta||'',contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,logo:f.logo,
   personas:selec(f).map(p=>({pid:p.pid,nombre:p.nombre,ci:p.ci,cargo:p.cargo,obs:p.obs}))}}
-function leerCampos(){const fm=document.getElementById('ot-f');if(!fm)return;['numero','fecha','contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3'].forEach(k=>{if(fm[k])O.form[k]=fm[k].value})}
+function leerCampos(){const fm=document.getElementById('ot-f');if(!fm)return;['numero','fecha','desde','hasta','contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3'].forEach(k=>{if(fm[k])O.form[k]=fm[k].value})}
 
 /* ---------- vistas ---------- */
 function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=O.q.trim().toLowerCase();
@@ -3662,6 +3665,9 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
     <div class="form" style="padding:0">
       <label>N° de OT<input type="text" name="numero" value="${esc(f.numero)}" required></label>
       <label>Fecha de la OT<input type="date" name="fecha" value="${f.fecha}" required></label>
+      <label>Trabajos desde<input type="date" name="desde" value="${f.desde||''}"></label>
+      <label>Trabajos hasta<input type="date" name="hasta" value="${f.hasta||''}" min="${f.desde||''}"></label>
+      <div class="sub ot-per" style="grid-column:1/-1;margin-top:-4px">${f.desde&&f.hasta&&f.hasta<f.desde?'<b style="color:var(--bad)">La fecha final es anterior a la inicial.</b>':periodo(f)?esc(periodo(f))+(dias(f)>1?` · ${dias(f)} días corridos`:''):'Poné desde qué fecha y hasta cuándo se realizan los trabajos.'}</div>
       <label>Contratista<input type="text" name="contratista" value="${esc(f.contratista)}"></label>
       <label>C.I. N° / RUC N°<input type="text" name="ruc" value="${esc(f.ruc)}"></label>
       <label>Horario de trabajo<input type="text" name="horario" value="${esc(f.horario)}"></label>
@@ -3694,7 +3700,7 @@ function vBase(){
   </tbody></table></div>`}
 function vHist(){
   return `<div class="panel tw"><table><thead><tr><th>OT</th><th>Fecha</th><th>Servicio</th><th class="n">Personas</th><th></th></tr></thead><tbody>
-  ${O.ots.map(x=>`<tr><td class="num">N° ${x.numero}</td><td class="num">${fOT(x.fecha)}</td><td>${esc(x.datos.servicio||'')}</td><td class="n">${(x.datos.personas||[]).length}</td>
+  ${O.ots.map(x=>`<tr><td class="num">N° ${x.numero}</td><td class="num">${fOT(x.fecha)}</td><td>${esc(x.datos.servicio||'')}${periodo(x.datos)?`<div class="sub">${esc(periodo(x.datos))}</div>`:''}</td><td class="n">${(x.datos.personas||[]).length}</td>
     <td><div class="bar" style="justify-content:flex-end"><button class="btn sm" data-oact="hpdf" data-id="${x.id}">PDF</button><button class="btn sm" data-oact="hxls" data-id="${x.id}">Excel</button><button class="btn sm ghost" data-oact="abrir" data-id="${x.id}">Abrir</button><button class="btn sm ghost" data-oact="duplicar" data-id="${x.id}">Duplicar</button>
       ${O.cconf===x.id?`<button class="btn sm" style="color:var(--bad)" data-oact="borraot" data-id="${x.id}">¿Borrar?</button>`:`<button class="btn sm ghost" data-oact="confot" data-id="${x.id}">×</button>`}</div></td></tr>`).join('')||'<tr><td colspan="5" class="sub">Todavía no guardaste ninguna OT.</td></tr>'}
   </tbody></table></div>`}
@@ -3722,7 +3728,7 @@ async function pdfOT(num,fecha,d){
   doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('ORDEN DE TRABAJO',X+118+32,num?22.5:25,{align:'center'});if(num){doc.setFontSize(11);doc.text('N° '+T(String(num)),X+118+32,29,{align:'center'})}
   doc.autoTable({startY:34,margin:{left:X,right:14},theme:'grid',tableWidth:W,styles:{font:'helvetica',fontSize:8.5,cellPadding:1.3,textColor:0,lineColor:0,lineWidth:0.2},
     columnStyles:{0:{cellWidth:38,fontStyle:'bold'},1:{cellWidth:W-38}},
-    body:[['Fecha de la OT:',fOT(fecha)],['Contratista:',T(d.contratista||'')],['C.I. N° / RUC N°:',T(d.ruc||'')],['Dirección:',T(d.direccion||'')],['Obra:',T(d.obra||'')],['Servicio:',T(d.servicio||'')],['Horario de trabajo:',T(d.horario||'')]]});
+    body:[['Fecha de la OT:',fOT(fecha)],...(periodo(d)?[['Período de trabajos:',T(periodo(d))]]:[]),['Contratista:',T(d.contratista||'')],['C.I. N° / RUC N°:',T(d.ruc||'')],['Dirección:',T(d.direccion||'')],['Obra:',T(d.obra||'')],['Servicio:',T(d.servicio||'')],['Horario de trabajo:',T(d.horario||'')]]});
   const body=[];for(let k=0;k<filas;k++){const p=P[k];body.push([k+1,p?T(p.nombre):'',p?ciTxt(p.ci):'',p?T(p.cargo||''):'',p?T(p.obs||''):''])}
   doc.autoTable({startY:doc.lastAutoTable.finalY,margin:{left:X,right:14,top:14,bottom:14},theme:'grid',tableWidth:W,
     head:[['ÍTEMS','NOMBRE Y APELLIDO','CI','CARGO','OBS']],body,
@@ -3749,9 +3755,9 @@ async function xlsOT(num,fecha,d){
   ws.mergeCells('A1:C1');ws.mergeCells('D1:F1');ws.getRow(1).height=62;
   const t=ws.getCell('D1');t.value=num?'ORDEN DE TRABAJO\nN° '+num:'ORDEN DE TRABAJO';t.font={bold:true,size:14};t.alignment={horizontal:'center',vertical:'middle',wrapText:true};caja(1,1,1,6);
   try{const lg=d.logo||OT_LOGO_DEF;const ext=/image\/jpe?g/.test(lg)?'jpeg':'png';const id=wb.addImage({base64:lg,extension:ext});ws.addImage(id,{tl:{col:0.4,row:0.15},ext:{width:250,height:70}})}catch(e){}
-  const enc=[['Fecha de la OT:',fOT(fecha)],['Contratista:',d.contratista],['C.I.N°/ Ruc N°:',d.ruc],['Dirección:',d.direccion],['Obra:',d.obra],['Servicio:',d.servicio],['Horario de trabajo',d.horario]];
+  const enc=[['Fecha de la OT:',fOT(fecha)],...(periodo(d)?[['Período de trabajos:',periodo(d)]]:[]),['Contratista:',d.contratista],['C.I.N°/ Ruc N°:',d.ruc],['Dirección:',d.direccion],['Obra:',d.obra],['Servicio:',d.servicio],['Horario de trabajo',d.horario]];
   enc.forEach(([k,v],i)=>{const r=2+i;ws.getCell(r,1).value=k;ws.getCell(r,1).font={size:9};ws.mergeCells(r,2,r,6);ws.getCell(r,2).value=v||'';ws.getCell(r,2).font={size:9};caja(r,1,r,6)});
-  const h=9;['ÍTEMS','NOMBRE Y APELLIDO','CI','CARGO','OBS'].forEach((x,i)=>{const c=ws.getCell(h,i+1);c.value=x;c.font={bold:true,size:9};c.alignment={horizontal:'center'};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEBEBEB'}}});
+  const h=2+enc.length;['ÍTEMS','NOMBRE Y APELLIDO','CI','CARGO','OBS'].forEach((x,i)=>{const c=ws.getCell(h,i+1);c.value=x;c.font={bold:true,size:9};c.alignment={horizontal:'center'};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEBEBEB'}}});
   ws.mergeCells(h,5,h,6);caja(h,1,h,6);
   const P=d.personas||[];const filas=Math.max(P.length,22);
   for(let k=0;k<filas;k++){const r=h+1+k;const p=P[k];ws.getCell(r,1).value=k+1;ws.getCell(r,1).alignment={horizontal:'center'};
@@ -3803,6 +3809,7 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   if(!dentro(e))return;const t=e.target;
+  if(t.form&&t.form.id==='ot-f'&&(t.name==='desde'||t.name==='hasta')){leerCampos();if(t.name==='desde'&&O.form.hasta&&O.form.hasta<O.form.desde)O.form.hasta='';const el=document.querySelector('#ot-f .ot-per');const f=O.form;if(el)el.innerHTML=f.desde&&f.hasta&&f.hasta<f.desde?'<b style="color:var(--bad)">La fecha final es anterior a la inicial.</b>':periodo(f)?esc(periodo(f))+(dias(f)>1?` · ${dias(f)} días corridos`:''):'Poné desde qué fecha y hasta cuándo se realizan los trabajos.';const h=document.querySelector('#ot-f [name=hasta]');if(h){h.min=f.desde||'';h.value=f.hasta||''}return}
   if(t.dataset.osel){leerCampos();if(t.checked){if(!O.form.sel.some(s=>s.pid===t.dataset.osel))O.form.sel.push({pid:t.dataset.osel,obs:''})}else O.form.sel=O.form.sel.filter(s=>s.pid!==t.dataset.osel);return render()}
   if(t.id==='ot-imp'&&t.files[0]){if(!window.XLSX)return toast('No se pudo cargar el lector de Excel');let L=[];
     try{const wb=XLSX.read(await t.files[0].arrayBuffer(),{type:'array'});const nz=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
@@ -3825,7 +3832,7 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.oobs){const s=O.form.sel.find(x=>x.pid===t.dataset.oobs);if(s)s.obs=t.value}});
 document.addEventListener('keydown',e=>{if(!dentro(e))return;if(e.key==='Enter'&&e.target.closest('.ot-pf')){e.preventDefault();guardarP()}});
 document.addEventListener('submit',async e=>{if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();if(e.target.id!=='ot-f')return;leerCampos();
-  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');
+  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');if(f.desde&&f.hasta&&f.hasta<f.desde)return toast('La fecha final de los trabajos es anterior a la inicial');
   const prev=O.ots.find(x=>x.id===f.id);if(prev&&String(prev.numero)!==f.numero)f.id=nid();
   const dup=O.ots.find(x=>x.id!==f.id&&String(x.numero)===f.numero);if(dup&&!f.confirmDup){f.confirmDup=true;return toast(`Ya existe la OT N° ${f.numero}. Tocá Guardar otra vez para guardarla igual, o cambiá el número.`)}delete f.confirmDup;const row={id:f.id,obra_id:O.oid,numero:f.numero,fecha:f.fecha,datos:datosForm()};
   try{await window.OTB.save(row)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 14?')}
