@@ -407,20 +407,22 @@ function backendLocal(){
       return d.pedidos.filter(p=>p.obra_id===oid).map(p=>JSON.parse(JSON.stringify(p)))},
     async savePedido(p){const v=JSON.parse(JSON.stringify(p));const i=d.pedidos.findIndex(x=>x.id===p.id);if(i>=0)d.pedidos[i]=v;else d.pedidos.push(v);save()},
     async delPedido(id){d.pedidos=d.pedidos.filter(x=>x.id!==id);save()},
-    async proveedores(){if(!d.proveedores){d.proveedores=[];save()}return JSON.parse(JSON.stringify(d.proveedores))},
+    async proveedores(oid){d.proveedores=d.proveedores||[];const leg=d.proveedores.filter(x=>!x.obra_id);if(leg.length){d.proveedores=d.proveedores.filter(x=>x.obra_id);d.obras.forEach(o=>leg.forEach(v=>d.proveedores.push({...JSON.parse(JSON.stringify(v)),id:uid(),obra_id:o.id})));save()}return JSON.parse(JSON.stringify(d.proveedores.filter(x=>x.obra_id===oid)))},
     async saveProveedor(v){const x=JSON.parse(JSON.stringify(v));const i=d.proveedores.findIndex(y=>y.id===v.id);if(i>=0)d.proveedores[i]=x;else d.proveedores.push(x);save()},
     async delProveedor(id){d.proveedores=d.proveedores.filter(x=>x.id!==id);save()},
     async perfiles(){return JSON.parse(JSON.stringify(d.perfiles||[]))},
     async tareas(oid){return JSON.parse(JSON.stringify((d.tareas||[]).filter(t=>t.obra_id===oid)))},
-    async otPersonas(){if(!d.otPersonas){d.otPersonas=SEMILLA_OTP.map(p=>({...p,id:uid()}));save()}return JSON.parse(JSON.stringify(d.otPersonas))},
+    async otPersonas(oid){if(!d.otPersonas){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.otPersonas=o?SEMILLA_OTP.map(p=>({...p,id:uid(),obra_id:o.id})):[];save()}
+      const leg=d.otPersonas.filter(x=>!x.obra_id);if(leg.length){d.otPersonas=d.otPersonas.filter(x=>x.obra_id);d.obras.forEach(o=>leg.forEach(p=>d.otPersonas.push({...p,id:uid(),obra_id:o.id})));save()}
+      return JSON.parse(JSON.stringify(d.otPersonas.filter(x=>x.obra_id===oid)))},
     async saveOtPersona(p){const v=JSON.parse(JSON.stringify(p));const i=d.otPersonas.findIndex(x=>x.id===p.id);if(i>=0)d.otPersonas[i]=v;else d.otPersonas.push(v);save()},
     async delOtPersona(id){d.otPersonas=d.otPersonas.filter(x=>x.id!==id);save()},
     async ots(oid){return JSON.parse(JSON.stringify((d.ots||[]).filter(x=>x.obra_id===oid)))},
     async saveOt(o){d.ots=d.ots||[];const v=JSON.parse(JSON.stringify(o));const i=d.ots.findIndex(x=>x.id===o.id);if(i>=0)d.ots[i]=v;else d.ots.push(v);save()},
     async delOt(id){d.ots=(d.ots||[]).filter(x=>x.id!==id);save()},
-    async comps(){if(!d.composiciones){d.composiciones=JSON.parse(JSON.stringify(SEMILLA_COMP));save()}return JSON.parse(JSON.stringify(d.composiciones))},
-    async saveComp(c){const v=JSON.parse(JSON.stringify(c));const i=d.composiciones.findIndex(x=>x.id===c.id);if(i>=0)d.composiciones[i]=v;else d.composiciones.push(v);save()},
-    async delComp(id){d.composiciones=d.composiciones.filter(x=>x.id!==id);save()},
+    async comps(oid){d.composiciones=d.composiciones||[];if(!d.composiciones.some(x=>x.obra_id===oid)){const leg=d.composiciones.filter(x=>!x.obra_id);const tpl=leg.length?leg:SEMILLA_COMP;tpl.forEach(c=>d.composiciones.push({...JSON.parse(JSON.stringify(c)),obra_id:oid}));d.composiciones=d.composiciones.filter(x=>x.obra_id);save()}return JSON.parse(JSON.stringify(d.composiciones.filter(x=>x.obra_id===oid)))},
+    async saveComp(c){const v=JSON.parse(JSON.stringify(c));const i=d.composiciones.findIndex(x=>x.id===c.id&&x.obra_id===c.obra_id);if(i>=0)d.composiciones[i]=v;else d.composiciones.push(v);save()},
+    async delComp(oid,id){d.composiciones=d.composiciones.filter(x=>!(x.id===id&&x.obra_id===oid));save()},
     async computo(oid){return JSON.parse(JSON.stringify((d.computos||{})[oid]||{}))},
     async saveComputo(oid,v){d.computos=d.computos||{};d.computos[oid]=JSON.parse(JSON.stringify(v));save()},
     async saveTarea(t){d.tareas=d.tareas||[];const v=JSON.parse(JSON.stringify(t));const i=d.tareas.findIndex(x=>x.id===t.id);if(i>=0)d.tareas[i]=v;else d.tareas.push(v);save()},
@@ -460,20 +462,22 @@ function backendNube(sb){
     async pedidos(oid){if(!oid)return[];return ok(await sb.from('pedidos').select('*').eq('obra_id',oid).order('numero')).map(p=>({...p,items:p.items||[]}))},
     async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items,sugeridos:p.sugeridos||[]}))},
     async delPedido(id){ok(await sb.from('pedidos').delete().eq('id',id))},
-    async proveedores(){return ok(await sb.from('proveedores').select('*').order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
-    async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
+    async proveedores(oid){if(!oid)return[];return ok(await sb.from('proveedores').select('*').eq('obra_id',oid).order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
+    async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,obra_id:v.obra_id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
     async delProveedor(id){ok(await sb.from('proveedores').delete().eq('id',id))},
     async perfiles(){return ok(await sb.from('perfiles').select('*').order('creado'))},
     async tareas(oid){if(!oid)return[];return ok(await sb.from('tareas').select('*').eq('obra_id',oid).order('creado'))},
-    async otPersonas(){return ok(await sb.from('ot_personas').select('*').order('orden').order('creado'))},
-    async saveOtPersona(p){ok(await sb.from('ot_personas').upsert({id:p.id,nombre:p.nombre,ci:p.ci||null,cargo:p.cargo||null}))},
+    async otPersonas(oid){if(!oid)return[];return ok(await sb.from('ot_personas').select('*').eq('obra_id',oid).order('orden').order('creado'))},
+    async saveOtPersona(p){ok(await sb.from('ot_personas').upsert({id:p.id,obra_id:p.obra_id,nombre:p.nombre,ci:p.ci||null,cargo:p.cargo||null}))},
     async delOtPersona(id){ok(await sb.from('ot_personas').delete().eq('id',id))},
     async ots(oid){if(!oid)return[];return ok(await sb.from('ots').select('*').eq('obra_id',oid))},
     async saveOt(o){ok(await sb.from('ots').upsert({id:o.id,obra_id:o.obra_id,numero:String(o.numero),fecha:o.fecha,datos:o.datos}))},
     async delOt(id){ok(await sb.from('ots').delete().eq('id',id))},
-    async comps(){return ok(await sb.from('composiciones').select('*').order('rubro')).map(c=>({...c,mats:c.mats||[]}))},
-    async saveComp(c){ok(await sb.from('composiciones').upsert({id:c.id,rubro:c.rubro||null,nombre:c.nombre,ud:c.ud,mats:c.mats}))},
-    async delComp(id){ok(await sb.from('composiciones').delete().eq('id',id))},
+    async comps(oid){if(!oid)return[];let r=ok(await sb.from('composiciones').select('*').eq('obra_id',oid).order('rubro'));
+      if(!r.length){const tpl=ok(await sb.from('composiciones').select('*').is('obra_id',null));if(tpl.length){ok(await sb.from('composiciones').insert(tpl.map(c=>({id:c.id,obra_id:oid,rubro:c.rubro,nombre:c.nombre,ud:c.ud,mats:c.mats}))));r=ok(await sb.from('composiciones').select('*').eq('obra_id',oid).order('rubro'))}}
+      return r.map(c=>({...c,mats:c.mats||[]}))},
+    async saveComp(c){ok(await sb.from('composiciones').upsert({id:c.id,obra_id:c.obra_id,rubro:c.rubro||null,nombre:c.nombre,ud:c.ud,mats:c.mats},{onConflict:'obra_id,id'}))},
+    async delComp(oid,id){ok(await sb.from('composiciones').delete().eq('obra_id',oid).eq('id',id))},
     async computo(oid){if(!oid)return{};const r=ok(await sb.from('computos').select('datos').eq('obra_id',oid).limit(1));return(r[0]&&r[0].datos)||{}},
     async saveComputo(oid,v){ok(await sb.from('computos').upsert({obra_id:oid,datos:v},{onConflict:'obra_id'}))},
     async saveTarea(t){ok(await sb.from('tareas').upsert({id:t.id,obra_id:t.obra_id,titulo:t.titulo,fecha:t.fecha||null,prioridad:t.prioridad||'media',responsable:t.responsable||null,nota:t.nota||null,hecha:!!t.hecha,hecha_el:t.hecha_el||null}))},
@@ -1165,10 +1169,10 @@ window.ASIS_OBRA=()=>obraAct();
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
-window.PVB={list:()=>DB.proveedores(),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
-window.OTB={personas:()=>DB.otPersonas(),savePersona:p=>DB.saveOtPersona(p),delPersona:id=>DB.delOtPersona(id),list:oid=>DB.ots(oid),save:o=>DB.saveOt(o),del:id=>DB.delOt(id)};
+window.PVB={list:oid=>DB.proveedores(oid),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
+window.OTB={personas:oid=>DB.otPersonas(oid),savePersona:p=>DB.saveOtPersona(p),delPersona:id=>DB.delOtPersona(id),list:oid=>DB.ots(oid),save:o=>DB.saveOt(o),del:id=>DB.delOt(id)};
 const SEMILLA_OTP=[];
-window.CMB={comps:()=>DB.comps(),saveComp:c=>DB.saveComp(c),delComp:id=>DB.delComp(id),get:oid=>DB.computo(oid),save:(oid,v)=>DB.saveComputo(oid,v)};
+window.CMB={comps:oid=>DB.comps(oid),saveComp:c=>DB.saveComp(c),delComp:(oid,id)=>DB.delComp(oid,id),get:oid=>DB.computo(oid),save:(oid,v)=>DB.saveComputo(oid,v)};
 const SEMILLA_COMP=[];
 window.TDB={list:oid=>DB.tareas(oid),save:t=>DB.saveTarea(t),del:id=>DB.delTarea(id)};
 window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
@@ -2326,7 +2330,7 @@ function cantLetras(v){if(v==null||v==='')return '';v=Number(v);const e=Math.flo
 
 async function cargar(oid){if(M.cargando)return;M.cargando=true;
   try{M.lista=await window.MDB.list(oid)}catch(e){M.lista=[];toast('No se pudieron leer los pedidos')}
-  M.oid=oid;M.cargando=false;M.vista='lista';M.sel=null;render()}
+  M.oid=oid;M.cargando=false;M.vista='lista';M.sel=null;PV.lista=null;PV.edit=null;render()}
 async function guardar(p){try{await window.MDB.save(p)}catch(e){toast('No se pudo guardar en la base. Revisá la conexión.')}}
 const ordenados=()=>M.lista.slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(Number(b.numero)||0)-(Number(a.numero)||0));
 const proximo=()=>M.lista.reduce((m,p)=>Math.max(m,Number(p.numero)||0),0)+1;
@@ -2415,7 +2419,7 @@ const RUBROS=[
 const RN=RUBROS.map(x=>x[0]);
 const rubroDe=d=>{const t=String(d||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');for(const[n,re]of RUBROS){const re2=new RegExp(re.source.normalize('NFD').replace(/[̀-ͯ]/g,''));if(re2.test(t))return n}return 'Otros'};
 const PV={lista:null,cargando:false,edit:null,rubro:'Todos',q:'',confirm:null};
-async function cargarPV(){if(PV.cargando)return;PV.cargando=true;try{PV.lista=await window.PVB.list()}catch(e){PV.lista=[]}PV.cargando=false;render()}
+async function cargarPV(){if(PV.cargando)return;PV.cargando=true;const oid=M.oid;try{PV.lista=await window.PVB.list(oid)}catch(e){PV.lista=[]}PV.oid=oid;PV.cargando=false;render()}
 const telWA=t=>{let d=String(t||'').replace(/\D/g,'');if(!d)return'';if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='595'+d.slice(1);else if(!d.startsWith('595')&&d.length<=9)d='595'+d;return d};
 const mapa=q=>'https://www.google.com/maps/search/'+encodeURIComponent(q+' cerca de '+((OB()||{}).ubicacion||'Encarnación, Itapúa'));
 function textoPedido(p,items,pv){const o=OB()||{};const emp=(typeof S!=='undefined'&&S.aj&&S.aj.empresa)||'Avaroga Arquitectura S.A';
@@ -2484,8 +2488,8 @@ function vProveedores(){
     .sort((a,b)=>(b.favorito?1:0)-(a.favorito?1:0)||a.nombre.localeCompare(b.nombre));
   const compras=nom=>M.lista.filter(p=>(p.proveedor||'').trim().toLowerCase()===nom.trim().toLowerCase()).length;
   return `
-  <div class="bar between"><div><h2>Proveedores</h2><div class="sub">Tu lista de proveedores y contactos. Sirve para todas las obras.</div></div>
-    <div class="bar"><input type="text" id="pv-q" placeholder="Buscar proveedor o material" value="${esc(PV.q)}" style="width:220px"><button class="btn primary" data-mact="pv-nuevo">+ Agregar proveedor</button></div></div>
+  <div class="bar between"><div><h2>Proveedores</h2><div class="sub">Proveedores y contactos de esta obra (cada obra tiene su propia lista).</div></div>
+    <div class="bar"><input type="text" id="pv-q" placeholder="Buscar proveedor o material" value="${esc(PV.q)}" style="width:220px">${S.obras.length>1?`<select id="pv-copiar" aria-label="Copiar de otra obra"><option value="">Copiar de otra obra…</option>${S.obras.filter(o=>o.id!==M.oid).map(o=>`<option value="${o.id}">${esc(o.nombre)}</option>`).join('')}</select>`:''}<button class="btn primary" data-mact="pv-nuevo">+ Agregar proveedor</button></div></div>
   ${PV.edit?vPVForm():''}
   <div class="subnav-p">${['Todos',...RN.filter(r=>usados.has(r))].map(r=>`<button class="chip-p" data-mact="pv-rubro" data-r="${esc(r)}" aria-pressed="${PV.rubro===r}">${esc(r.split(' (')[0])}</button>`).join('')}</div>
   <div class="pv-grid">${vis.map(pv=>`<div class="panel pv-card">
@@ -2687,6 +2691,9 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('change',async e=>{
   if(!dentro(e))return;const t=e.target;
+  if(t.id==='pv-copiar'&&t.value){const otra=t.value;let L=[];try{L=await window.PVB.list(otra)}catch(err){}const ya=new Set((PV.lista||[]).map(x=>(x.nombre||'').trim().toLowerCase()));let n=0;
+    for(const v of L){if(ya.has((v.nombre||'').trim().toLowerCase()))continue;const c={...v,id:nid(),obra_id:M.oid};try{await window.PVB.save(c);PV.lista.push(c);n++}catch(err){}}
+    render();return toast(n?`${n} proveedor${n>1?'es':''} copiado${n>1?'s':''} a esta obra`:'No había proveedores nuevos para copiar')}
   if(t.dataset.mpick){const pv=PV.lista.find(x=>x.id===t.dataset.mpick);if(!pv)return;
     const obj=t.dataset.ctx==='form'?M.form:M.lista.find(x=>x.id===M.sel);if(!obj)return;
     if(t.dataset.ctx==='form'){const fm=document.getElementById('m-form');if(fm){['numero','fecha','ref','proveedor','nota'].forEach(k=>{if(fm[k])obj[k]=fm[k].value})}}
@@ -2715,7 +2722,7 @@ document.addEventListener('submit',async e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;
   if(f.id==='pv-f'){const fd=new FormData(f);const v={...PV.edit,nombre:(fd.get('nombre')||'').trim(),contacto:(fd.get('contacto')||'').trim(),telefono:(fd.get('telefono')||'').trim(),whatsapp:(fd.get('whatsapp')||'').trim(),
       email:(fd.get('email')||'').trim(),direccion:(fd.get('direccion')||'').trim(),notas:(fd.get('notas')||'').trim(),rubros:fd.getAll('rubros'),favorito:!!fd.get('favorito')};
-    if(!v.nombre)return toast('Poné el nombre del proveedor');if(!v.id)v.id=nid();
+    if(!v.nombre)return toast('Poné el nombre del proveedor');if(!v.id)v.id=nid();v.obra_id=M.oid;
     try{await window.PVB.save(v)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 09 en Supabase?')}
     const i=PV.lista.findIndex(x=>x.id===v.id);if(i>=0)PV.lista[i]=v;else PV.lista.push(v);PV.edit=null;render();return toast('Proveedor guardado')}
   if(f.id==='sug-f'){const p=M.lista.find(x=>x.id===M.sel);if(!p)return;const fd=Object.fromEntries(new FormData(f));p.sugeridos=p.sugeridos||[];
@@ -3230,7 +3237,7 @@ function sugerir(it,comps){if(NOMAT.test(nz(it.rubro+' '+it.desc))&&!/^(obrador|
   return ms>=0.45?mejor:null}
 
 async function cargar(oid){if(K.cargando)return;K.cargando=true;
-  try{[K.pres,K.dat,K.comps]=await Promise.all([window.PDB.get(oid),window.CMB.get(oid),window.CMB.comps()])}catch(e){toast('No se pudo leer el cómputo. ¿Ejecutaste el SQL 13?');K.pres=K.pres||null;K.dat=K.dat||{};K.comps=K.comps||[]}
+  try{[K.pres,K.dat,K.comps]=await Promise.all([window.PDB.get(oid),window.CMB.get(oid),window.CMB.comps(oid)])}catch(e){toast('No se pudo leer el cómputo. ¿Ejecutaste el SQL 13?');K.pres=K.pres||null;K.dat=K.dat||{};K.comps=K.comps||[]}
   K.dat=Object.assign({asign:{},factor:{},manual:{},alias:{},conv:{}},K.dat||{});K.oid=oid;K.cargando=false;render()}
 const guardar=()=>{if(K.dat)window.CMB.save(K.oid,K.dat).catch(()=>toast('No se pudo guardar el cómputo'))};
 const compDe=id=>K.comps.find(c=>c.id===id);
@@ -3343,7 +3350,7 @@ function vItems(){
   <p class="sub" style="margin:0">El <b>multiplicador</b> pasa la cantidad del ítem a la unidad de la composición. La app lo calcula sola cuando puede (por ejemplo, encadenado en ml × la sección 0,30 × 0,15 que dice la descripción). Si queda en rojo, escribilo vos.</p>
   <div class="panel tw"><table><thead><tr><th>N°</th><th>Ítem</th><th class="n">Cantidad</th><th>Composición</th><th>Multiplicador</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="5" class="sub">No hay ítems.</td></tr>'}</tbody></table></div>`}
 function vComps(){const c=K.cedit;
-  return `<p class="sub" style="margin:0">Las composiciones son tu biblioteca de rendimientos (sirven para todas las obras). Vienen de tu planilla "Composición Unitaria de Gastos"; podés corregirlas o crear nuevas.</p>
+  return `<p class="sub" style="margin:0">Composiciones de esta obra (cada obra tiene las suyas: lo que cambies acá no afecta a otras obras). Arrancan con tu planilla "Composición Unitaria de Gastos"; podés corregirlas o crear nuevas.</p>
   ${c?`<form class="panel k-cf" id="k-cf"><div class="form" style="padding:0"><label>Rubro<input type="text" name="rubro" value="${esc(c.rubro||'')}"></label><label class="wide">Nombre<input type="text" name="nombre" value="${esc(c.nombre||'')}" required></label>
       <label>Materiales por<select name="ud">${['m2','m3','ml','un','gl'].map(u=>`<option ${u===c.ud?'selected':''}>${u}</option>`).join('')}</select></label></div>
     <table class="k-cm"><thead><tr><th>Material</th><th>Cantidad</th><th>Unidad</th><th></th></tr></thead><tbody>${c.mats.map((m,k)=>`<tr><td><input type="text" data-kcm="mat" data-i="${k}" value="${esc(m.mat)}"></td><td><input type="text" inputmode="decimal" data-kcm="cant" data-i="${k}" value="${q2(m.cant)}"></td><td><input type="text" data-kcm="ud" data-i="${k}" value="${esc(m.ud)}" style="width:70px"></td><td><button type="button" class="btn sm ghost" data-kact="cmquitar" data-i="${k}">×</button></td></tr>`).join('')}</tbody></table>
@@ -3389,7 +3396,7 @@ document.addEventListener('click',async e=>{
   if(a==='cmagregar'){K.cedit.mats.push({mat:'',cant:0,ud:'kg'});return render()}
   if(a==='cmquitar'){K.cedit.mats.splice(+t.dataset.i,1);return render()}
   if(a==='confcomp'){K.cdel=K.cedit.id;return render()}
-  if(a==='delcomp'){try{await window.CMB.delComp(K.cedit.id);K.comps=K.comps.filter(x=>x.id!==K.cedit.id);K.cedit=null;render();toast('Composición borrada')}catch(err){toast('No se pudo borrar')}return}
+  if(a==='delcomp'){try{await window.CMB.delComp(K.oid,K.cedit.id);K.comps=K.comps.filter(x=>x.id!==K.cedit.id);K.cedit=null;render();toast('Composición borrada')}catch(err){toast('No se pudo borrar')}return}
 });
 document.addEventListener('change',e=>{
   if(!dentro(e))return;const t=e.target;
@@ -3410,7 +3417,7 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
 document.addEventListener('submit',async e=>{if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;if(f.id!=='k-cf')return;
   const fd=Object.fromEntries(new FormData(f));const c={...K.cedit,rubro:fd.rubro.trim(),nombre:fd.nombre.trim(),ud:fd.ud,mats:K.cedit.mats.filter(m=>m.mat.trim()&&m.cant>0).map(m=>({mat:m.mat.trim(),cant:m.cant,ud:m.ud.trim()||'un'}))};
   if(!c.nombre)return toast('Poné un nombre');if(!c.mats.length)return toast('Agregá al menos un material');if(!c.id)c.id=crypto.randomUUID?crypto.randomUUID():'c'+Date.now();
-  try{await window.CMB.saveComp(c)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 13?')}
+  c.obra_id=K.oid;try{await window.CMB.saveComp(c)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 13?')}
   const i=K.comps.findIndex(x=>x.id===c.id);if(i>=0)K.comps[i]=c;else K.comps.push(c);K.cedit=null;render();toast('Composición guardada')},true);
 
 const css=document.createElement('style');css.textContent=`
@@ -3451,14 +3458,15 @@ const ciTxt=c=>{const d=String(c||'').replace(/\D/g,'');return d?gs(+d):String(c
 const nid=()=>(crypto.randomUUID?crypto.randomUUID():'o'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
 const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
 
+function selDe(d){const busca=p=>{const ci=String(p.ci||'').replace(/\D/g,'');const x=O.personas.find(y=>y.id===p.pid)||O.personas.find(y=>ci&&String(y.ci||'').replace(/\D/g,'')===ci)||O.personas.find(y=>y.nombre.toLowerCase()===String(p.nombre||'').toLowerCase());return x?{pid:x.id,obs:p.obs||''}:null};return(d.personas||[]).map(busca).filter(Boolean)}
 function nuevoForm(base){const o=OB()||{};const ult=base||O.ots[0];const d=ult?JSON.parse(JSON.stringify(ult.datos)):null;
   return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),
     contratista:d?d.contratista:'VANGUARD S.A',ruc:d?d.ruc:'80095183-2',direccion:d?d.direccion:(o.ubicacion||''),obra:d?d.obra:(o.nombre||''),
     servicio:d?d.servicio:'',horario:d?d.horario:'07:00 a 18:00 hs.',cond:d?d.cond:COND_DEF,
     f1:d?d.f1:'',f2:d?d.f2:'Ing. Luis Oviedo',f3:d?d.f3:'Walter Benitez',logo:d&&d.logo?d.logo:OT_LOGO_DEF,
-    sel:d&&base?d.personas.map(p=>({pid:p.pid,obs:p.obs||''})):[]}}
+    sel:d&&base?selDe(d):[]}}
 async function cargar(oid){if(O.cargando)return;O.cargando=true;
-  try{[O.personas,O.ots]=await Promise.all([window.OTB.personas(),window.OTB.list(oid)]);O.ots.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(parseInt(b.numero)||0)-(parseInt(a.numero)||0))}
+  try{[O.personas,O.ots]=await Promise.all([window.OTB.personas(oid),window.OTB.list(oid)]);O.ots.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(parseInt(b.numero)||0)-(parseInt(a.numero)||0))}
   catch(e){O.personas=O.personas||[];O.ots=[];toast('No se pudieron leer las OT. ¿Ejecutaste el SQL 14?')}
   O.oid=oid;O.cargando=false;O.form=nuevoForm(null);render()}
 const cargos=()=>[...new Set(O.personas.map(p=>p.cargo).filter(Boolean))];
@@ -3489,7 +3497,7 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
       <div class="ot-lista">${L.map(p=>{const s=f.sel.find(x=>x.pid===p.id);return `<div class="ot-p ${s?'on':''}"><label class="m-box"><input type="checkbox" data-osel="${p.id}" ${s?'checked':''} aria-label="${esc(p.nombre)}"><span></span></label>
         <div class="ot-pt"><b>${esc(p.nombre)}</b><span class="sub">CI ${esc(ciTxt(p.ci))} · ${esc(p.cargo||'')}</span></div>
         ${s?`<input type="text" class="ot-obs" data-oobs="${p.id}" value="${esc(s.obs)}" placeholder="Obs.">`:''}</div>`}).join('')||'<p class="sub">Nadie coincide.</p>'}</div>
-      <div class="bar"><button type="button" class="btn sm" data-oact="nuevap">+ Agregar persona a la base</button><button type="button" class="btn sm ghost" data-oact="delpersonal">Traer del personal de la obra</button><button type="button" class="btn sm ghost" data-oact="vista" data-v="base">Editar base de personas</button></div>
+      <div class="bar"><button type="button" class="btn sm" data-oact="nuevap">+ Agregar persona a la base</button><button type="button" class="btn sm ghost" data-oact="delpersonal">Traer del personal de la obra</button><button type="button" class="btn sm ghost" data-oact="vista" data-v="base">Editar base / copiar de otra obra</button></div>
       ${O.pedit&&!O.pedit.id?vPForm():''}
     </div>
     <label class="ot-cond">Condiciones particulares<textarea name="cond" rows="4">${esc(f.cond)}</textarea></label>
@@ -3499,7 +3507,7 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
 function vPForm(){const p=O.pedit;return `<div class="ot-pf"><input type="text" id="op-nombre" value="${esc(p.nombre||'')}" placeholder="Nombre y apellido"><input type="text" inputmode="numeric" id="op-ci" value="${esc(p.ci||'')}" placeholder="CI"><input type="text" id="op-cargo" value="${esc(p.cargo||'')}" placeholder="Cargo" list="ot-cargos"><datalist id="ot-cargos">${cargos().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <button type="button" class="btn sm primary" data-oact="guardap">Guardar</button><button type="button" class="btn sm ghost" data-oact="cancelap">Cancelar</button></div>`}
 function vBase(){
-  return `<div class="bar between"><p class="sub" style="margin:0">Base de personas para las OT (sirve para todas las obras). ${O.personas.length} personas.</p><button class="btn sm primary" data-oact="nuevap">+ Agregar persona</button></div>
+  return `<div class="bar between"><p class="sub" style="margin:0">Base de personas de esta obra (cada obra tiene la suya). ${O.personas.length} personas.</p><div class="bar">${S.obras.length>1?`<select id="ot-copiar"><option value="">Copiar de otra obra…</option>${S.obras.filter(o=>o.id!==O.oid).map(o=>`<option value="${o.id}">${esc(o.nombre)}</option>`).join('')}</select>`:''}<label class="btn sm" style="cursor:pointer">Importar desde Excel<input type="file" id="ot-imp" accept=".xlsx,.xls,.csv" hidden></label><button class="btn sm primary" data-oact="nuevap">+ Agregar persona</button></div></div>
   ${O.pedit&&!O.pedit.id?`<div class="panel" style="padding:10px">${vPForm()}</div>`:''}
   <div class="panel tw"><table><thead><tr><th>Nombre y apellido</th><th>CI</th><th>Cargo</th><th></th></tr></thead><tbody>
   ${O.personas.map(p=>O.pedit&&O.pedit.id===p.id?`<tr><td colspan="4">${vPForm()}</td></tr>`:`<tr><td><b>${esc(p.nombre)}</b></td><td class="num">${esc(ciTxt(p.ci))}</td><td>${esc(p.cargo||'')}</td>
@@ -3582,7 +3590,7 @@ async function xlsOT(num,fecha,d){
 /* ---------- eventos ---------- */
 const dentro=e=>{const r=document.getElementById('ot-root');return r&&r.contains(e.target)};
 async function guardarP(){const p={...O.pedit,nombre:(document.getElementById('op-nombre').value||'').trim().replace(/\s+/g,' '),ci:(document.getElementById('op-ci').value||'').trim(),cargo:(document.getElementById('op-cargo').value||'').trim()};
-  if(!p.nombre)return toast('Poné el nombre');const nuevo=!p.id;if(!p.id)p.id=nid();
+  if(!p.nombre)return toast('Poné el nombre');const nuevo=!p.id;if(!p.id)p.id=nid();p.obra_id=O.oid;
   try{await window.OTB.savePersona(p)}catch(e){return toast('No se pudo guardar. ¿Ejecutaste el SQL 14?')}
   const i=O.personas.findIndex(x=>x.id===p.id);if(i>=0)O.personas[i]=p;else O.personas.push(p);
   if(nuevo&&O.vista==='nueva'&&!O.form.sel.some(s=>s.pid===p.id))O.form.sel.push({pid:p.id,obs:''});O.pedit=null;render();toast(nuevo?'Persona agregada':'Persona actualizada')}
@@ -3601,13 +3609,14 @@ document.addEventListener('click',async e=>{
   if(a==='borrap'){try{await window.OTB.delPersona(t.dataset.id);O.personas=O.personas.filter(p=>p.id!==t.dataset.id);O.form.sel=O.form.sel.filter(s=>s.pid!==t.dataset.id);O.pconf=null;render();toast('Persona borrada')}catch(err){toast('No se pudo borrar')}return}
   if(a==='delpersonal'){const obra=S.obra;const act=S.personal.filter(p=>p.obra_id===obra&&p.activo!==false);let n=0;
     for(const p of act){const ci=String(p.ci||'').replace(/\D/g,'');if(O.personas.some(x=>ci&&String(x.ci).replace(/\D/g,'')===ci||x.nombre.toLowerCase()===String(p.nombre).toLowerCase()))continue;
-      const np={id:nid(),nombre:String(p.nombre).trim(),ci:p.ci||'',cargo:p.categoria||''};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
+      const np={id:nid(),obra_id:O.oid,nombre:String(p.nombre).trim(),ci:p.ci||'',cargo:p.categoria||''};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
     render();return toast(n?`${n} persona${n>1?'s':''} del personal agregada${n>1?'s':''} a la base`:'El personal de la obra ya está en la base')}
   if(a==='pdf'){if(!O.form.sel.length)return toast('Marcá al menos una persona');return pdfOT(O.form.numero,O.form.fecha,datosForm())}
   if(a==='xls'){if(!O.form.sel.length)return toast('Marcá al menos una persona');return xlsOT(O.form.numero,O.form.fecha,datosForm())}
   if(a==='hpdf'&&ot)return pdfOT(ot.numero,ot.fecha,ot.datos);
   if(a==='hxls'&&ot)return xlsOT(ot.numero,ot.fecha,ot.datos);
-  if(a==='abrir'&&ot){const d=ot.datos;O.form={id:ot.id,numero:ot.numero,fecha:ot.fecha,...d,sel:(d.personas||[]).map(p=>({pid:p.pid,obs:p.obs||''}))};O.vista='nueva';render();window.scrollTo(0,0);return}
+  if(a==='abrir'&&ot){const d=ot.datos;const busca=p=>{const ci=String(p.ci||'').replace(/\D/g,'');const x=O.personas.find(y=>y.id===p.pid)||O.personas.find(y=>ci&&String(y.ci||'').replace(/\D/g,'')===ci)||O.personas.find(y=>y.nombre.toLowerCase()===String(p.nombre||'').toLowerCase());return x?{pid:x.id,obs:p.obs||''}:null};
+    O.form={id:ot.id,numero:ot.numero,fecha:ot.fecha,...d,sel:(d.personas||[]).map(busca).filter(Boolean)};O.vista='nueva';render();window.scrollTo(0,0);return}
   if(a==='duplicar'&&ot){O.form=nuevoForm(ot);O.vista='nueva';render();window.scrollTo(0,0);return toast('Copia lista con la fecha de hoy')}
   if(a==='confot'){O.cconf=t.dataset.id;return render()}
   if(a==='borraot'&&ot){try{await window.OTB.del(ot.id);O.ots=O.ots.filter(x=>x.id!==ot.id);O.cconf=null;render();toast('OT borrada')}catch(err){toast('No se pudo borrar')}return}
@@ -3615,6 +3624,20 @@ document.addEventListener('click',async e=>{
 document.addEventListener('change',async e=>{
   if(!dentro(e))return;const t=e.target;
   if(t.dataset.osel){leerCampos();if(t.checked){if(!O.form.sel.some(s=>s.pid===t.dataset.osel))O.form.sel.push({pid:t.dataset.osel,obs:''})}else O.form.sel=O.form.sel.filter(s=>s.pid!==t.dataset.osel);return render()}
+  if(t.id==='ot-imp'&&t.files[0]){if(!window.XLSX)return toast('No se pudo cargar el lector de Excel');let L=[];
+    try{const wb=XLSX.read(await t.files[0].arrayBuffer(),{type:'array'});const nz=x=>String(x??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+      for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''});
+        const h=rows.findIndex(r=>r.some(c=>/nombre/.test(nz(c)))&&r.some(c=>/^c\.?i\.?$|cedula|^ci /.test(nz(c))||nz(c)==='ci'));if(h<0)continue;
+        const hr=rows[h].map(nz);const cn=hr.findIndex(c=>/nombre/.test(c)),cc=hr.findIndex(c=>/^c\.?i|cedula/.test(c)),cg=hr.findIndex(c=>/cargo|categ|funci/.test(c));
+        for(const r of rows.slice(h+1)){const nm=String(r[cn]||'').trim().replace(/\s+/g,' ');if(!nm||/condiciones|proveedor/i.test(nm))continue;L.push({nombre:nm,ci:String(r[cc]||'').replace(/[^\d]/g,''),cargo:cg>=0?String(r[cg]||'').trim().replace(/\s+/g,' '):''})}}}
+    catch(err){return toast('No se pudo leer el archivo')}
+    let n=0;for(const p of L){const ci=p.ci;if(O.personas.some(x=>ci&&String(x.ci||'').replace(/\D/g,'')===ci||x.nombre.toLowerCase()===p.nombre.toLowerCase()))continue;
+      const np={id:nid(),obra_id:O.oid,...p};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
+    t.value='';render();return toast(L.length?(n?`${n} persona${n>1?'s':''} importada${n>1?'s':''} a esta obra`:'Todas las personas del Excel ya estaban cargadas'):'No encontré una tabla con columnas Nombre y CI')}
+  if(t.id==='ot-copiar'&&t.value){let L=[];try{L=await window.OTB.personas(t.value)}catch(err){}let n=0;
+    for(const p of L){const ci=String(p.ci||'').replace(/\D/g,'');if(O.personas.some(x=>ci&&String(x.ci||'').replace(/\D/g,'')===ci||x.nombre.toLowerCase()===p.nombre.toLowerCase()))continue;
+      const np={id:nid(),obra_id:O.oid,nombre:p.nombre,ci:p.ci||'',cargo:p.cargo||''};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
+    render();return toast(n?`${n} persona${n>1?'s':''} copiada${n>1?'s':''} a esta obra`:'No había personas nuevas para copiar')}
   if(t.id==='ot-logo'&&t.files[0]){leerCampos();const fr=new FileReader();fr.onload=()=>{O.form.logo=fr.result;render()};fr.readAsDataURL(t.files[0])}
 });
 document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
