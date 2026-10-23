@@ -484,7 +484,9 @@ function backendNube(sb){
     async delComp(oid,id){ok(await sb.from('composiciones').delete().eq('obra_id',oid).eq('id',id))},
     async computo(oid){if(!oid)return{};const r=ok(await sb.from('computos').select('datos').eq('obra_id',oid).limit(1));return(r[0]&&r[0].datos)||{}},
     async saveComputo(oid,v){ok(await sb.from('computos').upsert({obra_id:oid,datos:v},{onConflict:'obra_id'}))},
-    async saveTarea(t){ok(await sb.from('tareas').upsert({id:t.id,obra_id:t.obra_id,titulo:t.titulo,fecha:t.fecha||null,prioridad:t.prioridad||'media',responsable:t.responsable||null,nota:t.nota||null,hecha:!!t.hecha,hecha_el:t.hecha_el||null}))},
+    async saveTarea(t){const base={id:t.id,obra_id:t.obra_id,titulo:t.titulo,fecha:t.fecha||null,prioridad:t.prioridad||'media',responsable:t.responsable||null,nota:t.nota||null,hecha:!!t.hecha,hecha_el:t.hecha_el||null};
+      if(!DB._tarSin){const r=await sb.from('tareas').upsert({...base,estado:t.estado||'pendiente',adjuntos:t.adjuntos||[]});if(!r.error)return{};if(!/estado|adjuntos|column/i.test(r.error.message||''))return ok(r);DB._tarSin=true}
+      ok(await sb.from('tareas').upsert(base));return{sinColumnas:true}},
     async delTarea(id){ok(await sb.from('tareas').delete().eq('id',id))},
     async asignarUsuario(v){const{error}=await sb.rpc('asignar_usuario',{p_email:v.email,p_nombre:v.nombre||null,p_rol:v.rol,p_obras:v.obras,p_modulos:v.modulos});if(error)throw error},
     async quitarPerfil(id){ok(await sb.from('perfiles').delete().eq('user_id',id))},
@@ -3201,7 +3203,7 @@ function hojas(wb,R,pref){
   if(R.proveedores&&R.proveedores.length)add('Proveedores',[['Nombre','Contacto','Teléfono','WhatsApp','Correo','Dirección','Rubros','Favorito','Notas'],...R.proveedores.map(v=>[v.nombre||'',v.contacto||'',v.telefono||'',v.whatsapp||'',v.email||'',v.direccion||'',(v.rubros||[]).join(', '),v.favorito?'Sí':'',v.notas||''])]);
   if(R.ots&&R.ots.length){const A=[['N° OT','Fecha','Desde','Hasta','Servicio','Contratista','Horario','Nombre','CI','Cargo','Obs']];R.ots.forEach(x=>{const d=x.datos||{};const P=d.personas&&d.personas.length?d.personas:[{}];P.forEach(p=>A.push([x.numero,x.fecha||'',d.desde||'',d.hasta||'',d.servicio||'',d.contratista||'',d.horario||'',p.nombre||'',p.ci||'',p.cargo||'',p.obs||'']))});add('OT',A)}
   if(R.ot_personas&&R.ot_personas.length)add('Personas OT',[['Nombre','CI','Cargo'],...R.ot_personas.map(p=>[p.nombre||'',p.ci||'',p.cargo||''])]);
-  if(R.tareas&&R.tareas.length)add('Tareas',[['Tarea','Fecha','Prioridad','Responsable','Hecha','Hecha el','Nota'],...R.tareas.map(t=>[t.titulo||'',t.fecha||'',t.prioridad||'',t.responsable||'',t.hecha?'Sí':'No',t.hecha_el||'',t.nota||''])]);
+  if(R.tareas&&R.tareas.length)add('Tareas',[['Tarea','Estado','Fecha','Prioridad','Responsable','Hecha el','Descripción','Fotos'],...R.tareas.map(t=>[t.titulo||'',t.hecha?'Hecha':t.estado==='curso'?'En curso':'Pendiente',t.fecha||'',t.prioridad||'',t.responsable||'',t.hecha_el||'',t.nota||'',(t.adjuntos||[]).length])]);
 }
 async function respaldo(lista){
   if(I.ocupado)return;I.ocupado=true;render();
@@ -3306,108 +3308,292 @@ const css=document.createElement('style');css.textContent=`
 })();
 
 (function(){
-/* ============ Tareas pendientes por obra ============ */
-const T={oid:undefined,lista:[],cargando:false,edit:null,verHechas:false,q:'',conf:null};
+/* ============ Tareas por obra: lista, tablero y calendario; cada tarea con descripción con formato y fotos ============ */
+const T={oid:undefined,lista:[],cargando:false,verHechas:false,q:'',vista:'lista',abierta:null,editDesc:false,borrador:null,prev:false,guia:false,conf:null,menu:null,mes:null,fotoGrande:null,avisoSQL:false};
+try{const v=localStorage.getItem('tareas_vista');if(['lista','tablero','calendario'].includes(v))T.vista=v}catch(e){}
 const hoyT=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const sumD=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-const DS=['dom','lun','mar','mié','jue','vie','sáb'];
+const DS=['dom','lun','mar','mié','jue','vie','sáb'];const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const fTxt=s=>{if(!s)return '';const h=hoyT();if(s===h)return 'hoy';if(s===sumD(h,1))return 'mañana';if(s===sumD(h,-1))return 'ayer';const d=new Date(s+'T12:00:00');return `${DS[d.getDay()]} ${s.slice(8,10)}/${s.slice(5,7)}`};
 const PRI={alta:['Alta','bad'],media:['Media','warn'],baja:['Baja','ok']};
+const EST={pendiente:'Pendiente',curso:'En curso',hecha:'Hecha'};
 const nid=()=>(crypto.randomUUID?crypto.randomUUID():'t'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
 const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
+const estado=t=>t.hecha?'hecha':(t.estado==='curso'?'curso':'pendiente');
+const desc=t=>t.nota||'';
+const fotos=t=>Array.isArray(t.adjuntos)?t.adjuntos:[];
 
 async function cargar(oid){if(T.cargando)return;T.cargando=true;
   try{T.lista=await window.TDB.list(oid)}catch(e){T.lista=[];toast('No se pudieron leer las tareas. ¿Ejecutaste el SQL 12?')}
   T.oid=oid;T.cargando=false;render()}
-async function guardar(t){try{await window.TDB.save(t)}catch(e){toast('No se pudo guardar la tarea. Revisá la conexión.')}}
+async function guardar(t){try{const r=await window.TDB.save(t);if(r&&r.sinColumnas&&!T.avisoSQL){T.avisoSQL=true;toast('Para guardar "En curso" y las fotos ejecutá el SQL 17 en Supabase')}}catch(e){toast('No se pudo guardar la tarea. Revisá la conexión.')}}
 
+/* ---------- texto con formato (markdown simple y seguro) ---------- */
+const escT=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function enLinea(s){
+  s=escT(s);
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s=s.replace(/(^|[\s(])((?:https?:\/\/)[^\s<]+[^\s<.,;:)])/g,'$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g,'$1<i>$2</i>').replace(/(^|\W)_([^_\s][^_]*)_(?=\W|$)/g,'$1<i>$2</i>').replace(/~~([^~]+)~~/g,'<s>$1</s>');
+  return s}
+function md(txt,interactivo){
+  const L=String(txt||'').replace(/\r/g,'').split('\n');let h='',lista=null,tabla=null;
+  const cerrar=()=>{if(lista){h+=lista==='ol'?'</ol>':'</ul>';lista=null}if(tabla){h+='</tbody></table></div>';tabla=null}};
+  L.forEach((ln,i)=>{let m;
+    if(/^\s*\|.*\|\s*$/.test(ln)){const cel=ln.trim().slice(1,-1).split('|').map(c=>c.trim());if(cel.every(c=>/^:?-{2,}:?$/.test(c)))return;
+      if(!tabla){cerrar();tabla=true;h+='<div class="md-tw"><table><thead><tr>'+cel.map(c=>`<th>${enLinea(c)}</th>`).join('')+'</tr></thead><tbody>';return}
+      h+='<tr>'+cel.map(c=>`<td>${enLinea(c)}</td>`).join('')+'</tr>';return}
+    if((m=ln.match(/^\s*[-*] \[( |x|X)\] (.*)$/))){if(lista!=='chk'){cerrar();lista='chk';h+='<ul class="md-chk">'}
+      const ok=m[1]!==' ';h+=`<li class="${ok?'ok':''}"><label><input type="checkbox" ${ok?'checked':''} ${interactivo?`data-tline="${i}"`:'disabled'}><span>${enLinea(m[2])}</span></label></li>`;return}
+    if((m=ln.match(/^\s*[-*] (.*)$/))){if(lista!=='ul'){cerrar();lista='ul';h+='<ul>'}h+=`<li>${enLinea(m[1])}</li>`;return}
+    if((m=ln.match(/^\s*\d+[.)] (.*)$/))){if(lista!=='ol'){cerrar();lista='ol';h+='<ol>'}h+=`<li>${enLinea(m[1])}</li>`;return}
+    cerrar();
+    if((m=ln.match(/^(#{1,3}) (.*)$/))){const n=m[1].length+2;h+=`<h${n}>${enLinea(m[2])}</h${n}>`;return}
+    if(/^\s*(-{3,}|\*{3,})\s*$/.test(ln)){h+='<hr>';return}
+    if((m=ln.match(/^> ?(.*)$/))){h+=`<blockquote>${enLinea(m[1])}</blockquote>`;return}
+    if(!ln.trim()){h+='<div class="md-sp"></div>';return}
+    h+=`<p>${enLinea(ln)}</p>`});
+  cerrar();return h}
+const chkProg=s=>{const a=(String(s||'').match(/^\s*[-*] \[( |x|X)\] /gm)||[]);return a.length?{n:a.length,ok:a.filter(x=>/\[(x|X)\]/.test(x)).length}:null};
+const plano=s=>String(s||'').replace(/^#{1,3} /gm,'').replace(/^\s*[-*] \[( |x|X)\] /gm,'').replace(/^\s*[-*] /gm,'· ').replace(/\*\*|~~|`/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').replace(/\n+/g,' ').trim();
+
+/* ---------- vistas ---------- */
 function grupos(L){const h=hoyT(),sem=sumD(h,7);const G=[['vencidas','Vencidas',[]],['hoy','Hoy',[]],['semana','Próximos 7 días',[]],['luego','Más adelante',[]],['sin','Sin fecha',[]]];
   const g=k=>G.find(x=>x[0]===k)[2];
   L.forEach(t=>{if(!t.fecha)g('sin').push(t);else if(t.fecha<h)g('vencidas').push(t);else if(t.fecha===h)g('hoy').push(t);else if(t.fecha<=sem)g('semana').push(t);else g('luego').push(t)});
   const pr={alta:0,media:1,baja:2};G.forEach(x=>x[2].sort((a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9')||(pr[a.prioridad]??1)-(pr[b.prioridad]??1)));return G}
-
-function fila(t){const e=T.edit===t.id;const h=hoyT();const venc=!t.hecha&&t.fecha&&t.fecha<h;
-  if(e)return `<form class="tk-edit" id="tk-ef" data-id="${t.id}">
-    <input type="text" name="titulo" value="${esc(t.titulo)}" required aria-label="Tarea">
-    <label>Para el<input type="date" name="fecha" value="${t.fecha||''}"></label>
-    <label>Prioridad<select name="prioridad">${Object.entries(PRI).map(([k,[n]])=>`<option value="${k}" ${k===(t.prioridad||'media')?'selected':''}>${n}</option>`).join('')}</select></label>
-    <label>Responsable<input type="text" name="responsable" value="${esc(t.responsable||'')}" placeholder="opcional"></label>
-    <label class="wide">Nota<input type="text" name="nota" value="${esc(t.nota||'')}" placeholder="detalle, a quién llamar, qué pedir…"></label>
-    <div class="bar"><button class="btn sm primary">Guardar</button><button type="button" class="btn sm ghost" data-tact="noedit">Cancelar</button>
-      ${T.conf===t.id?`<button type="button" class="btn sm" style="color:var(--bad)" data-tact="borrar" data-id="${t.id}">¿Borrar la tarea?</button>`:`<button type="button" class="btn sm ghost" data-tact="conf" data-id="${t.id}">Borrar</button>`}</div></form>`;
+function marcas(t){const p=chkProg(desc(t));const f=fotos(t).length;const d=desc(t).trim();
+  return `${estado(t)==='curso'?'<span class="tk-est">En curso</span>':''}${d?'<span class="tk-ic" title="Tiene descripción">≡</span>':''}${p?`<span class="tk-ic ${p.ok===p.n?'ok':''}" title="Lista de control">☑ ${p.ok}/${p.n}</span>`:''}${f?`<span class="tk-ic" title="Fotos">📷 ${f}</span>`:''}`}
+function meta(t){const venc=!t.hecha&&t.fecha&&t.fecha<hoyT();
+  return [t.fecha?`<span class="tk-f ${venc?'venc':''}">${venc?'venció ':''}${fTxt(t.fecha)}</span>`:'',t.prioridad&&t.prioridad!=='media'?`<span class="tk-p ${PRI[t.prioridad][1]}">${PRI[t.prioridad][0]}</span>`:'',t.responsable?esc(t.responsable):'',t.hecha&&t.hecha_el?'hecha '+fTxt(t.hecha_el):''].filter(Boolean).join(' · ')}
+function fila(t){const venc=!t.hecha&&t.fecha&&t.fecha<hoyT();const d=plano(desc(t));
   return `<div class="tk ${t.hecha?'hecha':''} ${venc?'venc':''}">
     <label class="m-box"><input type="checkbox" data-tchk="${t.id}" ${t.hecha?'checked':''} aria-label="Hecha: ${esc(t.titulo)}"><span></span></label>
-    <button class="tk-txt" data-tact="editar" data-id="${t.id}"><b>${esc(t.titulo)}</b>
-      <span class="sub">${t.fecha?`<span class="tk-f">${venc?'venció ':''}${fTxt(t.fecha)}</span>`:''}${t.prioridad&&t.prioridad!=='media'?` · <span class="tk-p ${PRI[t.prioridad][1]}">${PRI[t.prioridad][0]}</span>`:''}${t.responsable?' · '+esc(t.responsable):''}${t.nota?' · '+esc(t.nota):''}${t.hecha&&t.hecha_el?' · hecha '+fTxt(t.hecha_el):''}</span></button>
+    <button class="tk-txt" data-tact="abrir" data-id="${t.id}"><b>${esc(t.titulo)}</b>
+      <span class="sub">${meta(t)} ${marcas(t)}</span>${d?`<span class="tk-d">${esc(d.slice(0,140))}</span>`:''}</button>
   </div>`}
+function vLista(pend,hechas,q){const G=grupos(pend);
+  return `${G.filter(x=>x[2].length).map(([k,n,L])=>`<div class="panel tk-g g-${k}"><div class="tk-h"><b>${n}</b><span class="sub">${L.length}</span></div>${L.map(fila).join('')}</div>`).join('')
+    ||`<div class="panel" style="padding:16px">${T.lista.length?(q?'Ninguna tarea coincide.':'No hay tareas pendientes. 👍'):'Todavía no hay tareas. Escribí la primera arriba y tocá Agregar.'}</div>`}
+  ${hechas.length?`<div class="panel tk-g"><button class="tk-h tk-tog" data-tact="hechas"><b>Hechas</b><span class="sub">${hechas.length} · ${T.verHechas?'ocultar':'ver'}</span></button>${T.verHechas?hechas.map(fila).join(''):''}</div>`:''}`}
+function tarjeta(t){const d=plano(desc(t));const f=fotos(t);const e=estado(t);const otros=Object.keys(EST).filter(k=>k!==e);
+  return `<div class="kb-card ${t.prioridad==='alta'?'alta':''} ${!t.hecha&&t.fecha&&t.fecha<hoyT()?'venc':''}" draggable="true" data-drag="${t.id}">
+    ${f[0]?`<img class="kb-img" src="${f[0].src}" alt="">`:''}
+    <button class="kb-t" data-tact="abrir" data-id="${t.id}"><b>${esc(t.titulo)}</b>${d?`<span class="tk-d">${esc(d.slice(0,90))}</span>`:''}</button>
+    <div class="kb-m"><span class="sub">${meta(t)}</span><span>${marcas(t).replace('<span class="tk-est">En curso</span>','')}</span></div>
+    <div class="kb-mv">${otros.map(k=>`<button class="chip-p" data-tact="mover" data-id="${t.id}" data-e="${k}">${k==='hecha'?'✓ Hecha':'→ '+EST[k]}</button>`).join('')}</div>
+  </div>`}
+function vTablero(L){const pr={alta:0,media:1,baja:2};const ord=(a,b)=>(a.fecha||'9').localeCompare(b.fecha||'9')||(pr[a.prioridad]??1)-(pr[b.prioridad]??1);
+  const col=k=>L.filter(t=>estado(t)===k).sort(k==='hecha'?(a,b)=>(b.hecha_el||'').localeCompare(a.hecha_el||''):ord);
+  return `<div class="kb">${Object.entries(EST).map(([k,n])=>{const C=col(k);const vis=k==='hecha'&&!T.verHechas?C.slice(0,6):C;
+    return `<div class="kb-col k-${k}" data-drop="${k}"><div class="kb-h"><b>${n}</b><span class="sub">${C.length}</span></div>
+      <div class="kb-l">${vis.map(tarjeta).join('')||'<p class="sub kb-v">Arrastrá tareas acá</p>'}${k==='hecha'&&C.length>6?`<button class="btn sm ghost" data-tact="hechas">${T.verHechas?'Mostrar menos':'Ver las '+C.length}</button>`:''}</div></div>`}).join('')}</div>
+  <p class="sub">Arrastrá las tarjetas entre columnas o usá los botones de cada tarjeta. Tocá una tarjeta para ver su descripción.</p>`}
+function vCalendario(L){
+  const m=T.mes||hoyT().slice(0,7);const [y,mm]=m.split('-').map(Number);const ini=new Date(y,mm-1,1);const dow=(ini.getDay()+6)%7;
+  const start=sumD(m+'-01',-dow);const h=hoyT();const porDia={};L.forEach(t=>{if(t.fecha)(porDia[t.fecha]=porDia[t.fecha]||[]).push(t)});
+  const sinF=L.filter(t=>!t.fecha&&!t.hecha);let cel='';
+  for(let i=0;i<42;i++){const d=sumD(start,i);const fuera=d.slice(0,7)!==m;if(i>=35&&fuera&&d.slice(0,7)>m)break;const ts=(porDia[d]||[]).sort((a,b)=>(a.hecha?1:0)-(b.hecha?1:0));
+    cel+=`<div class="cal-d ${fuera?'fuera':''} ${d===h?'hoy':''}" data-tact="dia" data-d="${d}"><span class="cal-n">${+d.slice(8,10)}</span>
+      ${ts.slice(0,4).map(t=>`<button class="cal-t ${t.hecha?'hecha':''} p-${t.prioridad||'media'} ${!t.hecha&&d<h?'venc':''}" data-tact="abrir" data-id="${t.id}" title="${esc(t.titulo)}">${esc(t.titulo)}</button>`).join('')}${ts.length>4?`<span class="sub cal-mas">+${ts.length-4} más</span>`:''}</div>`}
+  const ant=sumD(m+'-01',-1).slice(0,7),sig=sumD(m+'-01',32).slice(0,7);
+  return `<div class="panel cal"><div class="bar between cal-top"><button class="btn sm" data-tact="mes" data-m="${ant}">‹</button><b>${MES[mm-1]} ${y}</b><div class="bar"><button class="btn sm ghost" data-tact="mes" data-m="${h.slice(0,7)}">Hoy</button><button class="btn sm" data-tact="mes" data-m="${sig}">›</button></div></div>
+    <div class="cal-g">${['lun','mar','mié','jue','vie','sáb','dom'].map(x=>`<div class="cal-w">${x}</div>`).join('')}${cel}</div></div>
+  ${sinF.length?`<div class="panel tk-g"><div class="tk-h"><b>Sin fecha</b><span class="sub">${sinF.length}</span></div>${sinF.map(fila).join('')}</div>`:''}
+  <p class="sub">Tocá un día vacío para cargar una tarea con esa fecha.</p>`}
+
+/* ---------- detalle de la tarea ---------- */
+const TB=[
+  ['tt','Tt',[['h1','Título'],['h2','Subtítulo'],['p','Texto normal']]],
+  ['b','<b>B</b>'],
+  ['i','<i>I</i>',[['i','Cursiva'],['s','Tachado'],['code','Código']]],
+  ['ul','☰',[['ul','Viñetas'],['ol','Lista numerada'],['chk','Lista de control']]],
+  ['link','🔗'],['img','🖼'],
+  ['mas','+',[['tabla','Tabla'],['hr','Separador'],['cita','Cita'],['hoy','Fecha de hoy']]]];
+function editor(){const v=T.borrador??'';
+  return `<div class="ed">
+    <div class="ed-tb">${TB.map(([k,ic,sub])=>`<div class="ed-g"><button type="button" class="ed-b" data-ed="${sub?'menu':k}" data-k="${k}" title="${({tt:'Tamaño del texto',b:'Negrita (Ctrl+B)',i:'Cursiva (Ctrl+I)',ul:'Listas',link:'Enlace',img:'Agregar foto',mas:'Insertar'})[k]}">${ic}${sub?' <small>▾</small>':''}</button>
+      ${sub&&T.menu===k?`<div class="ed-menu">${sub.map(([s,n])=>`<button type="button" data-ed="${s}">${n}</button>`).join('')}</div>`:''}</div>`).join('')}
+      <span class="ed-sp"></span><button type="button" class="ed-b" data-ed="img" title="Adjuntar foto">📎</button><button type="button" class="ed-b ${T.prev?'on':''}" data-ed="prev" title="Vista previa">M↓</button><button type="button" class="ed-b ${T.guia?'on':''}" data-ed="guia" title="Guía de formato">?</button></div>
+    ${T.prev?`<div class="ed-prev md">${md(v)||'<p class="sub">Nada para mostrar todavía.</p>'}</div>`:`<textarea id="tk-desc" rows="9" placeholder="Escribí la descripción: qué hay que hacer, medidas, a quién llamar…">${escT(v)}</textarea>`}
+    ${T.guia?guia():''}
+    <div class="bar between ed-pie"><div class="bar"><button type="button" class="btn primary" data-tact="gdesc">Guardar</button><button type="button" class="btn ghost" data-tact="cdesc">Cancelar</button></div><button type="button" class="btn sm" data-ed="guia">Guía de formato</button></div>
+  </div>`}
+function guia(){return `<div class="ed-guia"><table><tbody>
+  <tr><td><code># Título</code></td><td>Título grande</td></tr><tr><td><code>## Subtítulo</code></td><td>Subtítulo</td></tr>
+  <tr><td><code>**negrita**</code></td><td><b>negrita</b></td></tr><tr><td><code>*cursiva*</code></td><td><i>cursiva</i></td></tr><tr><td><code>~~tachado~~</code></td><td><s>tachado</s></td></tr>
+  <tr><td><code>- elemento</code></td><td>Viñeta</td></tr><tr><td><code>1. elemento</code></td><td>Lista numerada</td></tr><tr><td><code>- [ ] por hacer</code></td><td>Casilla que se marca desde la tarea</td></tr>
+  <tr><td><code>[texto](https://…)</code></td><td>Enlace</td></tr><tr><td><code>&gt; texto</code></td><td>Cita</td></tr><tr><td><code>---</code></td><td>Separador</td></tr>
+  <tr><td><code>| A | B |</code></td><td>Tabla</td></tr></tbody></table><p class="sub">Atajos: Ctrl+B negrita · Ctrl+I cursiva · Ctrl+Enter guardar · Esc cancelar. En una lista, Enter sigue la lista.</p></div>`}
+function detalle(){const t=T.lista.find(x=>x.id===T.abierta);if(!t)return '';const f=fotos(t);const d=desc(t);const e=estado(t);
+  return `<div class="tk-ov" data-tact="cerrar"></div><aside class="tk-dr" role="dialog" aria-label="Tarea">
+    <div class="tk-dr-h"><label class="m-box"><input type="checkbox" data-tchk="${t.id}" ${t.hecha?'checked':''} aria-label="Hecha"><span></span></label>
+      <input type="text" id="tk-tit" value="${esc(t.titulo)}" aria-label="Título de la tarea"><button class="btn sm ghost" data-tact="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="tk-dr-c">
+      <div class="tk-props">
+        <label>Estado<select data-tprop="estado">${Object.entries(EST).map(([k,n])=>`<option value="${k}" ${k===e?'selected':''}>${n}</option>`).join('')}</select></label>
+        <label>Para el<input type="date" data-tprop="fecha" value="${t.fecha||''}"></label>
+        <label>Prioridad<select data-tprop="prioridad">${Object.entries(PRI).map(([k,[n]])=>`<option value="${k}" ${k===(t.prioridad||'media')?'selected':''}>${n}</option>`).join('')}</select></label>
+        <label>Responsable<input type="text" data-tprop="responsable" value="${esc(t.responsable||'')}" placeholder="opcional"></label>
+      </div>
+      <div class="tk-sec"><div class="bar between"><b class="tk-lab">≡ Descripción</b>${T.editDesc?'':`<button class="btn sm" data-tact="edesc">${d.trim()?'Editar':'Agregar'}</button>`}</div>
+        ${T.editDesc?editor():d.trim()?`<div class="md tk-md" data-tact="edesc2">${md(d,true)}</div>`:`<button class="tk-vacio" data-tact="edesc">Agregá una descripción: detalle del trabajo, medidas, lista de control…</button>`}</div>
+      <div class="tk-sec"><div class="bar between"><b class="tk-lab">📷 Fotos ${f.length?`<span class="sub">${f.length}</span>`:''}</b><label class="btn sm">Agregar foto<input type="file" id="tk-foto" accept="image/*" multiple hidden></label></div>
+        ${f.length?`<div class="tk-fotos">${f.map((x,i)=>`<div class="tk-fo"><img src="${x.src}" alt="${esc(x.nombre||'foto')}" data-tact="verfoto" data-i="${i}"><button class="tk-fx" data-tact="quitafoto" data-i="${i}" aria-label="Quitar foto">✕</button></div>`).join('')}</div>`:'<p class="sub" style="margin:4px 0 0">Sin fotos. Podés sacar una con el celular.</p>'}</div>
+    </div>
+    <div class="tk-dr-p bar between"><span class="sub">${t.creado?'Creada '+fTxt(String(t.creado).slice(0,10)):''}</span>
+      ${T.conf===t.id?`<button class="btn sm" style="color:var(--bad)" data-tact="borrar" data-id="${t.id}">¿Borrar la tarea?</button>`:`<button class="btn sm ghost" data-tact="conf" data-id="${t.id}">Borrar tarea</button>`}</div>
+  </aside>
+  ${T.fotoGrande!=null&&f[T.fotoGrande]?`<div class="tk-lb" data-tact="cerrarfoto"><img src="${f[T.fotoGrande].src}" alt=""></div>`:''}`}
 
 function render(){
   const root=document.getElementById('tar-root');if(!root)return;
   const o=OB();const oid=o?o.id:null;
   if(!oid){root.innerHTML='<div class="panel" style="padding:16px">Elegí una obra.</div>';return}
-  if(oid!==T.oid){root.innerHTML='<p class="sub">Cargando tareas…</p>';cargar(oid);return}
-  const foco=document.activeElement&&document.activeElement.id;
+  if(oid!==T.oid){root.innerHTML='<p class="sub">Cargando tareas…</p>';T.abierta=null;cargar(oid);return}
+  const foco=document.activeElement&&document.activeElement.id;const ta=document.getElementById('tk-desc');const sel=ta?[ta.selectionStart,ta.selectionEnd,ta.scrollTop]:null;
   const q=T.q.trim().toLowerCase();const filt=t=>!q||[t.titulo,t.nota,t.responsable].some(v=>(v||'').toLowerCase().includes(q));
-  const pend=T.lista.filter(t=>!t.hecha&&filt(t)),hechas=T.lista.filter(t=>t.hecha&&filt(t)).sort((a,b)=>(b.hecha_el||'').localeCompare(a.hecha_el||''));
-  const G=grupos(pend);const nv=G[0][2].length,nh=G[1][2].length;
+  const vis=T.lista.filter(filt);
+  const pend=vis.filter(t=>!t.hecha),hechas=vis.filter(t=>t.hecha).sort((a,b)=>(b.hecha_el||'').localeCompare(a.hecha_el||''));
+  const G=grupos(pend);const nv=G[0][2].length,nh=G[1][2].length,nc=pend.filter(t=>estado(t)==='curso').length;
   root.innerHTML=`
-  <div class="bar between"><div><h2>Tareas pendientes</h2><div class="sub">${esc(o.nombre)} · ${pend.length} pendiente${pend.length===1?'':'s'}${nv?` · <b style="color:var(--bad)">${nv} vencida${nv>1?'s':''}</b>`:''}${nh?` · ${nh} para hoy`:''}</div></div>
-    <div class="bar"><input type="text" id="tk-q" placeholder="Buscar tarea" value="${esc(T.q)}" style="width:170px">${T.lista.length?'<button class="btn" data-tact="pdf">PDF</button>':''}</div></div>
+  <div class="bar between"><div><h2>Tareas</h2><div class="sub">${esc(o.nombre)} · ${pend.length} pendiente${pend.length===1?'':'s'}${nc?` · ${nc} en curso`:''}${nv?` · <b style="color:var(--bad)">${nv} vencida${nv>1?'s':''}</b>`:''}${nh?` · ${nh} para hoy`:''}</div></div>
+    <div class="bar"><div class="tk-vistas" role="group" aria-label="Vista">${[['lista','☰ Lista'],['tablero','▥ Tablero'],['calendario','▦ Calendario']].map(([k,n])=>`<button class="chip-p" data-tact="vista" data-v="${k}" aria-pressed="${T.vista===k}">${n}</button>`).join('')}</div>
+    <input type="text" id="tk-q" placeholder="Buscar tarea" value="${esc(T.q)}" style="width:160px">${T.lista.length?'<button class="btn" data-tact="pdf">PDF</button>':''}</div></div>
   <form class="panel tk-nueva" id="tk-nf" autocomplete="off">
-    <input type="text" id="tk-titulo" name="titulo" placeholder="Nueva tarea… ej.: Pedir hormigón para viga, llamar al electricista" required>
+    <input type="text" id="tk-titulo" name="titulo" placeholder="Nueva tarea… ej.: Relevamiento y dibujo de módulos de parque infantil" required>
     <input type="date" name="fecha" value="${T.ultFecha||''}" aria-label="Para el">
     <select name="prioridad" aria-label="Prioridad"><option value="media">Prioridad media</option><option value="alta">Alta</option><option value="baja">Baja</option></select>
-    <div class="tk-rap"><button type="button" class="chip-p" data-tact="f" data-d="0">Hoy</button><button type="button" class="chip-p" data-tact="f" data-d="1">Mañana</button><button type="button" class="chip-p" data-tact="f" data-d="7">En 1 semana</button><button type="button" class="chip-p" data-tact="f" data-d="">Sin fecha</button></div>
+    <div class="tk-rap"><button type="button" class="chip-p" data-tact="f" data-d="0">Hoy</button><button type="button" class="chip-p" data-tact="f" data-d="1">Mañana</button><button type="button" class="chip-p" data-tact="f" data-d="7">En 1 semana</button><button type="button" class="chip-p" data-tact="f" data-d="">Sin fecha</button><span class="sub">La descripción, la lista de control y las fotos se cargan tocando la tarea.</span></div>
     <button class="btn primary">Agregar</button>
   </form>
-  ${G.filter(x=>x[2].length).map(([k,n,L])=>`<div class="panel tk-g g-${k}"><div class="tk-h"><b>${n}</b><span class="sub">${L.length}</span></div>${L.map(fila).join('')}</div>`).join('')
-    ||`<div class="panel" style="padding:16px">${T.lista.length?(q?'Ninguna tarea coincide.':'No hay tareas pendientes. 👍'):'Todavía no hay tareas. Escribí la primera arriba y tocá Agregar.'}</div>`}
-  ${hechas.length?`<div class="panel tk-g"><button class="tk-h tk-tog" data-tact="hechas"><b>Hechas</b><span class="sub">${hechas.length} · ${T.verHechas?'ocultar':'ver'}</span></button>${T.verHechas?hechas.map(fila).join(''):''}</div>`:''}`;
-  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='text'&&el.setSelectionRange)el.setSelectionRange(el.value.length,el.value.length)}}
+  ${T.vista==='tablero'?vTablero(vis):T.vista==='calendario'?vCalendario(vis):vLista(pend,hechas,q)}
+  ${detalle()}`;
+  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.id==='tk-desc'&&sel){el.setSelectionRange(sel[0],sel[1]);el.scrollTop=sel[2]}else if(el.type==='text'&&el.setSelectionRange)el.setSelectionRange(el.value.length,el.value.length)}}
 }
 window.TAREAS={mount:render,contar:async oid=>{try{const L=await window.TDB.list(oid);const h=hoyT();return{pend:L.filter(t=>!t.hecha).length,venc:L.filter(t=>!t.hecha&&t.fecha&&t.fecha<h).length}}catch(e){return null}}};
 
 function pdf(){
   if(!PDFK.ok())return;const o=OB()||{};const doc=PDFK.nuevo('portrait');
   let y=PDFK.titulo(doc,'TAREAS PENDIENTES',[['Obra:',o.nombre],['Al:',hoyT().split('-').reverse().join('/')]]);
-  const body=[];grupos(T.lista.filter(t=>!t.hecha)).filter(x=>x[2].length).forEach(([k,n,L])=>{body.push([{content:n.toUpperCase(),colSpan:5,styles:{fontStyle:'bold',fillColor:[240,240,240]}}]);
-    L.forEach(t=>body.push(['☐'.replace('☐',''),t.titulo+(t.nota?' — '+t.nota:''),t.fecha?t.fecha.split('-').reverse().join('/'):'',PRI[t.prioridad||'media'][0],t.responsable||'']))});
+  const T2=window.pdfTxt||(x=>x);const body=[];grupos(T.lista.filter(t=>!t.hecha)).filter(x=>x[2].length).forEach(([k,n,L])=>{body.push([{content:n.toUpperCase(),colSpan:5,styles:{fontStyle:'bold',fillColor:[240,240,240]}}]);
+    L.forEach(t=>{const d=plano(desc(t));const p=chkProg(desc(t));body.push(['',T2(t.titulo+(estado(t)==='curso'?' (en curso)':'')+(d?'\n'+d.slice(0,300):'')+(p?`\nLista de control: ${p.ok}/${p.n}`:'')),t.fecha?t.fecha.split('-').reverse().join('/'):'',PRI[t.prioridad||'media'][0],T2(t.responsable||'')])})});
   PDFK.tabla(doc,{startY:y,head:[['','Tarea','Fecha','Prioridad','Responsable']],body:body.length?body:[[{content:'Sin tareas pendientes.',colSpan:5}]],
     columnStyles:{0:{cellWidth:7},2:{cellWidth:22},3:{cellWidth:20},4:{cellWidth:32}},
-    didDrawCell:d=>{if(d.section==='body'&&d.column.index===0&&d.row.raw.length===5){d.doc.setDrawColor(90);d.doc.rect(d.cell.x+1.6,d.cell.y+d.cell.height/2-1.8,3.6,3.6)}}});
+    didDrawCell:d=>{if(d.section==='body'&&d.column.index===0&&d.row.raw.length===5){d.doc.setDrawColor(90);d.doc.rect(d.cell.x+1.6,d.cell.y+3,3.6,3.6)}}});
   PDFK.cerrar(doc,`Tareas_${o.nombre||''}_${hoyT()}`);
 }
 
+/* ---------- edición de la descripción ---------- */
+function envolver(a,b,ph){const ta=document.getElementById('tk-desc');if(!ta)return;const s=ta.selectionStart,e=ta.selectionEnd;const v=ta.value;const sel=v.slice(s,e)||ph;
+  ta.value=v.slice(0,s)+a+sel+b+v.slice(e);T.borrador=ta.value;ta.focus();ta.setSelectionRange(s+a.length,s+a.length+sel.length)}
+function lineas(fn){const ta=document.getElementById('tk-desc');if(!ta)return;const v=ta.value;let s=ta.selectionStart,e=ta.selectionEnd;
+  const a=v.lastIndexOf('\n',s-1)+1;let b=v.indexOf('\n',e);if(b<0)b=v.length;const blk=v.slice(a,b).split('\n').map(fn).join('\n');
+  ta.value=v.slice(0,a)+blk+v.slice(b);T.borrador=ta.value;ta.focus();ta.setSelectionRange(a,a+blk.length)}
+function insertar(txt){const ta=document.getElementById('tk-desc');if(!ta)return;const s=ta.selectionStart;const v=ta.value;const pre=s&&v[s-1]!=='\n'?'\n':'';
+  ta.value=v.slice(0,s)+pre+txt+v.slice(ta.selectionEnd);T.borrador=ta.value;ta.focus();const p=s+pre.length+txt.length;ta.setSelectionRange(p,p)}
+const sinMarca=l=>l.replace(/^(#{1,3} |\s*[-*] \[( |x|X)\] |\s*[-*] |\s*\d+[.)] |> )/,'');
+function accionEd(k){
+  if(k==='b')return envolver('**','**','negrita');
+  if(k==='i')return envolver('*','*','cursiva');
+  if(k==='s')return envolver('~~','~~','tachado');
+  if(k==='code')return envolver('`','`','código');
+  if(k==='h1')return lineas(l=>'# '+sinMarca(l));
+  if(k==='h2')return lineas(l=>'## '+sinMarca(l));
+  if(k==='p')return lineas(sinMarca);
+  if(k==='ul')return lineas(l=>'- '+sinMarca(l));
+  if(k==='chk')return lineas(l=>'- [ ] '+sinMarca(l));
+  if(k==='ol'){let n=0;return lineas(l=>(++n)+'. '+sinMarca(l))}
+  if(k==='cita')return lineas(l=>'> '+sinMarca(l));
+  if(k==='hr')return insertar('---\n');
+  if(k==='tabla')return insertar('| Ítem | Cantidad | Observación |\n| --- | --- | --- |\n|  |  |  |\n');
+  if(k==='hoy')return insertar(hoyT().split('-').reverse().join('/')+' ');
+  if(k==='link'){const ta=document.getElementById('tk-desc');if(!ta)return;const s=ta.selectionStart,e=ta.selectionEnd,v=ta.value,sel=v.slice(s,e);const url=/^https?:\/\//.test(sel);
+    const txt=url?'texto':(sel||'texto'),u=url?sel:'https://';const ins='['+txt+']('+u+')';ta.value=v.slice(0,s)+ins+v.slice(e);T.borrador=ta.value;ta.focus();
+    const a=url?s+1:s+txt.length+3,b=url?s+1+txt.length:s+txt.length+3+u.length;ta.setSelectionRange(a,b)}
+}
+async function comprimir(file){return new Promise(ok=>{const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const M=1280;let w=im.width,h=im.height;if(Math.max(w,h)>M){const k=M/Math.max(w,h);w=Math.round(w*k);h=Math.round(h*k)}
+  const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);ok(c.toDataURL('image/jpeg',0.72))};im.onerror=()=>ok(null);im.src=r.result};r.onerror=()=>ok(null);r.readAsDataURL(file)})}
+
 const dentro=e=>{const r=document.getElementById('tar-root');return r&&r.contains(e.target)};
 document.addEventListener('click',async e=>{
-  if(!dentro(e))return;const b=e.target.closest('[data-tact]');if(!b)return;const a=b.dataset.tact;const t=T.lista.find(x=>x.id===b.dataset.id);
+  if(!dentro(e))return;
+  const eb=e.target.closest('[data-ed]');
+  if(eb){e.preventDefault();const k=eb.dataset.ed;const ta=document.getElementById('tk-desc');if(ta)T.borrador=ta.value;
+    if(k==='menu'){T.menu=T.menu===eb.dataset.k?null:eb.dataset.k;render();return}
+    T.menu=null;
+    if(k==='prev'){T.prev=!T.prev;render();return}
+    if(k==='guia'){T.guia=!T.guia;render();return}
+    if(k==='img'){const i=document.getElementById('tk-foto');if(i)i.click();return}
+    if(T.prev){T.prev=false;render();const t2=document.getElementById('tk-desc');if(t2)t2.focus()}
+    accionEd(k);render();return}
+  if(T.menu&&!e.target.closest('.ed-menu')){T.menu=null;render()}
+  const b=e.target.closest('[data-tact]');if(!b)return;const a=b.dataset.tact;const t=T.lista.find(x=>x.id===(b.dataset.id||T.abierta));
   if(a==='f'){const f=document.querySelector('#tk-nf [name=fecha]');T.ultFecha=b.dataset.d===''?'':sumD(hoyT(),+b.dataset.d);if(f)f.value=T.ultFecha;document.getElementById('tk-titulo').focus();return}
-  if(a==='editar'&&t){T.edit=t.id;T.conf=null;return render()}
-  if(a==='noedit'){T.edit=null;return render()}
+  if(a==='vista'){T.vista=b.dataset.v;try{localStorage.setItem('tareas_vista',T.vista)}catch(err){}return render()}
+  if(a==='abrir'&&t){e.stopPropagation();T.abierta=t.id;T.editDesc=false;T.borrador=null;T.prev=false;T.guia=false;T.conf=null;T.fotoGrande=null;return render()}
+  if(a==='cerrar'){if(T.editDesc&&(T.borrador??desc(t||{}))!==desc(t||{})&&!confirm('Hay cambios sin guardar en la descripción. ¿Cerrar igual?'))return;T.abierta=null;T.editDesc=false;return render()}
+  if(a==='edesc'||(a==='edesc2'&&!e.target.closest('a,input,label'))){T.editDesc=true;T.borrador=desc(t);T.prev=false;render();const ta=document.getElementById('tk-desc');if(ta){ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}return}
+  if(a==='cdesc'){T.editDesc=false;T.borrador=null;T.guia=false;return render()}
+  if(a==='gdesc'&&t){const ta=document.getElementById('tk-desc');if(ta)T.borrador=ta.value;t.nota=(T.borrador||'').replace(/\s+$/,'');T.editDesc=false;T.borrador=null;T.guia=false;render();await guardar(t);return toast('Descripción guardada')}
+  if(a==='verfoto'){T.fotoGrande=+b.dataset.i;return render()}
+  if(a==='cerrarfoto'){T.fotoGrande=null;return render()}
+  if(a==='quitafoto'&&t){t.adjuntos=fotos(t).filter((x,i)=>i!==+b.dataset.i);render();await guardar(t);return toast('Foto quitada')}
+  if(a==='mover'&&t){mover(t,b.dataset.e);return}
+  if(a==='mes'){T.mes=b.dataset.m;return render()}
+  if(a==='dia'&&!e.target.closest('[data-tact="abrir"]')){T.ultFecha=b.dataset.d;const f=document.querySelector('#tk-nf [name=fecha]');if(f)f.value=b.dataset.d;const i=document.getElementById('tk-titulo');if(i){i.focus();i.scrollIntoView({block:'center',behavior:'smooth'})}toast('Escribí la tarea para el '+fTxt(b.dataset.d));return}
   if(a==='conf'){T.conf=b.dataset.id;return render()}
-  if(a==='borrar'&&t){try{await window.TDB.del(t.id);T.lista=T.lista.filter(x=>x.id!==t.id);T.edit=null;render();toast('Tarea borrada')}catch(err){toast('No se pudo borrar')}return}
+  if(a==='borrar'&&t){try{await window.TDB.del(t.id);T.lista=T.lista.filter(x=>x.id!==t.id);T.abierta=null;render();toast('Tarea borrada')}catch(err){toast('No se pudo borrar')}return}
   if(a==='hechas'){T.verHechas=!T.verHechas;return render()}
   if(a==='pdf')return pdf();
 });
+async function mover(t,e){if(estado(t)===e)return;t.estado=e==='hecha'?(t.estado||'pendiente'):e;t.hecha=e==='hecha';t.hecha_el=t.hecha?hoyT():null;if(!t.hecha)t.estado=e;render();await guardar(t);toast(e==='hecha'?'Tarea hecha ✓':'Movida a '+EST[e])}
 document.addEventListener('change',async e=>{
-  if(!dentro(e))return;const c=e.target;if(!c.dataset.tchk)return;const t=T.lista.find(x=>x.id===c.dataset.tchk);if(!t)return;
-  t.hecha=c.checked;t.hecha_el=c.checked?hoyT():null;render();await guardar(t);if(c.checked)toast('Tarea hecha ✓')});
-document.addEventListener('input',e=>{if(e.target.id==='tk-q'&&dentro(e)){T.q=e.target.value;render()}});
+  if(!dentro(e))return;const c=e.target;
+  if(c.dataset.tchk){const t=T.lista.find(x=>x.id===c.dataset.tchk);if(!t)return;t.hecha=c.checked;t.hecha_el=c.checked?hoyT():null;if(!c.checked&&t.estado==='hecha')t.estado='pendiente';render();await guardar(t);if(c.checked)toast('Tarea hecha ✓');return}
+  if(c.dataset.tline!=null){const t=T.lista.find(x=>x.id===T.abierta);if(!t)return;const L=desc(t).split('\n');const i=+c.dataset.tline;
+    L[i]=L[i].replace(/\[( |x|X)\]/,c.checked?'[x]':'[ ]');t.nota=L.join('\n');render();await guardar(t);return}
+  if(c.dataset.tprop){const t=T.lista.find(x=>x.id===T.abierta);if(!t)return;const k=c.dataset.tprop;
+    if(k==='estado'){mover(t,c.value);return}
+    t[k]=k==='fecha'?(c.value||null):c.value.trim();render();await guardar(t);return}
+  if(c.id==='tk-tit'){const t=T.lista.find(x=>x.id===T.abierta);if(!t||!c.value.trim())return;t.titulo=c.value.trim();render();await guardar(t);return}
+  if(c.id==='tk-foto'&&c.files&&c.files.length){const t=T.lista.find(x=>x.id===T.abierta);if(!t)return;const ta=document.getElementById('tk-desc');if(ta)T.borrador=ta.value;
+    const nuevas=[];for(const f of [...c.files].slice(0,8)){const src=await comprimir(f);if(src)nuevas.push({id:nid(),nombre:f.name,src,fecha:hoyT()})}
+    if(!nuevas.length)return toast('No se pudo leer la imagen');t.adjuntos=[...fotos(t),...nuevas];c.value='';render();await guardar(t);toast(nuevas.length>1?nuevas.length+' fotos agregadas':'Foto agregada')}
+});
+document.addEventListener('input',e=>{if(!dentro(e))return;if(e.target.id==='tk-q'){T.q=e.target.value;render()}if(e.target.id==='tk-desc')T.borrador=e.target.value});
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('tar-root'))return;
+  if(e.key==='Escape'&&T.abierta){if(T.fotoGrande!=null){T.fotoGrande=null;render();return}if(T.menu){T.menu=null;render();return}if(T.editDesc){T.editDesc=false;T.borrador=null;render();return}T.abierta=null;render();return}
+  const ta=e.target;if(ta.id!=='tk-desc')return;
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='b'){e.preventDefault();T.borrador=ta.value;accionEd('b');return}
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='i'){e.preventDefault();T.borrador=ta.value;accionEd('i');return}
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();document.querySelector('[data-tact="gdesc"]')?.click();return}
+  if(e.key==='Enter'&&!e.shiftKey){const v=ta.value,s=ta.selectionStart;const a=v.lastIndexOf('\n',s-1)+1;const ln=v.slice(a,s);const m=ln.match(/^(\s*)([-*] \[( |x|X)\] |[-*] |(\d+)[.)] )(.*)$/);
+    if(m){e.preventDefault();if(!m[5].trim()){ta.value=v.slice(0,a)+v.slice(s);ta.setSelectionRange(a,a)}else{const pre=m[1]+(m[4]?(+m[4]+1)+'. ':m[2].replace(/\[(x|X)\]/,'[ ]'));ta.value=v.slice(0,s)+'\n'+pre+v.slice(ta.selectionEnd);ta.setSelectionRange(s+1+pre.length,s+1+pre.length)}T.borrador=ta.value}}
+});
+document.addEventListener('mousedown',e=>{if(e.target.closest&&e.target.closest('#tar-root [data-ed]')&&document.getElementById('tk-desc'))e.preventDefault()});
+/* arrastrar tarjetas en el tablero */
+document.addEventListener('dragstart',e=>{const c=e.target.closest&&e.target.closest('[data-drag]');if(!c||!dentro(e))return;e.dataTransfer.setData('text/plain',c.dataset.drag);e.dataTransfer.effectAllowed='move';c.classList.add('arr')});
+document.addEventListener('dragend',e=>{const c=e.target.closest&&e.target.closest('[data-drag]');if(c)c.classList.remove('arr');document.querySelectorAll('.kb-col.sobre').forEach(x=>x.classList.remove('sobre'))});
+document.addEventListener('dragover',e=>{const col=e.target.closest&&e.target.closest('[data-drop]');if(!col||!dentro(e))return;e.preventDefault();document.querySelectorAll('.kb-col.sobre').forEach(x=>x!==col&&x.classList.remove('sobre'));col.classList.add('sobre')});
+document.addEventListener('drop',e=>{const col=e.target.closest&&e.target.closest('[data-drop]');if(!col||!dentro(e))return;e.preventDefault();const t=T.lista.find(x=>x.id===e.dataTransfer.getData('text/plain'));if(t)mover(t,col.dataset.drop)});
 document.addEventListener('submit',async e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
   if(f.id==='tk-nf'){const titulo=(fd.titulo||'').trim();if(!titulo)return;
-    const t={id:nid(),obra_id:T.oid,titulo,fecha:fd.fecha||null,prioridad:fd.prioridad||'media',responsable:'',nota:'',hecha:false,hecha_el:null};
+    const t={id:nid(),obra_id:T.oid,titulo,fecha:fd.fecha||null,prioridad:fd.prioridad||'media',responsable:'',nota:'',estado:'pendiente',adjuntos:[],hecha:false,hecha_el:null,creado:new Date().toISOString()};
     T.lista.push(t);T.ultFecha=fd.fecha||'';render();const i=document.getElementById('tk-titulo');if(i)i.focus();await guardar(t);return}
-  if(f.id==='tk-ef'){const t=T.lista.find(x=>x.id===f.dataset.id);if(!t)return;
-    Object.assign(t,{titulo:(fd.titulo||'').trim()||t.titulo,fecha:fd.fecha||null,prioridad:fd.prioridad,responsable:(fd.responsable||'').trim(),nota:(fd.nota||'').trim()});
-    T.edit=null;render();await guardar(t);toast('Tarea guardada')}
 },true);
 
 const css=document.createElement('style');css.textContent=`
 #tar-root{display:flex;flex-direction:column;gap:12px}
 #tar-root .btn.sm{padding:5px 10px;font-size:13px}
+.tk-vistas{display:flex;gap:4px}.tk-vistas .chip-p{padding:5px 12px;font-size:13px}
+.tk-vistas .chip-p[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .tk-nueva{display:grid;grid-template-columns:1fr 150px 150px auto;gap:8px;padding:12px;align-items:center}
-.tk-nueva .tk-rap{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;order:5}
+.tk-nueva .tk-rap{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap;order:5;align-items:center}
+.tk-nueva .tk-rap .sub{font-size:12px;margin-left:4px}
 .tk-nueva .chip-p{padding:3px 11px;font-size:13px}
 .tk-g{overflow:hidden}
 .tk-h{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--chip);width:100%;border-left:0;border-right:0;border-top:0;text-align:left}
@@ -3416,15 +3602,93 @@ const css=document.createElement('style');css.textContent=`
 .g-hoy .tk-h{background:var(--warn-bg);color:var(--warn)}
 .tk{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:9px 14px;border-top:1px solid var(--line)}
 .tk-h+.tk{border-top:0}
-.tk-txt{display:flex;flex-direction:column;gap:2px;text-align:left;background:none;border:0;padding:0;cursor:pointer;min-width:0}
+.tk-txt{display:flex;flex-direction:column;gap:2px;text-align:left;background:none;border:0;padding:0;cursor:pointer;min-width:0;color:inherit}
+.tk-txt:hover b{text-decoration:underline;text-decoration-color:var(--line)}
+.tk-d{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .tk.hecha .tk-txt b{text-decoration:line-through;color:var(--muted);font-weight:500}
-.tk.venc .tk-f{color:var(--bad);font-weight:600}
+.tk-f.venc{color:var(--bad);font-weight:600}
 .tk-p.bad{color:var(--bad);font-weight:600}.tk-p.ok{color:var(--ok)}
-.tk-edit{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent) 7%,var(--panel))}
-.tk-edit>input[name=titulo]{grid-column:1/-1;font-weight:600}
-.tk-edit label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
-.tk-edit .wide,.tk-edit .bar{grid-column:1/-1}
-@media (max-width:760px){.tk-nueva{grid-template-columns:1fr 1fr}.tk-nueva #tk-titulo{grid-column:1/-1}.tk-nueva .btn.primary{grid-column:1/-1}#tk-q{width:100%!important;flex:1 1 100%}}
+.tk-ic{display:inline-block;font-size:12px;color:var(--muted);margin-left:6px}.tk-ic.ok{color:var(--ok)}
+.tk-est{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:color-mix(in srgb,var(--accent) 30%,transparent);color:var(--ink);border-radius:4px;padding:0 6px;margin-left:6px}
+/* tablero */
+.kb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+.kb-col{background:var(--chip);border-radius:12px;padding:8px;min-height:160px;border:2px dashed transparent;transition:border-color .15s}
+.kb-col.sobre{border-color:var(--accent)}
+.kb-h{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 8px}
+.k-curso .kb-h b{color:var(--warn)}.k-hecha .kb-h b{color:var(--ok)}
+.kb-l{display:flex;flex-direction:column;gap:8px}
+.kb-v{text-align:center;padding:18px 0;margin:0}
+.kb-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;cursor:grab;box-shadow:0 1px 2px rgb(0 0 0/.05)}
+.kb-card.alta{border-left:4px solid var(--bad)}.kb-card.venc .tk-f{color:var(--bad);font-weight:600}
+.kb-card.arr{opacity:.45}
+.k-hecha .kb-card .kb-t b{text-decoration:line-through;color:var(--muted);font-weight:500}
+.kb-img{width:100%;height:110px;object-fit:cover;border-radius:6px}
+.kb-t{background:none;border:0;padding:0;text-align:left;display:flex;flex-direction:column;gap:3px;cursor:pointer;color:inherit}
+.kb-t .tk-d{white-space:normal}
+.kb-m{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:12px}
+.kb-mv{display:flex;gap:4px;flex-wrap:wrap}.kb-mv .chip-p{padding:2px 9px;font-size:12px;font-weight:600}
+/* calendario */
+.cal{overflow:hidden}.cal-top{padding:10px 12px;border-bottom:1px solid var(--line)}.cal-top b{text-transform:capitalize;font-size:17px}
+.cal-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.cal-w{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line)}
+.cal-d{min-height:96px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;display:flex;flex-direction:column;gap:3px;cursor:pointer;min-width:0}
+.cal-d:nth-child(7n){border-right:0}.cal-d.fuera{background:color-mix(in srgb,var(--chip) 60%,transparent)}.cal-d.fuera .cal-n{opacity:.45}
+.cal-n{font-size:12px;font-weight:600;padding:1px 4px;align-self:flex-start;border-radius:99px}
+.cal-d.hoy .cal-n{background:var(--accent);color:var(--accent-ink)}
+.cal-t{font-size:12px;text-align:left;border:0;border-left:3px solid var(--warn);background:var(--chip);border-radius:4px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;color:inherit;max-width:100%}
+.cal-t.p-alta{border-left-color:var(--bad)}.cal-t.p-baja{border-left-color:var(--ok)}
+.cal-t.hecha{text-decoration:line-through;opacity:.55}.cal-t.venc{background:var(--bad-bg)}
+.cal-mas{font-size:11px;padding-left:4px}
+/* panel de detalle */
+.tk-ov{position:fixed;inset:0;background:rgb(0 0 0/.35);z-index:60}
+.tk-dr{position:fixed;top:0;right:0;bottom:0;width:min(620px,100%);background:var(--panel);z-index:61;display:flex;flex-direction:column;box-shadow:-8px 0 24px rgb(0 0 0/.18)}
+body:has(.tk-dr){overflow:hidden}
+.tk-dr-h{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+#tk-tit{font-size:19px;font-weight:700;border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 6px;width:100%}
+#tk-tit:hover,#tk-tit:focus{border-color:var(--line);background:var(--bg)}
+.tk-dr-c{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:16px}
+.tk-props{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tk-props label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.tk-props select,.tk-props input{width:100%}
+.tk-sec{display:flex;flex-direction:column;gap:8px}
+.tk-lab{font-size:15px}
+.tk-vacio{border:1px dashed var(--line);background:none;border-radius:8px;padding:16px;text-align:left;color:var(--muted);cursor:pointer}
+.tk-md{border:1px solid transparent;border-radius:8px;padding:4px 6px;margin:-4px -6px;cursor:text}.tk-md:hover{border-color:var(--line)}
+.tk-dr-p{padding:10px 14px;border-top:1px solid var(--line)}
+.tk-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.tk-fo{position:relative}.tk-fo img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;cursor:zoom-in;display:block}
+.tk-fx{position:absolute;top:4px;right:4px;background:rgb(0 0 0/.6);color:#fff;border:0;border-radius:99px;width:24px;height:24px;font-size:12px;cursor:pointer}
+.tk-lb{position:fixed;inset:0;background:rgb(0 0 0/.85);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out}.tk-lb img{max-width:100%;max-height:100%;border-radius:6px}
+/* editor */
+.ed{border:1.5px solid var(--accent);border-radius:10px;overflow:visible;background:var(--panel)}
+.ed-tb{display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;background:var(--bg);border-radius:9px 9px 0 0}
+.ed-g{position:relative}
+.ed-b{background:none;border:0;border-radius:6px;padding:5px 8px;font-size:15px;cursor:pointer;color:var(--ink);min-width:32px}
+.ed-b small{font-size:10px;opacity:.6}.ed-b:hover,.ed-b.on{background:var(--chip)}
+.ed-sp{flex:1}
+.ed-menu{position:absolute;top:100%;left:0;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 20px rgb(0 0 0/.15);display:flex;flex-direction:column;min-width:160px;padding:4px}
+.ed-menu button{background:none;border:0;text-align:left;padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--ink)}.ed-menu button:hover{background:var(--chip)}
+#tk-desc{display:block;width:100%;border:0;padding:12px;min-height:200px;resize:vertical;font-family:var(--f-body,inherit);font-size:15px;line-height:1.5;background:var(--panel);color:var(--ink)}
+#tk-desc:focus{outline:none}
+.ed-prev{padding:12px;min-height:200px}
+.ed-pie{padding:8px;border-top:1px solid var(--line)}
+.ed-guia{padding:10px 12px;border-top:1px solid var(--line);background:var(--bg);font-size:13px}.ed-guia table{border-collapse:collapse;width:100%}.ed-guia td{padding:3px 8px 3px 0;vertical-align:top}.ed-guia code{font-size:12px}
+/* texto con formato */
+.md{font-size:15px;line-height:1.5;overflow-wrap:anywhere}
+.md p{margin:0 0 4px}.md .md-sp{height:8px}
+.md h3{font-size:20px;margin:6px 0 4px;font-family:var(--f-display,inherit);text-transform:none}.md h4{font-size:17px;margin:6px 0 4px}.md h5{font-size:15px;margin:6px 0 4px}
+.md ul,.md ol{margin:2px 0 6px;padding-left:22px}.md li{margin:1px 0}
+.md ul.md-chk{list-style:none;padding-left:2px}.md-chk label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.md-chk input{margin-top:4px;width:16px;height:16px;accent-color:var(--ok)}.md-chk li.ok span{text-decoration:line-through;color:var(--muted)}
+.md blockquote{margin:4px 0;padding:4px 10px;border-left:3px solid var(--accent);color:var(--muted)}
+.md hr{border:0;border-top:1px solid var(--line);margin:10px 0}
+.md code{font-family:var(--f-num,monospace);font-size:13px;background:var(--chip);padding:1px 4px;border-radius:4px}
+.md a{color:inherit;text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:2px}
+.md-tw{overflow:auto;margin:4px 0 8px}.md table{border-collapse:collapse;font-size:14px}.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left}.md th{background:var(--chip)}
+@media (max-width:900px){.kb{grid-template-columns:1fr}.kb-col{min-height:0}}
+@media (max-width:760px){.tk-nueva{grid-template-columns:1fr 1fr}.tk-nueva #tk-titulo{grid-column:1/-1}.tk-nueva .btn.primary{grid-column:1/-1}#tk-q{width:100%!important;flex:1 1 100%}
+  .tk-vistas{flex:1 1 100%}.tk-vistas .chip-p{flex:1}
+  .tk-props{grid-template-columns:1fr 1fr}.tk-dr{width:100%}
+  .cal-d{min-height:64px;padding:2px}.cal-t{font-size:10px;padding:1px 3px}.cal-w{padding:4px 2px;text-align:center}}
 `;document.head.appendChild(css);
 })();
 
