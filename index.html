@@ -3502,7 +3502,7 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
     </div>
     <label class="ot-cond">Condiciones particulares<textarea name="cond" rows="4">${esc(f.cond)}</textarea></label>
     <div class="form" style="padding:0"><label>Proveedor / Contratista (firma)<input type="text" name="f1" value="${esc(f.f1)}" placeholder="nombre (opcional)"></label><label>Supervisor de Obras<input type="text" name="f2" value="${esc(f.f2)}"></label><label>Seguridad Física<input type="text" name="f3" value="${esc(f.f3)}"></label></div>
-    <div class="bar"><button type="button" class="btn primary" data-oact="pdf">Descargar PDF</button><button type="button" class="btn primary" data-oact="xls">Descargar Excel</button><button class="btn">Guardar OT</button>${O.ots.some(x=>x.id===f.id)?'<span class="sub">Esta OT ya está guardada; guardar actualiza.</span>':''}</div>
+    <div class="bar"><button type="button" class="btn primary" data-oact="pdf">Descargar PDF</button><button type="button" class="btn primary" data-oact="xls">Descargar Excel</button><button class="btn">${O.ots.some(x=>x.id===f.id)?'Guardar cambios':'Guardar OT'}</button>${O.ots.some(x=>x.id===f.id)?`<button type="button" class="btn ghost" data-oact="otnueva">+ Nueva OT</button><span class="sub">Estás editando la OT N° ${esc(O.ots.find(x=>x.id===f.id).numero)} guardada. Para hacer otra, tocá <b>+ Nueva OT</b> (o cambiá el número y guardá).</span>`:''}</div>
   </form>`}
 function vPForm(){const p=O.pedit;return `<div class="ot-pf"><input type="text" id="op-nombre" value="${esc(p.nombre||'')}" placeholder="Nombre y apellido"><input type="text" inputmode="numeric" id="op-ci" value="${esc(p.ci||'')}" placeholder="CI"><input type="text" id="op-cargo" value="${esc(p.cargo||'')}" placeholder="Cargo" list="ot-cargos"><datalist id="ot-cargos">${cargos().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <button type="button" class="btn sm primary" data-oact="guardap">Guardar</button><button type="button" class="btn sm ghost" data-oact="cancelap">Cancelar</button></div>`}
@@ -3597,7 +3597,8 @@ async function guardarP(){const p={...O.pedit,nombre:(document.getElementById('o
 document.addEventListener('click',async e=>{
   if(!dentro(e))return;const t=e.target.closest('[data-oact]');if(!t)return;const a=t.dataset.oact;if(O.vista==='nueva')leerCampos();
   const ot=O.ots.find(x=>x.id===t.dataset.id);
-  if(a==='vista'){O.vista=t.dataset.v;O.pedit=null;return render()}
+  if(a==='vista'){if(t.dataset.v==='nueva'&&O.vista!=='nueva'&&O.ots.some(x=>x.id===O.form.id))O.form=nuevoForm(null);O.vista=t.dataset.v;O.pedit=null;return render()}
+  if(a==='otnueva'){O.form=nuevoForm(null);O.q='';render();window.scrollTo(0,0);return toast(`Nueva OT N° ${O.form.numero}: marcá el personal`)}
   if(a==='cargo'){O.cargo=t.dataset.c;return render()}
   if(a==='todos'){const q=O.q.trim().toLowerCase();O.personas.filter(p=>(O.cargo==='Todos'||p.cargo===O.cargo)&&(!q||[p.nombre,p.ci,p.cargo].some(v=>String(v||'').toLowerCase().includes(q)))).forEach(p=>{if(!O.form.sel.some(s=>s.pid===p.id))O.form.sel.push({pid:p.id,obs:''})});return render()}
   if(a==='ninguno'){O.form.sel=[];return render()}
@@ -3645,7 +3646,9 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.oobs){const s=O.form.sel.find(x=>x.pid===t.dataset.oobs);if(s)s.obs=t.value}});
 document.addEventListener('keydown',e=>{if(!dentro(e))return;if(e.key==='Enter'&&e.target.closest('.ot-pf')){e.preventDefault();guardarP()}});
 document.addEventListener('submit',async e=>{if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();if(e.target.id!=='ot-f')return;leerCampos();
-  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');const row={id:f.id,obra_id:O.oid,numero:f.numero,fecha:f.fecha,datos:datosForm()};
+  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');
+  const prev=O.ots.find(x=>x.id===f.id);if(prev&&String(prev.numero)!==f.numero)f.id=nid();
+  const dup=O.ots.find(x=>x.id!==f.id&&String(x.numero)===f.numero);if(dup&&!f.confirmDup){f.confirmDup=true;return toast(`Ya existe la OT N° ${f.numero}. Tocá Guardar otra vez para guardarla igual, o cambiá el número.`)}delete f.confirmDup;const row={id:f.id,obra_id:O.oid,numero:f.numero,fecha:f.fecha,datos:datosForm()};
   try{await window.OTB.save(row)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 14?')}
   const i=O.ots.findIndex(x=>x.id===row.id);if(i>=0)O.ots[i]=row;else O.ots.unshift(row);render();toast(`OT N° ${f.numero} guardada`)},true);
 
