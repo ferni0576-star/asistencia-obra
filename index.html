@@ -1033,7 +1033,7 @@ function render(){
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
     ${S.tab==='inicio'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
     ${S.tab==='inicio'&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
-  ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?'Vista previa: así ve la obra tu cliente (solo lectura) · <button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':'Acceso de cliente'+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+' · solo lectura'}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
+  ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
   if(S.tab==='presupuesto'&&window.PRES)window.PRES.mount();
@@ -1042,6 +1042,7 @@ function render(){
   if(S.tab==='inicio'&&window.INICIO)window.INICIO.mount();
   if(S.tab==='obra'&&window.RESUMEN)window.RESUMEN.mount();
   if(window.APROB)window.APROB.check();
+  if(window.LATERAL)window.LATERAL();
   if(S.tab==='ot'&&window.OT)window.OT.mount();
   if(S.tab==='tareas'&&window.TAREAS)window.TAREAS.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
@@ -1243,7 +1244,7 @@ async function iniciar(session){
   document.getElementById('app').innerHTML='<main><p class="sub">Cargando…</p></main>';
   if(NUBE&&session){let pr;try{const r=await SB.from('perfiles').select('*').eq('user_id',session.user.id).maybeSingle();pr=r.error?null:(r.data||'sin')}catch(e){pr=null}
     if(pr==='sin'){document.getElementById('app').innerHTML=`<main><div class="panel" style="padding:20px;max-width:520px;margin:40px auto"><h2>Sin acceso todavía</h2><p class="sub">Tu usuario (${esc(session.user.email)}) existe pero la dirección de obra todavía no te dio acceso a ninguna obra.</p><button class="btn" data-act="salir">Cerrar sesión</button></div></main>`;return}
-    if(pr&&pr.rol==='cliente'){window.CLI={mods:['obra',...(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m))],nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}
+    if(pr&&(pr.rol==='cliente'||pr.rol==='aprobador')){window.CLI={aprobador:pr.rol==='aprobador',mods:['obra',...(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m))],nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}
     if(pr&&pr.rol==='equipo'){window.COL={mods:pr.modulos||[],obras:pr.obras||[],nombre:pr.nombre||''};document.body.classList.add('modo-col')}}
   S.aj={...AJ_DEF,...(await DB.ajustes()||{})};
   S.obras=await DB.obras();
@@ -3256,20 +3257,20 @@ const ESTADOS=[['activo','Activo'],['planificacion','Planificación'],['pausada'
 const I={q:'',edit:null,stats:{},cargando:false,filtro:'todas',ocupado:false,cli:false,usr:null,uedit:null};
 const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra'],['personal','Personal en obra','asistencia, planilla, liquidación y OT · solo colaboradores'],['tareas','Tareas','pendientes de la obra · solo colaboradores']];
 const MOD_CLI=['contratistas','presupuesto','planos','materiales'];
-const ROLN={admin:'Administrador',equipo:'Colaborador',cliente:'Cliente'};
+const ROLN={admin:'Administrador',equipo:'Colaborador',cliente:'Cliente',aprobador:'Administración'};
 async function cargarUsr(){try{I.usr=await window.USR.list()}catch(e){I.usr=[];toast('No se pudieron leer los accesos. ¿Ejecutaste el SQL 11?')}render()}
 function vClientes(){
   if(I.usr===null){cargarUsr();return '<div class="panel" style="padding:14px"><span class="sub">Cargando accesos…</span></div>'}
   const nube=window.USR.nube();const ob=id=>(S.obras.find(o=>o.id===id)||{}).nombre||'obra borrada';
-  const cl=I.usr.filter(u=>u.rol==='cliente'||u.rol==='equipo').sort((a,b)=>(a.rol>b.rol?1:-1)),adm=I.usr.filter(u=>u.rol==='admin');const u=I.uedit;
+  const cl=I.usr.filter(u=>u.rol==='cliente'||u.rol==='equipo'||u.rol==='aprobador').sort((a,b)=>(a.rol>b.rol?1:-1)),adm=I.usr.filter(u=>u.rol==='admin');const u=I.uedit;
   return `<div class="panel ini-cli">
-    <div class="bar between"><div><h3>Accesos</h3><span class="sub"><b>Cliente:</b> solo ve las obras y secciones que elijas, sin modificar nada (puede aprobar u observar). <b>Colaborador:</b> carga y edita solo en sus obras y secciones; no ve las demás ni da accesos. <b>Administrador:</b> vos, con control total.</span></div><button class="btn sm ghost" data-iact="clientes">Cerrar</button></div>
+    <div class="bar between"><div><h3>Accesos</h3><span class="sub"><b>Cliente:</b> solo ve las obras y secciones que elijas, sin modificar nada. <b>Administración del cliente:</b> ve lo mismo y además aprueba u observa los certificados y pedidos que le enviás. <b>Colaborador:</b> carga y edita solo en sus obras y secciones; no ve las demás ni da accesos. <b>Administrador:</b> vos, con control total.</span></div><button class="btn sm ghost" data-iact="clientes">Cerrar</button></div>
     ${nube?`<ol class="sub ini-pasos"><li>Creá su usuario en <b>Supabase → Authentication → Users → Add user</b> (correo y contraseña; marcá "Auto Confirm User").</li><li>Acá abajo escribí ese correo, elegí sus obras y qué secciones ve, y guardá.</li><li>Pasale al cliente la dirección de tu página, su correo y su contraseña.</li></ol>`
       :`<p class="sub" style="margin:0">En el modo prueba no se crean usuarios reales: guardá un acceso y usá <b>Vista previa</b> para ver exactamente lo que vería el cliente.</p>`}
     <div class="tw"><table><thead><tr><th>Usuario</th><th>Obras</th><th>Secciones</th><th></th></tr></thead><tbody>
       ${cl.map(x=>`<tr><td><b>${esc(x.nombre||'')}</b> <span class="ini-rol ${x.rol}">${ROLN[x.rol]||x.rol}</span><div class="sub">${esc(x.email||'')}</div></td><td>${(x.obras||[]).map(id=>esc(ob(id))).join('<br>')||'<span class="sub">ninguna</span>'}</td>
         <td>${(x.modulos||[]).map(m=>`<span class="ini-chip">${esc((MODC.find(c=>c[0]===m)||[0,m])[1])}</span>`).join(' ')}</td>
-        <td><div class="bar" style="justify-content:flex-end">${x.rol==='cliente'?`<button class="btn sm" data-iact="prev" data-u="${x.user_id}">Vista previa</button>`:''}<button class="btn sm ghost" data-iact="uedit" data-u="${x.user_id}">Editar</button>
+        <td><div class="bar" style="justify-content:flex-end">${x.rol==='cliente'||x.rol==='aprobador'?`<button class="btn sm" data-iact="prev" data-u="${x.user_id}">Vista previa</button>`:''}<button class="btn sm ghost" data-iact="uedit" data-u="${x.user_id}">Editar</button>
           ${I.uconf===x.user_id?`<button class="btn sm" style="color:var(--bad)" data-iact="uquitar" data-u="${x.user_id}">¿Quitar acceso?</button>`:`<button class="btn sm ghost" data-iact="uconf" data-u="${x.user_id}">Quitar</button>`}</div></td></tr>`).join('')
         ||'<tr><td colspan="4" class="sub">Todavía no diste acceso a nadie.</td></tr>'}
     </tbody></table></div>
@@ -3278,7 +3279,7 @@ function vClientes(){
       <div class="form" style="padding:0">
         <label>Correo del usuario<input type="text" inputmode="email" name="email" value="${esc(u&&u.email||'')}" required placeholder="cliente@correo.com"></label>
         <label>Nombre<input type="text" name="nombre" value="${esc(u&&u.nombre||'')}" placeholder="Ej.: Vanguard S.A"></label>
-        <label>Tipo de acceso<select name="rol"><option value="cliente" ${!u||u.rol!=='equipo'?'selected':''}>Cliente (solo ve y aprueba)</option><option value="equipo" ${u&&u.rol==='equipo'?'selected':''}>Colaborador (carga y edita lo elegido)</option></select></label>
+        <label>Tipo de acceso<select name="rol"><option value="cliente" ${!u||u.rol==='cliente'?'selected':''}>Cliente (solo ve)</option><option value="aprobador" ${u&&u.rol==='aprobador'?'selected':''}>Administración del cliente (ve y aprueba)</option><option value="equipo" ${u&&u.rol==='equipo'?'selected':''}>Colaborador (carga y edita lo elegido)</option></select></label>
       </div>
       <fieldset><legend>Obras que ve</legend>${S.obras.map(o=>`<label><input type="checkbox" name="obras" value="${o.id}" ${u?((u.obras||[]).includes(o.id)?'checked':''):(o.id===S.obra?'checked':'')}> ${esc(o.nombre)}</label>`).join('')}</fieldset>
       <fieldset><legend>Secciones</legend>${MODC.map(([k,t,d])=>`<label><input type="checkbox" name="modulos" value="${k}" ${u?((u.modulos||[]).includes(k)?'checked':''):(['contratistas','presupuesto'].includes(k)?'checked':'')}> <span>${t}<small class="sub" style="display:block;font-size:12px">${d}</small></span></label>`).join('')}</fieldset>
@@ -3286,7 +3287,7 @@ function vClientes(){
     </form>
     ${adm.length?`<p class="sub" style="margin:0">Administrador (control total, no se puede cambiar desde acá): ${adm.map(x=>esc(x.email||x.nombre||'')).join(', ')}.</p>`:''}
   </div>`}
-function entrarPreview(v){window.CLI={mods:['obra',...(v.modulos||[]).filter(m=>m!=='obra')],obras:v.obras||[],nombre:v.nombre||v.email||'',preview:true};document.body.classList.add('modo-cliente');
+function entrarPreview(v){window.CLI={mods:['obra',...(v.modulos||[]).filter(m=>m!=='obra'&&MOD_CLI.includes(m))],obras:v.obras||[],nombre:v.nombre||v.email||'',preview:true,aprobador:v.rol==='aprobador'};document.body.classList.add('modo-cliente');
   if(v.obras&&v.obras.length&&!v.obras.includes(S.obra))elegirObra(v.obras[0]);S.tab='inicio';I.cli=false;window.render();window.scrollTo(0,0)}
 function salirPreview(){delete window.CLI;document.body.classList.remove('modo-cliente');S.tab='inicio';I.cli=true;window.render();window.scrollTo(0,0)}
 const estadoDe=o=>o.estado||(o.activa===false?'terminada':'activo');
@@ -3435,7 +3436,7 @@ document.addEventListener('click',async e=>{
   if(a==='uconf'){I.uconf=t.dataset.u;return render()}
   if(a==='uquitar'){try{await window.USR.quitar(t.dataset.u);I.usr=I.usr.filter(x=>x.user_id!==t.dataset.u);I.uconf=null;render();toast('Acceso quitado')}catch(err){toast('No se pudo quitar el acceso')}return}
   if(a==='prev'){const u=I.usr.find(x=>x.user_id===t.dataset.u);if(u)entrarPreview(u);return}
-  if(a==='prevform'){const fd=new FormData(document.getElementById('ini-uf'));const m=fd.getAll('modulos');if(!m.length)return toast('Elegí al menos una sección');entrarPreview({nombre:fd.get('nombre')||fd.get('email'),obras:fd.getAll('obras'),modulos:m});return}
+  if(a==='prevform'){const fd=new FormData(document.getElementById('ini-uf'));const m=fd.getAll('modulos');if(!m.length)return toast('Elegí al menos una sección');entrarPreview({nombre:fd.get('nombre')||fd.get('email'),obras:fd.getAll('obras'),modulos:m,rol:fd.get('rol')});return}
 });
 document.addEventListener('click',e=>{const t=e.target.closest('[data-iact="salirprev"]');if(t)salirPreview()});
 document.addEventListener('input',e=>{if(e.target.id==='ini-q'&&dentro(e)){I.q=e.target.value;render()}});
@@ -3447,8 +3448,8 @@ document.addEventListener('change',async e=>{
 document.addEventListener('submit',async e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;
   if(f.id==='ini-uf'){const fd=new FormData(f);const v={email:(fd.get('email')||'').trim(),nombre:(fd.get('nombre')||'').trim(),rol:fd.get('rol'),obras:fd.getAll('obras'),modulos:fd.getAll('modulos')};
-    if(!/^\S+@\S+\.\S+$/.test(v.email))return toast('Escribí un correo válido');if(v.rol==='cliente')v.modulos=v.modulos.filter(m=>MOD_CLI.includes(m));if(!v.obras.length)return toast('Elegí al menos una obra');if(!v.modulos.length)return toast(v.rol==='cliente'?'Elegí al menos una sección para el cliente (Personal y Tareas son solo para colaboradores)':'Elegí al menos una sección');
-    try{await window.USR.asignar(v);I.uedit=null;I.usr=null;render();toast(v.rol==='cliente'?'Acceso del cliente guardado':'Acceso del colaborador guardado')}catch(err){toast(err&&err.message?err.message:'No se pudo guardar el acceso')}return}
+    if(!/^\S+@\S+\.\S+$/.test(v.email))return toast('Escribí un correo válido');if(v.rol!=='equipo')v.modulos=v.modulos.filter(m=>MOD_CLI.includes(m));if(!v.obras.length)return toast('Elegí al menos una obra');if(!v.modulos.length)return toast(v.rol!=='equipo'?'Elegí al menos una sección para el cliente (Personal y Tareas son solo para colaboradores)':'Elegí al menos una sección');
+    try{await window.USR.asignar(v);I.uedit=null;I.usr=null;render();toast(v.rol==='equipo'?'Acceso del colaborador guardado':v.rol==='aprobador'?'Acceso de administración guardado':'Acceso del cliente guardado')}catch(err){toast(err&&err.message?err.message:'No se pudo guardar el acceso')}return}
   if(f.id!=='ini-f')return;
   const fd=Object.fromEntries(new FormData(f));
   const o={...I.edit,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),ubicacion:fd.ubicacion.trim(),tipo:fd.tipo,estado:fd.estado,inicio:fd.inicio||null,
@@ -3465,7 +3466,7 @@ const css=document.createElement('style');css.textContent=`
 #ini-root .btn.sm{padding:5px 10px;font-size:13px}
 .ini-cli{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .ini-pasos{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
-.ini-rol{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 8px;margin-left:4px;background:var(--chip)}.ini-rol.equipo{background:color-mix(in srgb,var(--accent) 30%,transparent)}.ini-rol.cliente{background:var(--ok-bg);color:var(--ok)}
+.ini-rol{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 8px;margin-left:4px;background:var(--chip)}.ini-rol.equipo{background:color-mix(in srgb,var(--accent) 30%,transparent)}.ini-rol.cliente{background:var(--ok-bg);color:var(--ok)}.ini-rol.aprobador{background:var(--warn-bg);color:var(--warn)}
 .ini-chip{display:inline-block;font-size:12px;background:var(--chip);border-radius:99px;padding:2px 8px;margin:1px 0}
 .ini-uf{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .ini-uf h4{margin:0;font-family:var(--f-display);font-size:18px}
@@ -4005,7 +4006,7 @@ const ICO={
  ot:'<path d="M9 4h6v3H9z"/><path d="M7 5H5v16h14V5h-2"/><path d="M8.5 13l2.5 2.5 4.5-5"/>'};
 const icono=k=>`<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]||''}</svg>`;
 function accesos(){const D=RS.D,A=D.A;const L=[];const ap=window.APROB?window.APROB.resumen(D.obra.id):null;
-  if(ap&&ap.total)L.push(['aprob',window.CLI?'Por aprobar':'Aprobaciones del cliente',window.CLI?'Certificados y pedidos que esperan tu verificación.':'Lo que el cliente aprobó, observó o tiene pendiente.',window.CLI?(ap.pend?`${ap.pend} pendiente${ap.pend>1?'s':''}`:'Todo al día'):`${ap.pend} esperando · ${ap.obs} observado${ap.obs===1?'':'s'}`,{apb:1},window.CLI?ap.pend:ap.obs]);const pe=D.ped.map(estPed);const enC=pe.filter(x=>x[0]!=='ok').length;const N=novedades();
+  if(ap&&ap.total&&(!window.CLI||window.CLI.aprobador))L.push(['aprob',window.CLI?'Por aprobar':'Aprobaciones del cliente',window.CLI?'Certificados y pedidos que esperan tu verificación.':'Lo que el cliente aprobó, observó o tiene pendiente.',window.CLI?(ap.pend?`${ap.pend} pendiente${ap.pend>1?'s':''}`:'Todo al día'):`${ap.pend} esperando · ${ap.obs} observado${ap.obs===1?'':'s'}`,{apb:1},window.CLI?ap.pend:ap.obs]);const pe=D.ped.map(estPed);const enC=pe.filter(x=>x[0]!=='ok').length;const N=novedades();
   if(A)L.push(['avance','Avance de obra','Etapas, rubros y estado general de la obra.',`${pct(A.tot?A.ej/A.tot:0)} hecho`,{ver:'rubros'}]);
   if(ve('presupuesto')&&A)L.push(['presupuesto','Presupuesto','Montos por rubro, materiales y mano de obra.',`${mil(A.tot)} Gs`,{tab:'presupuesto'}]);
   if(ve('presupuesto')&&A)L.push(['certificados','Certificados','Lo certificado, lo pagado y el saldo de la obra.',`${A.certs.length} emitido${A.certs.length===1?'':'s'} · ${pct(A.tot?A.ce/A.tot:0)}`,{ver:'pagos'}]);
@@ -4207,6 +4208,7 @@ const AP={cache:{},cargando:{},vistos:{},abierto:false,obs:null,ocupado:false,si
 const TIPOS={cert_contratista:['Certificados de contratistas','contratistas'],cert_cliente:['Avances al cliente','presupuesto'],pedido:['Pedidos de materiales','materiales']};
 const OBA=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
 const veA=t=>!window.CLI||window.CLI.mods.includes(TIPOS[t][1]);
+const APR=()=>!!(window.CLI&&window.CLI.aprobador);
 const fdA=s=>s?String(s).slice(8,10)+'/'+String(s).slice(5,7):'';
 const kk=(t,r)=>t+'|'+r;
 try{AP.vistos=JSON.parse(sessionStorage.getItem('apb_vistos')||'{}')}catch(e){}
@@ -4229,19 +4231,20 @@ async function resolver(id,estado,comentario){const oid=(OBA()||{}).id;const x=l
 /* ---------- textos ---------- */
 const nombreEst={pendiente:'Pendiente',aprobado:'Aprobado',observado:'Observado'};
 function chip(tipo,ref){const o=OBA();if(!o)return '';const x=get(o.id,tipo,ref);if(!x)return '';
-  return `<span class="apb-chip ${x.estado}">${x.estado==='pendiente'?(window.CLI?'Por aprobar':'Esperando al cliente'):nombreEst[x.estado]}</span>`}
+  return `<span class="apb-chip ${x.estado}">${x.estado==='pendiente'?(APR()?'Por aprobar':window.CLI?'En revisión':'Esperando al cliente'):nombreEst[x.estado]}</span>`}
 function banner(tipo,ref,info){const o=OBA();if(!o||!window.APB)return '';const x=get(o.id,tipo,ref);if(info)AP['i_'+kk(tipo,ref)]=info;
-  if(!x){if(window.CLI||!info||AP.sinTabla)return '';return `<div class="apb-ban gris"><div><b>Sin pedido de aprobación</b><span class="sub">El cliente todavía no tiene esto para verificar.</span></div><button class="btn sm" data-apb="pedir" data-t="${tipo}" data-r="${esc(String(ref))}">Pedir aprobación al cliente</button></div>`}
+  if(!x){if(window.CLI||!info||AP.sinTabla)return '';return `<div class="apb-ban gris"><div><b>Sin pedido de aprobación</b><span class="sub">La administración del cliente todavía no tiene esto para aprobar.</span></div><button class="btn sm" data-apb="pedir" data-t="${tipo}" data-r="${esc(String(ref))}">Pedir aprobación</button></div>`}
   if(x.estado==='aprobado')return `<div class="apb-ban ok"><span class="apb-ic">✓</span><div><b>Aprobado${x.resuelto_por?' por '+esc(x.resuelto_por):''}</b><span class="sub">${x.resuelto?'el '+fdA(x.resuelto):''}${x.comentario?' · “'+esc(x.comentario)+'”':''}</span></div>${window.CLI?'':`<button class="btn sm ghost" data-apb="pedir" data-t="${tipo}" data-r="${esc(x.ref)}">Volver a pedir</button>`}</div>`;
-  if(x.estado==='observado')return `<div class="apb-ban bad"><span class="apb-ic">!</span><div><b>Observado${x.resuelto_por?' por '+esc(x.resuelto_por):''}${x.resuelto?' el '+fdA(x.resuelto):''}</b><span>“${esc(x.comentario||'')}”</span></div>${window.CLI?`<button class="btn sm" data-apb="aprobar" data-id="${x.id}">Aprobar igual</button>`:`<button class="btn sm" data-apb="pedir" data-t="${tipo}" data-r="${esc(x.ref)}">Ya lo corregí · volver a enviar</button>`}</div>`;
+  if(x.estado==='observado')return `<div class="apb-ban bad"><span class="apb-ic">!</span><div><b>Observado${x.resuelto_por?' por '+esc(x.resuelto_por):''}${x.resuelto?' el '+fdA(x.resuelto):''}</b><span>“${esc(x.comentario||'')}”</span></div>${window.CLI?(APR()?`<button class="btn sm" data-apb="aprobar" data-id="${x.id}">Aprobar igual</button>`:''):`<button class="btn sm" data-apb="pedir" data-t="${tipo}" data-r="${esc(x.ref)}">Ya lo corregí · volver a enviar</button>`}</div>`;
+  if(window.CLI&&!APR())return `<div class="apb-ban warn"><span class="apb-ic">…</span><div><b>En revisión por la administración</b><span class="sub">Enviado el ${fdA(x.solicitado)}.</span></div></div>`;
   if(window.CLI)return `<div class="apb-ban warn"><span class="apb-ic">?</span><div><b>Pendiente de tu verificación</b><span class="sub">Revisalo y aprobalo, o dejá una observación para que lo corrijamos.</span>
     ${AP.obs===x.id?`<textarea class="apb-ta" id="apb-ta" rows="2" placeholder="¿Qué hay que revisar?"></textarea>`:''}</div>
     <div class="apb-bt">${AP.obs===x.id?`<button class="btn sm" data-apb="cancelobs">Cancelar</button><button class="btn sm primary" data-apb="enviarobs" data-id="${x.id}">Enviar observación</button>`:`<button class="btn sm" data-apb="observar" data-id="${x.id}">Observar</button><button class="btn sm primary" data-apb="aprobar" data-id="${x.id}">✓ Aprobar</button>`}</div></div>`;
-  return `<div class="apb-ban warn"><span class="apb-ic">…</span><div><b>Enviado al cliente para aprobar</b><span class="sub">Desde el ${fdA(x.solicitado)}. Cuando lo apruebe u observe lo vas a ver acá.</span></div></div>`}
+  return `<div class="apb-ban warn"><span class="apb-ic">…</span><div><b>Enviado a la administración del cliente</b><span class="sub">Desde el ${fdA(x.solicitado)}. Cuando lo apruebe u observe lo vas a ver acá.</span></div></div>`}
 function resumen(oid){const L=lista(oid);return{pend:L.filter(x=>x.estado==='pendiente').length,obs:L.filter(x=>x.estado==='observado').length,ok:L.filter(x=>x.estado==='aprobado').length,total:L.length}}
 
 /* ---------- ventana de pendientes ---------- */
-function item(x){const cli=!!window.CLI;
+function item(x){const cli=APR();
   return `<div class="apb-it ${x.estado}">
     <div class="apb-ih"><span class="apb-chip ${x.estado}">${x.estado==='pendiente'?(cli?'Por aprobar':'Esperando'):nombreEst[x.estado]}</span><b>${esc(x.titulo||'')}</b>${x.monto?`<span class="num apb-m">${gs(x.monto)} Gs</span>`:''}</div>
     <div class="sub">${esc(x.detalle||'')}${x.solicitado?' · enviado el '+fdA(x.solicitado):''}</div>
@@ -4252,20 +4255,20 @@ function item(x){const cli=!!window.CLI;
       ${!cli&&x.estado==='observado'?`<button class="btn sm" data-apb="pedir" data-t="${x.tipo}" data-r="${esc(x.ref)}">Volver a enviar</button>`:''}</div></div>`}
 function pintar(){let el=document.getElementById('apb-pop');if(!AP.abierto){if(el)el.remove();document.body.classList.remove('apb-modal');return}
   const o=OBA();if(!o){AP.abierto=false;return pintar()}
-  const L=lista(o.id);const cli=!!window.CLI;const mostrar=cli?L.filter(x=>x.estado!=='aprobado'):L.filter(x=>x.estado!=='aprobado');
+  const L=lista(o.id);const cli=APR();const mostrar=cli?L.filter(x=>x.estado!=='aprobado'):L.filter(x=>x.estado!=='aprobado');
   const grupos=Object.keys(TIPOS).map(t=>[t,mostrar.filter(x=>x.tipo===t).sort((a,b)=>(b.solicitado||'').localeCompare(a.solicitado||''))]).filter(g=>g[1].length);
   const pend=L.filter(x=>x.estado==='pendiente').length,obs=L.filter(x=>x.estado==='observado').length;
-  const tit=cli?(pend?`Tenés ${pend} pendiente${pend>1?'s':''} por revisar`:'No tenés pendientes'):`Aprobaciones del cliente`;
+  const tit=cli?(pend?`Tenés ${pend} pendiente${pend>1?'s':''} por revisar`:'No tenés pendientes'):window.CLI?'En revisión por la administración':`Aprobaciones del cliente`;
   if(!el){el=document.createElement('div');el.id='apb-pop';document.body.appendChild(el)}
   el.innerHTML=`<div class="rs-ov" data-apb="cerrar"></div><div class="rs-win ancho apb-win" role="dialog" aria-modal="true" aria-label="${esc(tit)}">
     <div class="rs-wh"><b>${esc(tit)}</b><button class="rs-x" data-apb="cerrar" aria-label="Cerrar">✕</button></div>
-    <div class="rs-wc">${cli?`<p class="sub" style="margin:0">${esc(o.nombre)} · Revisá cada uno: si está bien tocá <b>Aprobar</b>; si algo no coincide tocá <b>Observar</b> y contanos qué.</p>`:`<p class="sub" style="margin:0">${pend} esperando al cliente · ${obs} observado${obs===1?'':'s'}. Los aprobados se ven en cada certificado o pedido.</p>`}
+    <div class="rs-wc">${cli?`<p class="sub" style="margin:0">${esc(o.nombre)} · Revisá cada uno: si está bien tocá <b>Aprobar</b>; si algo no coincide tocá <b>Observar</b> y contanos qué.</p>`:`<p class="sub" style="margin:0">${pend} esperando a la administración del cliente · ${obs} observado${obs===1?'':'s'}. Los aprobados se ven en cada certificado o pedido.</p>`}
       ${grupos.map(([t,xs])=>`<div class="apb-g"><div class="rs-sec">${TIPOS[t][0]}</div>${xs.map(item).join('')}</div>`).join('')||'<p>Todo al día. 👍</p>'}</div>
     <div class="apb-pie"><button class="btn" data-apb="cerrar">${cli&&pend?'Ver más tarde':'Cerrar'}</button></div></div>`;
   document.body.classList.add('apb-modal');const ta=document.getElementById('apb-ta');if(ta)ta.focus()}
 async function check(){const o=OBA();if(!o||!window.APB||S.tab==='inicio')return;const antes=JSON.stringify(lista(o.id).map(x=>x.id+x.estado));await cargar(o.id);
   const L=lista(o.id);const r=resumen(o.id);const clave=o.id+(window.CLI?'c':'e');
-  if(!AP.abierto&&!AP.vistos[clave]&&((window.CLI&&r.pend)||(!window.CLI&&r.obs))){AP.vistos[clave]=1;try{sessionStorage.setItem('apb_vistos',JSON.stringify(AP.vistos))}catch(e){}AP.abierto=true;pintar()}
+  if(!AP.abierto&&!AP.vistos[clave]&&((APR()&&r.pend)||(!window.CLI&&r.obs))){AP.vistos[clave]=1;try{sessionStorage.setItem('apb_vistos',JSON.stringify(AP.vistos))}catch(e){}AP.abierto=true;pintar()}
   if(JSON.stringify(L.map(x=>x.id+x.estado))!==antes&&window.render&&!AP.abierto)window.render()}
 function ir(x){AP.abierto=false;pintar();
   if(x.tipo==='cert_contratista'){const[c,n]=x.ref.split(':');window.CERT_IR={cid:c,n:+n};S.tab='contratistas'}
@@ -4282,7 +4285,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-apb]
   if(a==='cancelobs'){AP.obs=null;pintar();if(window.render)window.render();return}
   if(a==='enviarobs'&&x){const t=document.getElementById('apb-ta');return resolver(x.id,'observado',t?t.value:'')}
   if(a==='pedir'&&o){const k=kk(b.dataset.t,b.dataset.r);const prev=get(o.id,b.dataset.t,b.dataset.r);const info=AP['i_'+k]||(prev?{titulo:prev.titulo,detalle:prev.detalle,monto:prev.monto}:null);if(!info)return;
-    await pedir(o.id,b.dataset.t,b.dataset.r,info.titulo,info.detalle,info.monto);toast('Enviado al cliente para aprobar');pintar();if(window.render)window.render();return}});
+    await pedir(o.id,b.dataset.t,b.dataset.r,info.titulo,info.detalle,info.monto);toast('Enviado a la administración del cliente');pintar();if(window.render)window.render();return}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&AP.abierto){AP.abierto=false;AP.obs=null;pintar()}});
 window.APROB={cargar,get:(t,r)=>{const o=OBA();return o?get(o.id,t,r):null},pedir,quitar,banner,chip,resumen:oid=>resumen(oid),check,abrir:()=>{AP.abierto=true;pintar()}};
 
@@ -4308,6 +4311,68 @@ body.apb-modal{overflow:hidden}
 .apb-ic{width:32px;height:32px;border-radius:99px;display:grid;place-items:center;font-weight:800;background:var(--panel)}
 .apb-ban.ok .apb-ic{color:var(--ok)}.apb-ban.bad .apb-ic{color:var(--bad)}.apb-ban.warn .apb-ic{color:var(--warn)}
 @media (max-width:760px){.apb-ban{grid-template-columns:auto 1fr}.apb-ban>.apb-bt,.apb-ban>button{grid-column:1/-1;justify-self:stretch}.apb-ban.gris{grid-template-columns:1fr}.apb-bt{justify-content:stretch}.apb-bt .btn{flex:1}}
+`;document.head.appendChild(css);
+})();
+
+(function(){
+/* ============ Menú lateral (pantallas anchas): navegación, sub-secciones y avisos a la izquierda ============ */
+const ICS={
+ inicio:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
+ obra:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+ personal:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 016 5"/>',
+ contratistas:'<path d="M4 15a8 8 0 0116 0v2H4z"/><path d="M9 10V7a3 3 0 016 0v3M2 17h20"/>',
+ presupuesto:'<circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.6-1-1.7-1.6-3-1.6-1.7 0-3 1-3 2.3s1.2 1.9 3 2.2 3 .9 3 2.3-1.3 2.3-3 2.3c-1.4 0-2.5-.6-3.1-1.7M12 6v1.6M12 16.7V18"/>',
+ planos:'<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
+ materiales:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+ tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>'};
+const svg=k=>`<svg class="side-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICS[k]||''}</svg>`;
+const SUBS='main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p';
+const ancho=()=>window.matchMedia('(min-width:900px)').matches;
+const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(['contratistas','presupuesto','planos','materiales','tareas'].includes(t))return t;return 'personal'};
+let pend=false;
+function armar(){pend=false;const nav=document.querySelector('header.top nav.tabs');if(!nav)return;
+  nav.querySelectorAll('button[data-tab]').forEach(b=>{if(!b.querySelector('.side-ic'))b.insertAdjacentHTML('afterbegin',svg(claveDe(b)))});
+  const ini=nav.querySelector('button[data-tab="inicio"] .nl');if(ini){if(!ini.dataset.orig)ini.dataset.orig=ini.textContent;ini.textContent=ancho()?'Todas las obras':ini.dataset.orig}
+  nav.querySelectorAll('.side-sub').forEach(x=>x.remove());
+  if(!ancho())return;
+  const act=nav.querySelector('button[aria-current="true"]');const orig=document.querySelector(SUBS);if(!act||!orig)return;
+  const bs=[...orig.querySelectorAll('button.chip-p')];if(!bs.length)return;
+  const box=document.createElement('div');box.className='side-sub';
+  box.innerHTML=bs.map((b,i)=>`<button type="button" data-side="${i}" aria-current="${b.getAttribute('aria-pressed')==='true'}">${b.textContent.trim()}</button>`).join('');
+  act.after(box)}
+function pedir(){if(pend)return;pend=true;requestAnimationFrame(armar)}
+window.LATERAL=pedir;
+document.addEventListener('click',e=>{const b=e.target.closest('.side-sub [data-side]');if(!b)return;e.preventDefault();const orig=document.querySelector(SUBS);if(!orig)return;
+  const t=[...orig.querySelectorAll('button.chip-p')][+b.dataset.side];if(t){t.click();window.scrollTo(0,0)}});
+const obs=new MutationObserver(m=>{if(m.some(r=>!(r.target.closest&&r.target.closest('header.top'))))pedir()});
+function vigilar(){const app=document.getElementById('app');if(app){obs.observe(app,{childList:true,subtree:true,attributes:true,attributeFilter:['aria-pressed']});pedir()}else setTimeout(vigilar,200)}
+vigilar();window.addEventListener('resize',pedir);
+
+const css=document.createElement('style');css.textContent=`
+.side-ic{flex:none;opacity:.9;display:none}
+@media screen and (min-width:900px){
+  .side-ic{display:block}
+  body{padding-left:236px}
+  header.top{position:fixed;top:0;left:0;bottom:0;width:236px;flex-direction:column;align-items:stretch;justify-content:flex-start;flex-wrap:nowrap;gap:18px;padding:20px 14px 130px;overflow-y:auto;z-index:40;border-right:1px solid rgb(255 255 255/.06)}
+  header.top .brand b{font-size:21px}
+  header.top .obra-sel{width:100%;margin-top:10px;padding:7px 8px}
+  header.top nav.tabs{position:static;flex-direction:column;gap:2px;background:none;padding:0}
+  header.top nav.tabs button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px!important;font-size:15px!important;border-radius:10px;letter-spacing:.03em;flex:none!important}
+  header.top nav.tabs button .ns{display:none!important}header.top nav.tabs button .nl{display:inline!important}
+  header.top nav.tabs button:hover{opacity:1;background:rgb(255 255 255/.07)}
+  header.top nav.tabs button[aria-current="true"]:hover{background:var(--accent)}
+  .side-sub{display:flex;flex-direction:column;gap:1px;margin:4px 0 8px 22px;padding-left:12px;border-left:2px solid rgb(255 255 255/.12)}
+  header.top nav.tabs .side-sub button{background:none;border:0;color:var(--bg);opacity:.65;text-align:left;padding:6px 10px!important;border-radius:8px;font-size:14px!important;cursor:pointer;font-family:var(--f-body);text-transform:none;letter-spacing:0;font-weight:500}
+  header.top nav.tabs .side-sub button:hover{opacity:1;background:rgb(255 255 255/.07)}
+  header.top nav.tabs .side-sub button[aria-current="true"]{opacity:1;color:var(--accent);font-weight:700;background:rgb(255 255 255/.07)}
+  header.top .sesion{margin-top:auto;flex-direction:column;align-items:stretch;gap:6px;margin-left:0}
+  header.top .sesion .sub{display:block!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body>#app>.demo,#app .demo,#app .cli-banner{position:fixed;left:0;bottom:0;width:236px;z-index:41;text-align:left;justify-content:flex-start;font-size:12px;padding:10px 14px;line-height:1.35;flex-wrap:wrap}
+  main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p{display:none!important}
+  #cert-root > .subnav{justify-content:flex-end}
+  main{padding-top:20px}
+}
+@media print{body{padding-left:0!important}}
 `;document.head.appendChild(css);
 })();
 
