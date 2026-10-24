@@ -2823,7 +2823,7 @@ function vVer(){
     ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
     <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
   </div>
-  ${window.CLI?'':vSugeridos(p)}
+  ${window.CLI?'':provResumen(p)}
   <div class="panel">
     <div class="bar between" style="padding:12px 14px;border-bottom:1px solid var(--line)"><div><h3>Control de llegada a obra</h3><span class="sub">Tildá cada material cuando llega. Si llegó una parte, cargá la cantidad en “Parcial / nota”.</span></div>
       ${e!=='ok'?`<button class="btn sm" data-mact="todo">Llegó todo</button>`:`<button class="btn sm ghost" data-mact="nada">Desmarcar todo</button>`}</div>
@@ -2894,6 +2894,11 @@ function vParaCliente(p){const L=p.sugeridos||[];
       <div class="pv-btns"><button class="btn sm ghost" data-mact="elegido" data-k="${k}">Eligió el cliente</button><button class="btn sm ghost" data-mact="sug-up" data-k="${k}" ${k?'':'disabled'} aria-label="Subir">↑</button><button class="btn sm ghost" data-mact="sug-quitar" data-k="${k}" aria-label="Quitar">×</button></div></li>`).join('')}</ol>`
       :'<p class="sub" style="margin:4px 0 0">Todavía no elegiste proveedores para sugerir. Tocá “Sugerir al cliente” en los de abajo o agregá otro.</p>'}
   </div>`}
+function provResumen(p){const L=p.sugeridos||[];const ab=M.provAbierto===p.id;
+  if(ab)document.body.classList.add('rs-modal');else document.body.classList.remove('rs-modal');
+  return `<div class="panel pv-res"><div><b>Proveedores</b><div class="sub">${L.length?`Sugeridos al cliente: ${L.map(x=>esc(x.nombre)).join(', ')}`:'Todavía no sugeriste proveedores para este pedido'}</div></div>
+    <button class="btn" data-mact="provver">${L.length?'Ver / cambiar proveedores':'Ver proveedores sugeridos'}</button></div>
+  ${ab?`<div class="rs-ov" data-mact="provcerrar"></div><div class="rs-win ancho pv-win" role="dialog" aria-modal="true" aria-label="Proveedores"><div class="rs-wh"><b>Proveedores · Pedido N° ${esc(p.numero)}</b><button class="rs-x" data-mact="provcerrar" aria-label="Cerrar">✕</button></div><div class="rs-wc">${vSugeridos(p)}</div></div>`:''}`}
 function vSugeridos(p){
   if(PV.lista===null){cargarPV();return '<div class="panel" style="padding:14px"><span class="sub">Buscando proveedores…</span></div>'}
   const{res,rub,sinProv,viejos}=sugerencias4(p);
@@ -3001,6 +3006,7 @@ function sugerencias(){const m=new Map();ordenados().forEach(p=>p.items.forEach(
 
 function render(){
   const root=document.getElementById('ped-root');if(!root)return;
+  if(M.vista!=='ver'){M.provAbierto=null;document.body.classList.remove('rs-modal')}
   const o=OB();const oid=o?o.id:null;
   if(!oid){root.innerHTML='<div class="panel" style="padding:16px">Creá una obra en Personal en obra → Ajustes para cargar sus pedidos.</div>';return}
   if(oid!==M.oid){root.innerHTML='<p class="sub">Cargando pedidos…</p>';cargar(oid);return}
@@ -3105,8 +3111,10 @@ document.addEventListener('click',async e=>{
   if(a==='asignar'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.proveedor=pv.nombre;render();await guardar(p);return toast('Proveedor asignado al pedido')}
   if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();window.scrollTo(0,0);return}
   if(a==='filtro'){M.filtro=t.dataset.f;return render()}
-  if(a==='ver'){M.sel=t.dataset.id;M.vista='ver';M.confirm=false;M.abierto={};render();window.scrollTo(0,0);return}
-  if(a==='volver'){M.vista='lista';M.tab='pedidos';M.confirm=false;return render()}
+  if(a==='provver'){M.provAbierto=M.sel;return render()}
+  if(a==='provcerrar'){M.provAbierto=null;document.body.classList.remove('rs-modal');return render()}
+  if(a==='ver'){M.provAbierto=null;M.sel=t.dataset.id;M.vista='ver';M.confirm=false;M.abierto={};render();window.scrollTo(0,0);return}
+  if(a==='volver'){M.provAbierto=null;M.vista='lista';M.tab='pedidos';M.confirm=false;return render()}
   if(a==='abrir'){M.abierto[t.dataset.iid]=!M.abierto[t.dataset.iid];return render()}
   if(a==='editar'&&p){M.form=JSON.parse(JSON.stringify(p));M.form.numero=String(p.numero);M.vista='editar';return render()}
   if(a==='duplicar'&&p){M.form=nuevoForm(p);M.vista='editar';render();window.scrollTo(0,0);return toast('Copia lista: revisá cantidades y guardá')}
@@ -3173,7 +3181,10 @@ document.addEventListener('submit',async e=>{
   if(quiere==='pdf')pdfPedido(F);else if(quiere==='xls')xlsPedido(F);
 },true);
 
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.provAbierto&&document.getElementById('ped-root')){M.provAbierto=null;document.body.classList.remove('rs-modal');render()}});
 const css=document.createElement('style');css.textContent=`
+.pv-res{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px;flex-wrap:wrap}
+.pv-win .rs-wc>.panel{border:0;box-shadow:none;background:transparent}
 #ped-root{display:flex;flex-direction:column;gap:14px}
 #ped-root .btn.sm{padding:5px 10px;font-size:13px}
 .m-lista{display:flex;flex-direction:column;gap:8px}
