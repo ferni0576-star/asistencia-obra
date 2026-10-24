@@ -230,7 +230,7 @@ button.cell{cursor:pointer}
 .modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
 .modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
 .modo-cliente [data-mact="nuevo"],.modo-cliente [data-mact="editar"],.modo-cliente [data-mact="duplicar"],.modo-cliente [data-mact="conf"],.modo-cliente [data-mact="borrar"],.modo-cliente [data-mact="todo"],.modo-cliente [data-mact="nada"],.modo-cliente [data-mact="abrir"],.modo-cliente [data-mtab="proveedores"],.modo-cliente [data-mact="pv-nuevo"],
-.modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"],.modo-cliente .ci-panel{display:none!important}
+.modo-cliente [data-iact="editar"],.modo-cliente [data-iact="respaldo"],.modo-cliente [data-iact="respaldo-todo"],.modo-cliente [data-iact="nueva"],.modo-cliente [data-iact="clientes"],.modo-cliente .ci-panel,.modo-col [data-iact="clientes"],.modo-col [data-iact="nueva"],.modo-col [data-iact="editar"],.modo-col .subnav-p [data-tab="ajustes"],.modo-col .rs-hb label.rs-help{display:none!important}
 .modo-cliente .m-box{pointer-events:none}
 @media (max-width:760px){nav.tabs{justify-content:space-around;gap:2px}header.top nav.tabs button:first-child{flex:0 0 30px;font-size:16px}header.top nav.tabs button{flex:1 1 0;font-size:11px;padding:8px 0;letter-spacing:-.03em;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.nl{display:none}.ns{display:inline}}
 .sesion{display:flex;align-items:center;gap:10px;margin-left:auto}.sesion .sub{color:var(--bg);opacity:.7;font-size:13px}.btn-salir{background:transparent;color:var(--bg);border:1px solid color-mix(in srgb,var(--bg) 40%,transparent);border-radius:8px;padding:6px 12px;font-size:14px;cursor:pointer}.btn-salir:hover{border-color:var(--accent);color:var(--accent)}@media (max-width:760px){.sesion .sub{display:none}}
@@ -1026,12 +1026,13 @@ const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal
 const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='obra';
 function render(){
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
+  if(window.COL&&!['inicio','obra'].includes(S.tab)&&(S.tab==='ajustes'||!window.COL.mods.includes(esP(S.tab)?'personal':S.tab)))S.tab='obra';
   const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
     ${S.tab==='inicio'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${S.tab==='inicio'&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>!window.CLI||k==='inicio'||window.CLI.mods.includes(k)).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
+    ${S.tab==='inicio'&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?'Vista previa: así ve la obra tu cliente (solo lectura) · <button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':'Acceso de cliente'+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+' · solo lectura'}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
@@ -1242,7 +1243,8 @@ async function iniciar(session){
   document.getElementById('app').innerHTML='<main><p class="sub">Cargando…</p></main>';
   if(NUBE&&session){let pr;try{const r=await SB.from('perfiles').select('*').eq('user_id',session.user.id).maybeSingle();pr=r.error?null:(r.data||'sin')}catch(e){pr=null}
     if(pr==='sin'){document.getElementById('app').innerHTML=`<main><div class="panel" style="padding:20px;max-width:520px;margin:40px auto"><h2>Sin acceso todavía</h2><p class="sub">Tu usuario (${esc(session.user.email)}) existe pero la dirección de obra todavía no te dio acceso a ninguna obra.</p><button class="btn" data-act="salir">Cerrar sesión</button></div></main>`;return}
-    if(pr&&pr.rol==='cliente'){window.CLI={mods:['obra',...(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m))],nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}}
+    if(pr&&pr.rol==='cliente'){window.CLI={mods:['obra',...(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m))],nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}
+    if(pr&&pr.rol==='equipo'){window.COL={mods:pr.modulos||[],obras:pr.obras||[],nombre:pr.nombre||''};document.body.classList.add('modo-col')}}
   S.aj={...AJ_DEF,...(await DB.ajustes()||{})};
   S.obras=await DB.obras();
   let guardada=null;try{guardada=localStorage.getItem('obra_sel')}catch(e){}
@@ -3252,35 +3254,37 @@ const css=document.createElement('style');css.textContent=`
 const TIPOS=['Residencial','Comercial','Interiorismo','Industrial','Institucional','Otro'];
 const ESTADOS=[['activo','Activo'],['planificacion','Planificación'],['pausada','Pausada'],['terminada','Terminada']];
 const I={q:'',edit:null,stats:{},cargando:false,filtro:'todas',ocupado:false,cli:false,usr:null,uedit:null};
-const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra']];
+const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra'],['personal','Personal en obra','asistencia, planilla, liquidación y OT · solo colaboradores'],['tareas','Tareas','pendientes de la obra · solo colaboradores']];
+const MOD_CLI=['contratistas','presupuesto','planos','materiales'];
+const ROLN={admin:'Administrador',equipo:'Colaborador',cliente:'Cliente'};
 async function cargarUsr(){try{I.usr=await window.USR.list()}catch(e){I.usr=[];toast('No se pudieron leer los accesos. ¿Ejecutaste el SQL 11?')}render()}
 function vClientes(){
   if(I.usr===null){cargarUsr();return '<div class="panel" style="padding:14px"><span class="sub">Cargando accesos…</span></div>'}
   const nube=window.USR.nube();const ob=id=>(S.obras.find(o=>o.id===id)||{}).nombre||'obra borrada';
-  const cl=I.usr.filter(u=>u.rol==='cliente'),eq=I.usr.filter(u=>u.rol==='equipo');const u=I.uedit;
+  const cl=I.usr.filter(u=>u.rol==='cliente'||u.rol==='equipo').sort((a,b)=>(a.rol>b.rol?1:-1)),adm=I.usr.filter(u=>u.rol==='admin');const u=I.uedit;
   return `<div class="panel ini-cli">
-    <div class="bar between"><div><h3>Accesos de clientes</h3><span class="sub">El cliente entra con su correo y contraseña y solo ve las obras y secciones que elijas, sin poder modificar nada. Nunca ve personal, asistencia ni sueldos.</span></div><button class="btn sm ghost" data-iact="clientes">Cerrar</button></div>
+    <div class="bar between"><div><h3>Accesos</h3><span class="sub"><b>Cliente:</b> solo ve las obras y secciones que elijas, sin modificar nada (puede aprobar u observar). <b>Colaborador:</b> carga y edita solo en sus obras y secciones; no ve las demás ni da accesos. <b>Administrador:</b> vos, con control total.</span></div><button class="btn sm ghost" data-iact="clientes">Cerrar</button></div>
     ${nube?`<ol class="sub ini-pasos"><li>Creá su usuario en <b>Supabase → Authentication → Users → Add user</b> (correo y contraseña; marcá "Auto Confirm User").</li><li>Acá abajo escribí ese correo, elegí sus obras y qué secciones ve, y guardá.</li><li>Pasale al cliente la dirección de tu página, su correo y su contraseña.</li></ol>`
       :`<p class="sub" style="margin:0">En el modo prueba no se crean usuarios reales: guardá un acceso y usá <b>Vista previa</b> para ver exactamente lo que vería el cliente.</p>`}
-    <div class="tw"><table><thead><tr><th>Cliente</th><th>Obras</th><th>Ve</th><th></th></tr></thead><tbody>
-      ${cl.map(x=>`<tr><td><b>${esc(x.nombre||'')}</b><div class="sub">${esc(x.email||'')}</div></td><td>${(x.obras||[]).map(id=>esc(ob(id))).join('<br>')||'<span class="sub">ninguna</span>'}</td>
+    <div class="tw"><table><thead><tr><th>Usuario</th><th>Obras</th><th>Secciones</th><th></th></tr></thead><tbody>
+      ${cl.map(x=>`<tr><td><b>${esc(x.nombre||'')}</b> <span class="ini-rol ${x.rol}">${ROLN[x.rol]||x.rol}</span><div class="sub">${esc(x.email||'')}</div></td><td>${(x.obras||[]).map(id=>esc(ob(id))).join('<br>')||'<span class="sub">ninguna</span>'}</td>
         <td>${(x.modulos||[]).map(m=>`<span class="ini-chip">${esc((MODC.find(c=>c[0]===m)||[0,m])[1])}</span>`).join(' ')}</td>
-        <td><div class="bar" style="justify-content:flex-end"><button class="btn sm" data-iact="prev" data-u="${x.user_id}">Vista previa</button><button class="btn sm ghost" data-iact="uedit" data-u="${x.user_id}">Editar</button>
+        <td><div class="bar" style="justify-content:flex-end">${x.rol==='cliente'?`<button class="btn sm" data-iact="prev" data-u="${x.user_id}">Vista previa</button>`:''}<button class="btn sm ghost" data-iact="uedit" data-u="${x.user_id}">Editar</button>
           ${I.uconf===x.user_id?`<button class="btn sm" style="color:var(--bad)" data-iact="uquitar" data-u="${x.user_id}">¿Quitar acceso?</button>`:`<button class="btn sm ghost" data-iact="uconf" data-u="${x.user_id}">Quitar</button>`}</div></td></tr>`).join('')
-        ||'<tr><td colspan="4" class="sub">Todavía no diste acceso a ningún cliente.</td></tr>'}
+        ||'<tr><td colspan="4" class="sub">Todavía no diste acceso a nadie.</td></tr>'}
     </tbody></table></div>
     <form class="ini-uf" id="ini-uf" autocomplete="off">
       <h4>${u&&u.user_id?'Editar acceso':'Dar acceso'}</h4>
       <div class="form" style="padding:0">
         <label>Correo del usuario<input type="text" inputmode="email" name="email" value="${esc(u&&u.email||'')}" required placeholder="cliente@correo.com"></label>
         <label>Nombre<input type="text" name="nombre" value="${esc(u&&u.nombre||'')}" placeholder="Ej.: Vanguard S.A"></label>
-        <label>Tipo de acceso<select name="rol"><option value="cliente" ${!u||u.rol!=='equipo'?'selected':''}>Cliente (solo lectura)</option><option value="equipo" ${u&&u.rol==='equipo'?'selected':''}>Equipo (ve y edita todo)</option></select></label>
+        <label>Tipo de acceso<select name="rol"><option value="cliente" ${!u||u.rol!=='equipo'?'selected':''}>Cliente (solo ve y aprueba)</option><option value="equipo" ${u&&u.rol==='equipo'?'selected':''}>Colaborador (carga y edita lo elegido)</option></select></label>
       </div>
       <fieldset><legend>Obras que ve</legend>${S.obras.map(o=>`<label><input type="checkbox" name="obras" value="${o.id}" ${u?((u.obras||[]).includes(o.id)?'checked':''):(o.id===S.obra?'checked':'')}> ${esc(o.nombre)}</label>`).join('')}</fieldset>
-      <fieldset><legend>Secciones que ve</legend>${MODC.map(([k,t,d])=>`<label><input type="checkbox" name="modulos" value="${k}" ${u?((u.modulos||[]).includes(k)?'checked':''):(['contratistas','presupuesto'].includes(k)?'checked':'')}> <span>${t}<small class="sub" style="display:block;font-size:12px">${d}</small></span></label>`).join('')}</fieldset>
+      <fieldset><legend>Secciones</legend>${MODC.map(([k,t,d])=>`<label><input type="checkbox" name="modulos" value="${k}" ${u?((u.modulos||[]).includes(k)?'checked':''):(['contratistas','presupuesto'].includes(k)?'checked':'')}> <span>${t}<small class="sub" style="display:block;font-size:12px">${d}</small></span></label>`).join('')}</fieldset>
       <div class="bar"><button class="btn primary">Guardar acceso</button><button type="button" class="btn" data-iact="prevform">Vista previa</button>${u?'<button type="button" class="btn ghost" data-iact="unuevo">Cancelar</button>':''}</div>
     </form>
-    ${eq.length?`<p class="sub" style="margin:0">Equipo con acceso total: ${eq.map(x=>esc(x.email||x.nombre||'')).join(', ')}.</p>`:''}
+    ${adm.length?`<p class="sub" style="margin:0">Administrador (control total, no se puede cambiar desde acá): ${adm.map(x=>esc(x.email||x.nombre||'')).join(', ')}.</p>`:''}
   </div>`}
 function entrarPreview(v){window.CLI={mods:['obra',...(v.modulos||[]).filter(m=>m!=='obra')],obras:v.obras||[],nombre:v.nombre||v.email||'',preview:true};document.body.classList.add('modo-cliente');
   if(v.obras&&v.obras.length&&!v.obras.includes(S.obra))elegirObra(v.obras[0]);S.tab='inicio';I.cli=false;window.render();window.scrollTo(0,0)}
@@ -3347,7 +3351,7 @@ function render(){
   root.innerHTML=`
   <div class="bar between"><div><h2>Obras</h2><div class="sub">Todas tus obras en una sola pantalla: estado, tipo y avance real de cada proyecto.</div></div>
     <div class="bar"><input type="text" id="ini-q" placeholder="Buscar obra…" value="${esc(I.q)}" style="width:180px">
-      <button class="btn" data-iact="clientes">Accesos de clientes</button>
+      <button class="btn" data-iact="clientes">Accesos</button>
       <button class="btn" data-iact="respaldo-todo" ${I.ocupado?'disabled':''}>${I.ocupado?'Preparando…':'Respaldo de todo'}</button>
       <button class="btn primary" data-iact="nueva">+ Nueva obra</button></div></div>
   ${I.cli&&!window.CLI?vClientes():''}
@@ -3443,8 +3447,8 @@ document.addEventListener('change',async e=>{
 document.addEventListener('submit',async e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;
   if(f.id==='ini-uf'){const fd=new FormData(f);const v={email:(fd.get('email')||'').trim(),nombre:(fd.get('nombre')||'').trim(),rol:fd.get('rol'),obras:fd.getAll('obras'),modulos:fd.getAll('modulos')};
-    if(!/^\S+@\S+\.\S+$/.test(v.email))return toast('Escribí un correo válido');if(v.rol==='cliente'&&!v.obras.length)return toast('Elegí al menos una obra');if(v.rol==='cliente'&&!v.modulos.length)return toast('Elegí al menos una sección');
-    try{await window.USR.asignar(v);I.uedit=null;I.usr=null;render();toast(v.rol==='cliente'?'Acceso del cliente guardado':'Acceso de equipo guardado')}catch(err){toast(err&&err.message?err.message:'No se pudo guardar el acceso')}return}
+    if(!/^\S+@\S+\.\S+$/.test(v.email))return toast('Escribí un correo válido');if(v.rol==='cliente')v.modulos=v.modulos.filter(m=>MOD_CLI.includes(m));if(!v.obras.length)return toast('Elegí al menos una obra');if(!v.modulos.length)return toast(v.rol==='cliente'?'Elegí al menos una sección para el cliente (Personal y Tareas son solo para colaboradores)':'Elegí al menos una sección');
+    try{await window.USR.asignar(v);I.uedit=null;I.usr=null;render();toast(v.rol==='cliente'?'Acceso del cliente guardado':'Acceso del colaborador guardado')}catch(err){toast(err&&err.message?err.message:'No se pudo guardar el acceso')}return}
   if(f.id!=='ini-f')return;
   const fd=Object.fromEntries(new FormData(f));
   const o={...I.edit,nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),ubicacion:fd.ubicacion.trim(),tipo:fd.tipo,estado:fd.estado,inicio:fd.inicio||null,
@@ -3461,6 +3465,7 @@ const css=document.createElement('style');css.textContent=`
 #ini-root .btn.sm{padding:5px 10px;font-size:13px}
 .ini-cli{padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .ini-pasos{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:2px}
+.ini-rol{display:inline-block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 8px;margin-left:4px;background:var(--chip)}.ini-rol.equipo{background:color-mix(in srgb,var(--accent) 30%,transparent)}.ini-rol.cliente{background:var(--ok-bg);color:var(--ok)}
 .ini-chip{display:inline-block;font-size:12px;background:var(--chip);border-radius:99px;padding:2px 8px;margin:1px 0}
 .ini-uf{display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:12px}
 .ini-uf h4{margin:0;font-family:var(--f-display);font-size:18px}
@@ -3900,7 +3905,7 @@ const DSR=['dom','lun','mar','mié','jue','vie','sáb'];const fdia=s=>s?`${DSR[n
 const MESR=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 const hoyR=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const dias=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
-const ve=m=>!window.CLI||window.CLI.mods.includes(m);
+const ve=m=>window.COL?window.COL.mods.includes(m):!window.CLI||window.CLI.mods.includes(m);
 const q2r=x=>String(Math.round((x||0)*100)/100).replace('.',',');
 const sinNum=r=>String(r||'').replace(/^\d+\.\s*/,'');
 const cap=s=>{s=sinNum(s).toLowerCase();return s.charAt(0).toUpperCase()+s.slice(1)};
@@ -4007,9 +4012,9 @@ function accesos(){const D=RS.D,A=D.A;const L=[];const ap=window.APROB?window.AP
   if(ve('planos'))L.push(['planos','Planos','Arquitectura, estructura e instalaciones para ver o descargar.',D.pla.length?`${D.pla.length} plano${D.pla.length===1?'':'s'}`:'Sin planos aún',{tab:'planos'}]);
   if(ve('materiales'))L.push(['materiales','Compras y materiales','Pedidos, lo que llegó y lo que falta en obra.',D.ped.length?`${D.ped.length} pedidos · ${enC?enC+' en camino':'todo recibido'}`:'Sin pedidos aún',{tab:'materiales'}]);
   if(ve('contratistas'))L.push(['contratistas','Contratistas','Quién trabaja en la obra y cuánto lleva cada uno.',D.con.length?`${D.con.length} contratista${D.con.length===1?'':'s'}`:'Sin contratistas',{tab:'contratistas'}]);
-  if(!window.CLI){L.push(['personal','Personal en obra','Asistencia diaria, planilla y liquidación semanal.','Cargar asistencia',{tab:S.lastP||'cargar'}]);
-    L.push(['tareas','Tareas','Pendientes de la obra en lista, tablero o calendario.','Ver pendientes',{tab:'tareas'}]);
-    L.push(['ot','Órdenes de trabajo','OT para el ingreso de personal al shopping.','Nueva OT',{tab:'ot'}])}
+  if(!window.CLI){if(ve('personal'))L.push(['personal','Personal en obra','Asistencia diaria, planilla y liquidación semanal.','Cargar asistencia',{tab:S.lastP||'cargar'}]);
+    if(ve('tareas'))L.push(['tareas','Tareas','Pendientes de la obra en lista, tablero o calendario.','Ver pendientes',{tab:'tareas'}]);
+    if(ve('personal'))L.push(['ot','Órdenes de trabajo','OT para el ingreso de personal al shopping.','Nueva OT',{tab:'ot'}])}
   L.push(['novedades','Novedades','Todo lo último que pasó en la obra, en orden.',N.length?`Última: ${fdia(N[0].f)}`:'Sin novedades',{ver:'novedades'}]);
   return `<div class="rs-acc">${L.map(([k,t,d,v,go,alerta])=>`<button class="rs-ac ${alerta?'alerta':''}" ${go.apb?'data-apbopen':go.tab?`data-rtab="${go.tab}"`:`data-rver="${go.ver}"`}>${alerta?`<span class="rs-badge">${alerta}</span>`:''}<span class="rs-ai">${icono(k)}</span><b class="rs-at">${t}</b><span class="rs-ad">${d}</span><span class="rs-av">${esc(v)}</span></button>`).join('')}</div>`}
 
