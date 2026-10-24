@@ -431,6 +431,7 @@ function backendLocal(){
     async saveTarea(t){d.tareas=d.tareas||[];const v=JSON.parse(JSON.stringify(t));const i=d.tareas.findIndex(x=>x.id===t.id);if(i>=0)d.tareas[i]=v;else d.tareas.push(v);save()},
     async delTarea(id){d.tareas=(d.tareas||[]).filter(x=>x.id!==id);save()},
     async aprob(oid){return JSON.parse(JSON.stringify((d.aprob||[]).filter(x=>x.obra_id===oid)))},
+    async aprobTodas(){return JSON.parse(JSON.stringify(d.aprob||[]))},
     async pedirAprob(r){d.aprob=d.aprob||[];const i=d.aprob.findIndex(x=>x.obra_id===r.obra_id&&x.tipo===r.tipo&&x.ref===r.ref);const v={...r,id:i>=0?d.aprob[i].id:uid()};if(i>=0)d.aprob[i]=v;else d.aprob.push(v);save();return JSON.parse(JSON.stringify(v))},
     async resolverAprob(id,estado,com){const x=(d.aprob||[]).find(a=>a.id===id);if(!x)throw new Error('No existe la solicitud');Object.assign(x,{estado,comentario:(com||'').trim()||null,resuelto:new Date().toISOString(),resuelto_por:(window.CLI&&window.CLI.nombre)||S.email||'Cliente'});save();return JSON.parse(JSON.stringify(x))},
     async quitarAprob(oid,t,r){d.aprob=(d.aprob||[]).filter(x=>!(x.obra_id===oid&&x.tipo===t&&x.ref===r));save()},
@@ -493,6 +494,7 @@ function backendNube(sb){
       ok(await sb.from('tareas').upsert(base));return{sinColumnas:true}},
     async delTarea(id){ok(await sb.from('tareas').delete().eq('id',id))},
     async aprob(oid){if(!oid)return[];const r=await sb.from('aprobaciones').select('*').eq('obra_id',oid);if(r.error)throw r.error;return r.data},
+    async aprobTodas(){const r=await sb.from('aprobaciones').select('*').order('solicitado',{ascending:false}).limit(300);if(r.error)throw r.error;return r.data},
     async pedirAprob(row){const r=await sb.from('aprobaciones').upsert(row,{onConflict:'obra_id,tipo,ref'}).select().single();if(r.error)throw r.error;return r.data},
     async resolverAprob(id,estado,com){const r=await sb.rpc('resolver_aprobacion',{p_id:id,p_estado:estado,p_comentario:com||''});if(r.error)throw r.error;return Array.isArray(r.data)?r.data[0]:r.data},
     async quitarAprob(oid,t,ref){const r=await sb.from('aprobaciones').delete().eq('obra_id',oid).eq('tipo',t).eq('ref',ref);if(r.error)throw r.error},
@@ -1192,7 +1194,7 @@ window.OTB={personas:oid=>DB.otPersonas(oid),savePersona:p=>DB.saveOtPersona(p),
 const SEMILLA_OTP=[];
 window.CMB={comps:oid=>DB.comps(oid),saveComp:c=>DB.saveComp(c),delComp:(oid,id)=>DB.delComp(oid,id),get:oid=>DB.computo(oid),save:(oid,v)=>DB.saveComputo(oid,v)};
 const SEMILLA_COMP=[];
-window.APB={list:oid=>DB.aprob(oid),pedir:r=>DB.pedirAprob(r),resolver:(id,e,c)=>DB.resolverAprob(id,e,c),quitar:(o,t,r)=>DB.quitarAprob(o,t,r)};
+window.APB={todas:()=>DB.aprobTodas(),list:oid=>DB.aprob(oid),pedir:r=>DB.pedirAprob(r),resolver:(id,e,c)=>DB.resolverAprob(id,e,c),quitar:(o,t,r)=>DB.quitarAprob(o,t,r)};
 window.TDB={list:oid=>DB.tareas(oid),save:t=>DB.saveTarea(t),del:id=>DB.delTarea(id)};
 window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
 const SEMILLA_PEDIDOS=[];
@@ -4221,10 +4223,10 @@ function poner(oid,row){const c=AP.cache[oid]=AP.cache[oid]||{t:Date.now(),l:[]}
 async function pedir(oid,tipo,ref,titulo,detalle,monto){if(!oid||!window.APB||window.CLI)return;const row={obra_id:oid,tipo,ref:String(ref),titulo,detalle:detalle||'',monto:monto||0,estado:'pendiente',comentario:null,solicitado:new Date().toISOString(),resuelto:null,resuelto_por:null};
   try{const g=await window.APB.pedir(row);poner(oid,g||row);if(window.render)window.render()}catch(e){if(!AP.avisado){AP.avisado=true;toast('Para pedir aprobaciones al cliente ejecutá el SQL 18 en Supabase')}}}
 async function quitar(oid,tipo,ref){if(!oid||!window.APB||window.CLI)return;try{await window.APB.quitar(oid,tipo,String(ref))}catch(e){}const c=AP.cache[oid];if(c)c.l=c.l.filter(x=>!(x.tipo===tipo&&x.ref===String(ref)))}
-async function resolver(id,estado,comentario){const oid=(OBA()||{}).id;const x=lista(oid).find(r=>r.id===id);if(!x)return;
+async function resolver(id,estado,comentario){const oid=(OBA()||{}).id;const x=lista(oid).find(r=>r.id===id)||AP.todas.find(r=>r.id===id);if(!x)return;
   if(estado==='observado'&&!(comentario||'').trim())return toast('Escribí qué hay que revisar');
   AP.ocupado=true;pintar();
-  try{const g=await window.APB.resolver(id,estado,comentario||'');Object.assign(x,g||{estado,comentario,resuelto:new Date().toISOString()});toast(estado==='aprobado'?'Aprobado ✓':'Observación enviada')}
+  try{const g=await window.APB.resolver(id,estado,comentario||'');const nv=g||{estado,comentario,resuelto:new Date().toISOString()};Object.assign(x,nv);[...Object.values(AP.cache).flatMap(c=>c.l),...AP.todas].forEach(r=>{if(r.id===id&&r!==x)Object.assign(r,nv)});AP.bx.obs=null;pintarBx();toast(estado==='aprobado'?'Aprobado ✓':'Observación enviada')}
   catch(e){toast('No se pudo guardar: '+(e&&e.message||'revisá la conexión'))}
   AP.ocupado=false;AP.obs=null;pintar();if(window.render)window.render()}
 
@@ -4266,11 +4268,11 @@ function pintar(){let el=document.getElementById('apb-pop');if(!AP.abierto){if(e
       ${grupos.map(([t,xs])=>`<div class="apb-g"><div class="rs-sec">${TIPOS[t][0]}</div>${xs.map(item).join('')}</div>`).join('')||'<p>Todo al día. 👍</p>'}</div>
     <div class="apb-pie"><button class="btn" data-apb="cerrar">${cli&&pend?'Ver más tarde':'Cerrar'}</button></div></div>`;
   document.body.classList.add('apb-modal');const ta=document.getElementById('apb-ta');if(ta)ta.focus()}
-async function check(){const o=OBA();if(!o||!window.APB||S.tab==='inicio')return;const antes=JSON.stringify(lista(o.id).map(x=>x.id+x.estado));await cargar(o.id);
+async function check(){campana();cargarTodas();const o=OBA();if(!o||!window.APB||S.tab==='inicio')return;const antes=JSON.stringify(lista(o.id).map(x=>x.id+x.estado));await cargar(o.id);
   const L=lista(o.id);const r=resumen(o.id);const clave=o.id+(window.CLI?'c':'e');
   if(!AP.abierto&&!AP.vistos[clave]&&((APR()&&r.pend)||(!window.CLI&&r.obs))){AP.vistos[clave]=1;try{sessionStorage.setItem('apb_vistos',JSON.stringify(AP.vistos))}catch(e){}AP.abierto=true;pintar()}
   if(JSON.stringify(L.map(x=>x.id+x.estado))!==antes&&window.render&&!AP.abierto)window.render()}
-function ir(x){AP.abierto=false;pintar();
+function ir(x){AP.abierto=false;pintar();AP.bx.abierto=false;pintarBx();const o=OBA();if(x.obra_id&&(!o||o.id!==x.obra_id)&&typeof elegirObra==='function'){elegirObra(x.obra_id);if(typeof refrescar==='function')setTimeout(refrescar,0)}
   if(x.tipo==='cert_contratista'){const[c,n]=x.ref.split(':');window.CERT_IR={cid:c,n:+n};S.tab='contratistas'}
   else if(x.tipo==='cert_cliente'){window.PRES_IR=+x.ref;S.tab='presupuesto'}
   else{window.PED_IR=x.ref;S.tab='materiales'}
@@ -4287,7 +4289,60 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-apb]
   if(a==='pedir'&&o){const k=kk(b.dataset.t,b.dataset.r);const prev=get(o.id,b.dataset.t,b.dataset.r);const info=AP['i_'+k]||(prev?{titulo:prev.titulo,detalle:prev.detalle,monto:prev.monto}:null);if(!info)return;
     await pedir(o.id,b.dataset.t,b.dataset.r,info.titulo,info.detalle,info.monto);toast('Enviado a la administración del cliente');pintar();if(window.render)window.render();return}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&AP.abierto){AP.abierto=false;AP.obs=null;pintar()}});
-window.APROB={cargar,get:(t,r)=>{const o=OBA();return o?get(o.id,t,r):null},pedir,quitar,banner,chip,resumen:oid=>resumen(oid),check,abrir:()=>{AP.abierto=true;pintar()}};
+/* ---------- bandeja de notificaciones: todas las obras, siempre a mano ---------- */
+AP.todas=[];AP.bx={abierto:false,filtro:null,obs:null,t:0};
+const yo=()=>APR()?'aprobador':window.CLI?'cliente':'equipo';
+const kVisto=()=>'apb_visto_'+(S.email||'');
+const visto=()=>{try{return localStorage.getItem(kVisto())||''}catch(e){return ''}};
+async function cargarTodas(forzar){if(!window.APB||!window.APB.todas||yo()==='cliente')return AP.todas;if(!forzar&&Date.now()-AP.bx.t<30000)return AP.todas;AP.bx.t=Date.now();
+  const antes=new Set(AP.todas.map(x=>x.id+x.estado));const primera=!AP.bx.cargada;
+  try{AP.todas=(await window.APB.todas())||[];AP.bx.cargada=true}catch(e){return AP.todas}
+  const nuevos=primera?[]:AP.todas.filter(x=>!antes.has(x.id+x.estado)&&(yo()==='aprobador'?x.estado==='pendiente':x.estado!=='pendiente'));
+  nuevos.forEach(x=>{const t=yo()==='aprobador'?`Nuevo para aprobar: ${x.titulo}`:`${x.estado==='aprobado'?'Aprobado':'Observado'}: ${x.titulo}`;toast(t);
+    try{if(window.Notification&&Notification.permission==='granted')new Notification('Control de Obras',{body:t+(nombreObra(x.obra_id)?' · '+nombreObra(x.obra_id):''),tag:x.id})}catch(e){}});
+  campana();if(AP.bx.abierto)pintarBx();return AP.todas}
+const nombreObra=id=>((S.obras||[]).find(o=>o.id===id)||{}).nombre||'';
+function contar(){const L=AP.todas;if(yo()==='aprobador')return L.filter(x=>x.estado==='pendiente').length;if(yo()==='cliente')return 0;const v=visto();return L.filter(x=>x.estado!=='pendiente'&&(x.resuelto||'')>v).length}
+function campana(){if(yo()==='cliente'||!window.APB)return;const h=document.querySelector('header.top');if(!h)return;let b=h.querySelector('.apb-bell');
+  if(!b){b=document.createElement('button');b.className='apb-bell';b.type='button';b.setAttribute('data-bx','abrir');const br=h.querySelector('.brand');(br||h.firstChild).after?br.after(b):h.prepend(b)}
+  const n=contar();b.innerHTML=`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg><span class="apb-bl">${yo()==='aprobador'?'Por aprobar':'Notificaciones'}</span>${n?`<b class="apb-bn">${n>99?'99+':n}</b>`:''}`;
+  b.setAttribute('aria-label',(yo()==='aprobador'?'Por aprobar':'Notificaciones')+(n?`: ${n} nuevas`:''));b.classList.toggle('hay',!!n)}
+function pintarBx(){let el=document.getElementById('apb-bx');if(!AP.bx.abierto){if(el)el.remove();document.body.classList.remove('apb-modal');return}
+  const ap=yo()==='aprobador';const F=ap?[['pend','Pendientes'],['hechos','Resueltos'],['todo','Todo']]:[['resp','Respuestas'],['pend','Esperando'],['todo','Todo']];
+  if(!AP.bx.filtro)AP.bx.filtro=F[0][0];const v=AP.bx.v0||'';
+  const L=AP.todas.filter(x=>AP.bx.filtro==='todo'||(AP.bx.filtro==='pend'?x.estado==='pendiente':x.estado!=='pendiente')).sort((a,b)=>((b.resuelto||b.solicitado||'')).localeCompare(a.resuelto||a.solicitado||''));
+  const cuenta=k=>AP.todas.filter(x=>k==='todo'||(k==='pend'?x.estado==='pendiente':x.estado!=='pendiente')).length;
+  const fila=x=>{const nuevo=!ap&&x.estado!=='pendiente'&&(x.resuelto||'')>v;const TP={cert_contratista:'Certificado de contratista',cert_cliente:'Avance al cliente',pedido:'Pedido de materiales'}[x.tipo];
+    return `<div class="bx-it ${x.estado} ${nuevo?'nuevo':''}">
+      <div class="bx-top"><span class="apb-chip ${x.estado}">${x.estado==='pendiente'?(ap?'Por aprobar':'Esperando'):nombreEst[x.estado]}</span><span class="sub">${esc(nombreObra(x.obra_id))} · ${TP}</span><span class="sub bx-f">${fdA(x.resuelto||x.solicitado)}</span></div>
+      <div><b>${esc(x.titulo||'')}</b>${x.monto?` <span class="num" style="white-space:nowrap">· ${gs(x.monto)} Gs</span>`:''}</div>
+      ${x.detalle?`<div class="sub">${esc(x.detalle)}</div>`:''}
+      ${x.estado==='observado'?`<div class="apb-com">“${esc(x.comentario||'')}”${x.resuelto_por?' — '+esc(x.resuelto_por):''}</div>`:x.estado==='aprobado'&&x.resuelto_por?`<div class="sub">Aprobado por ${esc(x.resuelto_por)}</div>`:''}
+      ${AP.bx.obs===x.id?`<textarea class="apb-ta" id="bx-ta" rows="2" placeholder="¿Qué hay que revisar?"></textarea>`:''}
+      <div class="apb-bt"><button class="btn sm ghost" data-bx="ver" data-id="${x.id}">Ver ›</button>
+        ${ap&&x.estado==='pendiente'?(AP.bx.obs===x.id?`<button class="btn sm" data-bx="cancelobs">Cancelar</button><button class="btn sm primary" data-bx="enviarobs" data-id="${x.id}">Enviar observación</button>`:`<button class="btn sm" data-bx="observar" data-id="${x.id}">Observar</button><button class="btn sm primary" data-bx="aprobar" data-id="${x.id}">✓ Aprobar</button>`):''}</div></div>`};
+  if(!el){el=document.createElement('div');el.id='apb-bx';document.body.appendChild(el)}
+  const notif=window.Notification&&Notification.permission==='default';
+  el.innerHTML=`<div class="rs-ov" data-bx="cerrar"></div><aside class="bx-dr" role="dialog" aria-modal="true" aria-label="Bandeja">
+    <div class="rs-wh"><b>${ap?'Bandeja de aprobación':'Notificaciones'}</b><button class="rs-x" data-bx="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="bx-f2">${F.map(([k,n])=>`<button class="chip-p" data-bx="filtro" data-f="${k}" aria-pressed="${AP.bx.filtro===k}">${n} <span class="sub">${cuenta(k)}</span></button>`).join('')}</div>
+    ${notif?`<button class="bx-act" data-bx="permiso">🔔 Avisarme en este dispositivo cuando llegue algo nuevo</button>`:''}
+    <div class="bx-l">${L.map(fila).join('')||`<p class="sub" style="text-align:center;padding:30px 0">${AP.bx.filtro==='pend'?(ap?'No tenés nada pendiente de aprobar. 👍':'Nada esperando respuesta.'):'Sin novedades.'}</p>`}</div>
+    <p class="sub bx-pie">${ap?'Acá llega todo lo que la oficina te envía para aprobar, de todas tus obras.':'Acá ves las respuestas de la administración del cliente: aprobados y observados.'} Se actualiza solo cada minuto.</p></aside>`;
+  document.body.classList.add('apb-modal');const ta=document.getElementById('bx-ta');if(ta)ta.focus()}
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-bx]');if(!b)return;const a=b.dataset.bx;const x=AP.todas.find(r=>r.id===b.dataset.id);
+  if(a==='abrir'){AP.bx.v0=visto();AP.bx.abierto=true;AP.bx.filtro=null;pintarBx();await cargarTodas(true);pintarBx();if(yo()!=='aprobador'){try{localStorage.setItem(kVisto(),new Date().toISOString())}catch(err){}campana()}return}
+  if(a==='cerrar'){AP.bx.abierto=false;AP.bx.obs=null;pintarBx();campana();return}
+  if(a==='filtro'){AP.bx.filtro=b.dataset.f;return pintarBx()}
+  if(a==='ver'&&x)return ir(x);
+  if(a==='aprobar'&&x){await resolver(x.id,'aprobado','');campana();return}
+  if(a==='observar'&&x){AP.bx.obs=x.id;return pintarBx()}
+  if(a==='cancelobs'){AP.bx.obs=null;return pintarBx()}
+  if(a==='enviarobs'&&x){const t=document.getElementById('bx-ta');if(!(t&&t.value.trim()))return toast('Escribí qué hay que revisar');await resolver(x.id,'observado',t.value);campana();return}
+  if(a==='permiso'){try{const r=await Notification.requestPermission();toast(r==='granted'?'Listo: te vamos a avisar mientras tengas la app abierta':'No se activaron los avisos')}catch(err){}pintarBx()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&AP.bx.abierto){AP.bx.abierto=false;pintarBx()}});
+setInterval(()=>{if(document.querySelector('header.top'))cargarTodas(true)},60000);
+window.APROB={todas:()=>cargarTodas(),campana,get:(t,r)=>{const o=OBA();return o?get(o.id,t,r):null},pedir,quitar,banner,chip,resumen:oid=>resumen(oid),check,abrir:()=>{AP.abierto=true;pintar()}};
 
 const css=document.createElement('style');css.textContent=`
 body.apb-modal{overflow:hidden}
@@ -4302,6 +4357,22 @@ body.apb-modal{overflow:hidden}
 .apb-ta{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;resize:vertical;background:var(--panel);color:var(--ink);margin-top:6px}
 .apb-chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:99px;padding:3px 9px;white-space:nowrap}
 .apb-chip.pendiente{background:var(--warn-bg);color:var(--warn)}.apb-chip.aprobado{background:var(--ok-bg);color:var(--ok)}.apb-chip.observado{background:var(--bad-bg);color:var(--bad)}
+.apb-bell{position:relative;display:flex;align-items:center;gap:8px;background:rgb(255 255 255/.08);color:var(--bg);border:1px solid rgb(255 255 255/.14);border-radius:10px;padding:7px 10px;cursor:pointer;font-family:var(--f-body);font-size:14px}
+.apb-bell:hover{background:rgb(255 255 255/.14)}.apb-bell.hay{border-color:var(--accent)}
+.apb-bn{background:var(--bad);color:#fff;border-radius:99px;min-width:20px;height:20px;padding:0 6px;font-size:12px;display:grid;place-items:center;margin-left:auto}
+#apb-bx .rs-ov{z-index:92}
+.bx-dr{position:fixed;top:0;right:0;bottom:0;width:min(480px,100%);background:var(--bg);z-index:93;display:flex;flex-direction:column;box-shadow:-8px 0 24px rgb(0 0 0/.2)}
+.bx-dr .rs-wh{background:var(--panel)}
+.bx-f2{display:flex;gap:6px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}.bx-f2 .chip-p{padding:4px 12px;font-size:13px}
+.bx-f2 .chip-p[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}.bx-f2 .chip-p[aria-pressed="true"] .sub{color:inherit;opacity:.7}
+.bx-act{margin:10px 14px 0;background:var(--warn-bg);color:var(--warn);border:0;border-radius:10px;padding:9px 12px;text-align:left;cursor:pointer;font-weight:600}
+.bx-l{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.bx-it{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:5px}
+.bx-it.pendiente{border-left:4px solid var(--warn)}.bx-it.observado{border-left:4px solid var(--bad)}.bx-it.aprobado{border-left:4px solid var(--ok)}
+.bx-it.nuevo{box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 60%,transparent)}
+.bx-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12px}.bx-f{margin-left:auto}
+.bx-pie{padding:8px 14px 14px;margin:0;font-size:12px}
+@media (max-width:899px){.apb-bell{position:absolute;top:10px;right:12px;padding:7px}.apb-bell .apb-bl{display:none}.apb-bn{position:absolute;top:-6px;right:-6px;margin:0}header.top{padding-right:64px}}
 .apb-ban{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;border-radius:12px;padding:12px 14px;border:1px solid var(--line)}
 .apb-ban>div:nth-child(2){display:flex;flex-direction:column;gap:2px;min-width:0}
 .apb-ban.gris{grid-template-columns:1fr auto;background:var(--panel)}.apb-ban.gris>div:first-child{display:flex;flex-direction:column}
