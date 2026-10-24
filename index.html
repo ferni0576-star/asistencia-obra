@@ -1602,7 +1602,7 @@ function ciCrear(){
   const certs=traer?R.certs.map(c=>({n:c.n,fecha:c.fecha||null,desde:null,hasta:null,pres:Object.fromEntries(Object.entries(c.pres).map(([k,q])=>[mapa[k],q]))})):[];
   const des=traer?R.des.map(d=>({...d})):[];
   ALL.contratistas.push({id:(crypto.randomUUID?crypto.randomUUID():'c'+Date.now()),obra_id:OBRA_CARGADA,nombre,tipo:(CI.tipo||'Mano de obra').trim(),cuadrilla:false,items,certs,des});
-  CI=null;usar(ALL.contratistas.length-1);S.tab='resumen';guardar();render();window.scrollTo(0,0);
+  CI=null;usar(ALL.contratistas.length-1);S.tab='contrato';guardar();render();window.scrollTo(0,0);
   toast(`${nombre} creado con ${items.length} ítems${certs.length?' y '+certs.length+' certificados':''}`)}
 document.addEventListener('change',async e=>{if(!document.getElementById('cert-root'))return;const t=e.target;
   if(t.id==='c-imp'&&t.files&&t.files[0]){if(window.CLI)return;await ciArchivo(t.files[0]);t.value='';return}
@@ -2091,7 +2091,9 @@ function render(){
   const V={contratistas:vTodos,resumen:vRes,certificado:vCertificado,desembolsos:vDesembolsos,contrato:vContrato,adicionales:vAdicionales}[S.tab];
   const foco=document.activeElement&&document.activeElement.id;
   ROOT.innerHTML=`<div class="subnav">
-    <div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ctab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>
+    <div class="subnav-p">${(()=>{const sub=TABS.filter(([k])=>k!=='contratistas'&&k!=='resumen');const enC=S.tab!=='contratistas'&&D;
+      return `<button class="chip-p" data-ctab="contratistas" aria-pressed="${S.tab==='contratistas'}">Todos</button>`+ALL.contratistas.map((c,i)=>{const sel=enC&&i===S.sel;
+        return `<button class="chip-p solo-lateral" data-lvl="1" data-cact="abrir" data-i="${i}" aria-pressed="${sel?'true':'false'}">${esc(c.nombre.split(' (')[0])}</button>`+(sel?sub.map(([k,t])=>`<button class="chip-p" data-lvl="2" data-ctab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join(''):'')}).join('')})()}</div>
     ${S.tab!=='contratistas'?`<select id="sel" aria-label="Contratista">${ALL.contratistas.map((c,i)=>`<option value="${i}" ${i===S.sel?'selected':''}>${esc(c.nombre)} · ${esc(c.tipo.replace('Mano de obra · ',''))}</option>`).join('')}</select>`:''}
   </div>${(()=>{const h=V();const ban=S.tab==='certificado'&&D&&window.APROB&&D.certs.some(x=>x.n===S.cert)?window.APROB.banner('cert_contratista',D.id+':'+S.cert,apbInfo(D,S.cert)):'';return ban+h})()}`;
   if(foco){const el=document.getElementById(foco);if(el&&ROOT.contains(el)){el.focus();if(el.type==='text'&&el.setSelectionRange){const n=el.value.length;el.setSelectionRange(n,n)}}}
@@ -2103,7 +2105,7 @@ document.addEventListener('click',e=>{
   if(!document.getElementById('cert-root'))return;const t=e.target.closest('[data-ctab],[data-cact]');if(!t)return;
   if(t.dataset.ctab){S.tab=t.dataset.ctab;render();return}
   const a=t.dataset.cact;
-  if(a==='abrir'){usar(+t.dataset.i);S.tab='resumen';render();window.scrollTo(0,0);return}
+  if(a==='abrir'){usar(+t.dataset.i);S.tab='certificado';S.cert=null;render();window.scrollTo(0,0);return}
   if(a==='pdfcert'){return pdfCertificado(+t.dataset.n,pdfModo())}
   if(a==='pdfdes'){return pdfDesembolsos()}
   if(a==='pdfres'){return pdfResumen()}
@@ -2127,7 +2129,7 @@ document.addEventListener('input',e=>{
   if(t.id==='buscar'){S.buscar=t.value;return render()}
   if(t.dataset.id){S.raw=S.raw||{};S.raw[t.dataset.id]=t.value;const v=window.numES(t.value);S.borrador[t.dataset.id]=v==null?0:v;clearTimeout(S.k);S.k=setTimeout(render,500)}
 });
-document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas')S.tab='resumen';render()}});
+document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas'||S.tab==='resumen')S.tab='certificado';render()}});
 document.addEventListener('submit',e=>{
   if(!document.getElementById('cert-root')||!document.getElementById('cert-root').contains(e.target))return;
   e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
@@ -4420,7 +4422,7 @@ function armar(){pend=false;const nav=document.querySelector('header.top nav.tab
   const act=nav.querySelector('button[aria-current="true"]');const orig=document.querySelector(SUBS);if(!act||!orig)return;
   const bs=[...orig.querySelectorAll('button.chip-p')];if(!bs.length)return;
   const box=document.createElement('div');box.className='side-sub';
-  box.innerHTML=bs.map((b,i)=>`<button type="button" data-side="${i}" aria-current="${b.getAttribute('aria-pressed')==='true'}">${b.textContent.trim()}</button>`).join('');
+  box.innerHTML=bs.map((b,i)=>`<button type="button" data-side="${i}" class="${b.dataset.lvl?'lvl'+b.dataset.lvl:''}" aria-current="${b.getAttribute('aria-pressed')==='true'}">${b.textContent.trim()}</button>`).join('');
   act.after(box)}
 function pedir(){if(pend)return;pend=true;requestAnimationFrame(armar)}
 window.LATERAL=pedir;
@@ -4432,6 +4434,7 @@ vigilar();window.addEventListener('resize',pedir);
 
 const css=document.createElement('style');css.textContent=`
 .side-ic{flex:none;opacity:.9;display:none}
+@media (max-width:899px){#cert-root .subnav-p .solo-lateral{display:none}}
 @media screen and (min-width:900px){
   .side-ic{display:block}
   body{padding-left:236px}
@@ -4450,8 +4453,12 @@ const css=document.createElement('style');css.textContent=`
   header.top .sesion{margin-top:auto;flex-direction:column;align-items:stretch;gap:6px;margin-left:0}
   header.top .sesion .sub{display:block!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   body>#app>.demo,#app .demo,#app .cli-banner{position:fixed;left:0;bottom:0;width:236px;z-index:41;text-align:left;justify-content:flex-start;font-size:12px;padding:10px 14px;line-height:1.35;flex-wrap:wrap}
+  header.top nav.tabs .side-sub button.lvl1{font-weight:600;opacity:.85;margin-top:2px}
+  header.top nav.tabs .side-sub button.lvl1[aria-current="true"]{color:var(--bg);background:rgb(255 255 255/.1)}
+  header.top nav.tabs .side-sub button.lvl2{margin-left:14px;font-size:13.5px!important;border-left:2px solid rgb(255 255 255/.12);border-radius:0 8px 8px 0}
+  header.top nav.tabs .side-sub button.lvl2[aria-current="true"]{border-left-color:var(--accent)}
   main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p{display:none!important}
-  #cert-root > .subnav{justify-content:flex-end}
+  #cert-root > .subnav{display:none!important}
   main{padding-top:20px}
 }
 @media print{body{padding-left:0!important}}
