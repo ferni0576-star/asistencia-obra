@@ -4831,16 +4831,22 @@ const corto=(n,m)=>{if(m==='USD')return 'US$ '+usd(n);const a=Math.abs(n);return
 const fch=s=>{if(!s)return '';const[a,b,c]=String(s).slice(0,10).split('-');return `${c}/${b}/${a}`};
 const dias=s=>s?Math.round((new Date(hoyP())-new Date(String(s).slice(0,10)))/864e5):null;
 const hace=s=>{const d=dias(s);return d==null?'':d<=0?'hoy':d===1?'ayer':d<31?`hace ${d} días`:d<365?`hace ${Math.round(d/30)} ${Math.round(d/30)===1?'mes':'meses'}`:`hace ${Math.round(d/365)} año${Math.round(d/365)>1?'s':''}`};
-function cuentas(p){const total=(p.items||[]).reduce((s,i)=>s+num(i.monto),0);const cobrado=(p.pagos||[]).reduce((s,x)=>s+num(x.monto),0);
-  const falta=Math.max(0,total-cobrado);const pct=total?Math.min(100,Math.round(cobrado/total*100)):0;const mio=p.colab&&p.colab.si?Math.max(0,Math.min(100,num(p.colab.mio))):100;
-  const miParte=total*mio/100,miCobrado=cobrado*mio/100;const col=!!(p.colab&&p.colab.si);
-  const colTotal=col?total-miParte:0,colCobrado=col?cobrado-miCobrado:0,transferido=col?(p.colab.transf||[]).reduce((s,x)=>s+num(x.monto),0):0;
-  return{total,cobrado,falta,pct,mio,miParte,miCobrado,miFalta:Math.max(0,miParte-miCobrado),col,colTotal,colCobrado,colFalta:Math.max(0,colTotal-colCobrado),transferido,debo:Math.max(0,colCobrado-transferido),demas:Math.max(0,transferido-colCobrado)}}
+/* colaboración: uno o más colegas, cada uno con su % y sus transferencias (convierte el formato viejo de un solo colega) */
+function normColab(p){const c=p.colab||{si:false};if(!Array.isArray(c.colegas)){const L=[];if(c.si||c.colega)L.push({id:nid(),nombre:c.colega||'',pct:Math.max(0,100-(c.mio==null?50:num(c.mio))),nota:c.nota||'',transf:c.transf||[]});p.colab={si:!!c.si,colegas:L}}return p}
+const nombres=p=>(normColab(p).colab.colegas||[]).map(g=>g.nombre||'colega').join(', ');
+function cuentas(p){normColab(p);const total=(p.items||[]).reduce((s,i)=>s+num(i.monto),0);const cobrado=(p.pagos||[]).reduce((s,x)=>s+num(x.monto),0);
+  const falta=Math.max(0,total-cobrado);const pct=total?Math.min(100,Math.round(cobrado/total*100)):0;
+  const col=!!(p.colab.si&&p.colab.colegas.length);
+  const cg=col?p.colab.colegas.map(g=>{const q=Math.max(0,num(g.pct));const parte=total*q/100,cob=cobrado*q/100,tr=(g.transf||[]).reduce((s,x)=>s+num(x.monto),0);
+    return{g,pct:q,parte,cobrado:cob,falta:Math.max(0,parte-cob),transferido:tr,debo:Math.max(0,cob-tr),demas:Math.max(0,tr-cob)}}):[];
+  const colPct=cg.reduce((s,x)=>s+x.pct,0);const mio=Math.max(0,100-colPct);const miParte=total*mio/100,miCobrado=cobrado*mio/100;const S=k=>cg.reduce((s,x)=>s+x[k],0);
+  return{total,cobrado,falta,pct,mio,miParte,miCobrado,miFalta:Math.max(0,miParte-miCobrado),col,cg,colPct,exceso:colPct>100,
+    colTotal:S('parte'),colCobrado:S('cobrado'),colFalta:S('falta'),transferido:S('transferido'),debo:S('debo'),demas:S('demas')}}
 const permitido=()=>!window.CLI&&!window.COL;
 
 /* ---------- datos ---------- */
 async function cargar(forzar){if(P.cargando||(!forzar&&P.lista))return;P.cargando=true;P.err=null;
-  try{P.lista=((await window.PRYB.list())||[]).map(p=>p.estado==='enviado'?{...p,estado:'presupuestar'}:p)}catch(e){P.lista=P.lista||[];P.err=e&&e.message||'error'}P.cargando=false;mount()}
+  try{P.lista=((await window.PRYB.list())||[]).map(p=>normColab(p.estado==='enviado'?{...p,estado:'presupuestar'}:p))}catch(e){P.lista=P.lista||[];P.err=e&&e.message||'error'}P.cargando=false;mount()}
 async function guardar(p,silencio){p.actualizado=new Date().toISOString();try{await window.PRYB.save(JSON.parse(JSON.stringify(p)));const i=P.lista.findIndex(x=>x.id===p.id);if(i>=0)P.lista[i]=JSON.parse(JSON.stringify(p));else P.lista.unshift(JSON.parse(JSON.stringify(p)));
     P.estadoG='Guardado';if(!silencio)toast('Proyecto guardado')}catch(e){P.estadoG='No se pudo guardar';toast(/proyectos/i.test(e&&e.message||'')?'Falta pegar el SQL 23 de Proyectos en Supabase':'No se pudo guardar el proyecto')}
   const g=document.getElementById('pry-g');if(g)g.textContent=P.estadoG}
@@ -4848,7 +4854,7 @@ function autoguardar(){P.estadoG='Guardando…';const g=document.getElementById(
 
 /* ---------- vista general ---------- */
 function filtrados(){const q=P.q.trim().toLowerCase();return(P.lista||[]).filter(p=>(P.filtro==='todos'||p.estado===P.filtro)&&(!P.colab||(p.colab&&p.colab.si))&&
-  (!q||[p.nombre,p.cliente,p.tipo,p.pedido,p.colab&&p.colab.colega].join(' ').toLowerCase().includes(q)))}
+  (!q||[p.nombre,p.cliente,p.tipo,p.pedido,nombres(p)].join(' ').toLowerCase().includes(q)))}
 function kpis(){const L=P.lista||[];const n=e=>L.filter(p=>p.estado===e);const sum=(A,f)=>A.reduce((s,p)=>s+(p.moneda==='USD'?0:f(cuentas(p))),0);
   const pre=n('presupuestar'),apr=n('aprobado'),pau=n('pausa');const env=pre.filter(p=>p.envio).length;
   const K=[['presupuestar','Por presupuestar',pre.length,pre.length?(env?`${env} con presupuesto ya enviado`:'pedidos esperando tu presupuesto'):'nada pendiente'],
@@ -4862,7 +4868,7 @@ function tarjeta(p){const c=cuentas(p);let pie='';
   else if(['aprobado','terminado'].includes(p.estado)&&c.total)pie=barra(c,p.moneda);
   else if(c.total)pie=`<span class="sub">${corto(c.total,p.moneda)}</span>`;
   return `<button class="pry-card" data-pa="abrir" data-id="${esc(p.id)}"><b>${esc(p.nombre||'Sin nombre')}</b><span class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</span>
-    ${p.colab&&p.colab.si?`<span class="pry-col">Con ${esc(p.colab.colega||'colega')}</span>`:''}${pie}</button>`}
+    ${cuentas(p).col?`<span class="pry-col">Con ${esc(nombres(p))}</span>`:''}${pie}</button>`}
 function tablero(L){const cols=ESTADOS.filter(([k])=>k!=='rechazado'||L.some(p=>p.estado==='rechazado'));
   return `<div class="pry-tab">${cols.map(([k,t,d])=>{const C=L.filter(p=>(p.estado||'presupuestar')===k);return `<section class="pry-colm e-${k}"><header><b>${t}</b><span>${C.length}</span></header><p class="sub">${d}</p>
     <div class="pry-cards">${C.map(tarjeta).join('')||'<div class="pry-vacio">—</div>'}</div></section>`}).join('')}</div>`}
@@ -4870,14 +4876,14 @@ function lista(L){if(!L.length)return `<div class="panel pry-vacio2">No hay proy
   return `<div class="panel tw"><table class="pry-tl"><thead><tr><th>Proyecto</th><th>Estado</th><th class="num">Presupuesto</th><th>Cobros</th><th>Colega</th><th>Movimiento</th></tr></thead><tbody>
   ${L.map(p=>{const c=cuentas(p);return `<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre||'Sin nombre')}</b><div class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</div></td><td>${chipEstado(p.estado)}</td>
     <td class="num">${c.total?plata(c.total,p.moneda):'—'}</td><td style="min-width:170px">${c.total&&['aprobado','terminado','pausa'].includes(p.estado)?barra(c,p.moneda):'<span class="sub">—</span>'}</td>
-    <td>${p.colab&&p.colab.si?esc(p.colab.colega||'Sí')+(c.mio<100?` <span class="sub">(${100-c.mio}%)</span>`:''):'<span class="sub">No</span>'}</td><td class="sub">${hace(p.actualizado||p.fecha)}</td></tr>`}).join('')}</tbody></table></div>`}
+    <td>${c.col?c.cg.map(x=>`${esc(x.g.nombre||'colega')} <span class="sub">(${x.pct}%)</span>`).join('<br>'):'<span class="sub">No</span>'}</td><td class="sub">${hace(p.actualizado||p.fecha)}</td></tr>`}).join('')}</tbody></table></div>`}
 /* ---------- Cobros: suma de todos los trabajos, mi parte y la de cada colega ---------- */
 function cobros(T){const V=T.filter(p=>{const c=cuentas(p);return c.total>0&&(['aprobado','terminado','pausa'].includes(p.estado)||c.cobrado>0)});
   if(!V.length)return `<div class="panel pry-vacio2"><b>Todavía no hay trabajos aprobados.</b><p class="sub">Cuando un proyecto pasa a “Aprobado”, aparece acá con lo cobrado y lo que falta.</p></div>`;
   const mons=[...new Set(V.map(p=>p.moneda==='USD'?'USD':'Gs'))].sort((a,b)=>a==='Gs'?-1:1);
   return mons.map(m=>{const L=V.filter(p=>(p.moneda==='USD'?'USD':'Gs')===m).map(p=>({p,c:cuentas(p)}));const S=k=>L.reduce((s,x)=>s+x.c[k],0);
-    const cols=new Map();L.filter(x=>x.c.col).forEach(x=>{const k=(x.p.colab.colega||'Colega sin nombre').trim();const g=cols.get(k)||{n:0,colTotal:0,colCobrado:0,transferido:0,debo:0,colFalta:0,demas:0};
-      g.n++;['colTotal','colCobrado','transferido','debo','colFalta','demas'].forEach(f=>g[f]+=x.c[f]);cols.set(k,g)});
+    const cols=new Map();L.forEach(x=>x.c.cg.forEach(y=>{const k=(y.g.nombre||'Colega sin nombre').trim();const g=cols.get(k)||{n:0,colTotal:0,colCobrado:0,transferido:0,debo:0,colFalta:0,demas:0};
+      g.n++;g.colTotal+=y.parte;g.colCobrado+=y.cobrado;g.transferido+=y.transferido;g.debo+=y.debo;g.colFalta+=y.falta;g.demas+=y.demas;cols.set(k,g)}));
     const pct=S('total')?Math.round(S('cobrado')/S('total')*100):0;
     return `<section class="pry-cob">${mons.length>1?`<h3 class="pry-cm">${m==='USD'?'Trabajos en dólares':'Trabajos en guaraníes'}</h3>`:''}
     <div class="pry-ct"><div class="pry-ctt"><span class="sub">Total de los trabajos (${L.length})</span><b>${plata(S('total'),m)}</b></div><div class="pry-ctt"><span class="sub">Cobrado a clientes</span><b class="ok">${plata(S('cobrado'),m)}</b></div><div class="pry-ctt"><span class="sub">Falta cobrar a clientes</span><b class="warn">${plata(S('falta'),m)}</b></div></div>
@@ -4887,7 +4893,7 @@ function cobros(T){const V=T.filter(p=>{const c=cuentas(p);return c.total>0&&(['
     ${cols.size?`<div class="panel tw"><table class="pry-tl"><thead><tr><th>Colega</th><th class="num">Su parte</th><th class="num">Cobrado de su parte</th><th class="num">Le transferí</th><th class="num">Le debo transferir</th><th class="num">Falta cobrar al cliente</th></tr></thead><tbody>
       ${[...cols].map(([k,g])=>`<tr class="sin"><td><b>${esc(k)}</b><div class="sub">${g.n} trabajo${g.n===1?'':'s'}</div></td><td class="num">${plata(g.colTotal,m)}</td><td class="num">${plata(g.colCobrado,m)}</td><td class="num">${plata(g.transferido,m)}</td><td class="num"><b class="${g.debo?'warn':''}">${plata(g.debo,m)}</b>${g.demas?`<div class="sub">adelantado ${plata(g.demas,m)}</div>`:''}</td><td class="num">${plata(g.colFalta,m)}</td></tr>`).join('')}</tbody></table></div>`:''}
     <div class="panel tw"><table class="pry-tl"><thead><tr><th>Trabajo</th><th class="num">Total</th><th class="num">Cobrado</th><th class="num">Falta cobrar</th><th class="num">Mi parte por cobrar</th><th class="num">Colega por cobrar</th><th class="num">A transferir</th></tr></thead><tbody>
-      ${L.sort((a,b)=>b.c.falta-a.c.falta).map(({p,c})=>`<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre)}</b><div class="sub">${esc(p.cliente||'')} · ${ES(p.estado)[1]}${c.col?' · con '+esc(p.colab.colega||'colega'):''}</div></td><td class="num">${plata(c.total,m)}</td><td class="num">${plata(c.cobrado,m)}</td><td class="num">${c.falta?`<b class="warn">${plata(c.falta,m)}</b>`:'<span class="ok">✓</span>'}</td><td class="num">${plata(c.miFalta,m)}</td><td class="num">${c.col?plata(c.colFalta,m):'<span class="sub">—</span>'}</td><td class="num">${c.col?(c.debo?`<b class="warn">${plata(c.debo,m)}</b>`:'<span class="ok">✓</span>'):'<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div></section>`}).join('')}
+      ${L.sort((a,b)=>b.c.falta-a.c.falta).map(({p,c})=>`<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre)}</b><div class="sub">${esc(p.cliente||'')} · ${ES(p.estado)[1]}${c.col?' · con '+esc(nombres(p)):''}</div></td><td class="num">${plata(c.total,m)}</td><td class="num">${plata(c.cobrado,m)}</td><td class="num">${c.falta?`<b class="warn">${plata(c.falta,m)}</b>`:'<span class="ok">✓</span>'}</td><td class="num">${plata(c.miFalta,m)}</td><td class="num">${c.col?plata(c.colFalta,m):'<span class="sub">—</span>'}</td><td class="num">${c.col?(c.debo?`<b class="warn">${plata(c.debo,m)}</b>`:'<span class="ok">✓</span>'):'<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div></section>`}).join('')}
 function html(){
   if(!permitido())return `<div class="panel" style="padding:20px">Esta sección es solo para la dirección.</div>`;
   if(!P.lista){cargar();return `<p class="sub">Cargando proyectos…</p>`}
@@ -4914,7 +4920,7 @@ function vNuevo(){const n=P.nuevo;return `<div class="rs-ov" data-pa="cerrar"></
     <label>Tipo<select name="tipo">${TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></label>
     <label>Fecha del pedido<input type="date" name="fecha" value="${hoyP()}"></label>
     <label class="wide">¿Qué te pidió?<textarea name="pedido" rows="3" placeholder="Ej.: casa de 2 dormitorios en terreno de 12x30, quiere quincho y piscina"></textarea></label>
-    <label class="wide pry-chk"><input type="checkbox" name="colab"> Es colaborativo con otro colega</label>
+    <label class="wide pry-chk"><input type="checkbox" name="colab"> Es colaborativo con uno o más colegas</label>
   </div><div class="bar"><button class="btn primary">Crear proyecto</button><button type="button" class="btn ghost" data-pa="cerrar">Cancelar</button></div></form></div>`}
 
 /* ---------- ficha del proyecto ---------- */
@@ -4955,17 +4961,9 @@ function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';con
        ${(()=>{let s=c.total;return (p.pagos||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(x=>{s-=num(x.monto);return `<tr><td>${fch(x.fecha)}</td><td>${esc(x.concepto||'')}</td><td class="sub">${esc(x.medio||'')}</td><td class="num">${plata(num(x.monto),m)}</td><td class="num sub">${plata(Math.max(0,s),m)}</td><td><button type="button" class="pry-q" data-pa="quitarpago" data-id="${esc(x.id)}" aria-label="Quitar pago">✕</button></td></tr>`}).join('')})()}</tbody></table></div>`:'<p class="sub" style="margin:0">Todavía no registraste cobros.</p>'}
      <div class="pry-np"><input type="date" id="pry-pf" value="${hoyP()}" aria-label="Fecha del cobro"><input type="text" id="pry-pc" placeholder="Concepto (ej.: Anticipo 40%)" aria-label="Concepto"><select id="pry-pm" aria-label="Medio"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select><input type="text" id="pry-pv" inputmode="decimal" class="num" placeholder="Monto" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="pago">Registrar cobro</button></div></section>
 
-   <section class="pry-sec"><h3>Colaboración</h3>
-     <label class="pry-chk"><input type="checkbox" data-pa="colabsi" ${p.colab&&p.colab.si?'checked':''}> Este proyecto es colaborativo con otro colega</label>
-     ${p.colab&&p.colab.si?`<div class="form" style="padding:0;margin-top:8px"><label>Colega<input type="text" data-pc="colega" value="${esc(p.colab.colega||'')}" placeholder="Ej.: Arq. María López"></label>
-       <label>Mi participación %<input data-pc="mio" type="number" min="0" max="100" value="${esc(p.colab.mio??50)}" data-re="1"></label>
-       <label class="wide">Quién hace qué<input type="text" data-pc="nota" value="${esc(p.colab.nota||'')}" placeholder="Ej.: yo hago el proyecto, ella la dirección de obra"></label></div>
-       <div class="pry-rep"><div><span class="sub">Mi parte (${c.mio}%)</span><b>${plata(c.miParte,m)}</b><small>cobrado ${plata(c.miCobrado,m)}</small></div><div><span class="sub">${esc(p.colab.colega||'Colega')} (${100-c.mio}%)</span><b>${plata(c.total-c.miParte,m)}</b><small>cobrado ${plata(c.cobrado-c.miCobrado,m)}</small></div></div>
-       <div class="pry-trh"><h4>Lo que le transferiste a ${esc(p.colab.colega||'tu colega')}</h4><span class="sub">De lo que el cliente te pagó, le corresponde su ${100-c.mio}%</span></div>
-       <div class="pry-res pry-res4"><div><span class="sub">Le corresponde de lo cobrado</span><b>${plata(c.colCobrado,m)}</b></div><div><span class="sub">Ya le transferiste</span><b class="ok">${plata(c.transferido,m)}</b></div>
-         <div><span class="sub">${c.demas?'Le adelantaste de más':'Pendiente de transferir'}</span><b class="${c.debo?'warn':''}">${plata(c.demas||c.debo,m)}</b></div><div><span class="sub">Falta que el cliente pague de su parte</span><b>${plata(c.colFalta,m)}</b></div></div>
-       ${(p.colab.transf||[]).length?`<div class="tw"><table class="pry-pg"><thead><tr><th>Fecha</th><th>Detalle</th><th class="num">Monto</th><th></th></tr></thead><tbody>${(p.colab.transf||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(x=>`<tr><td>${fch(x.fecha)}</td><td>${esc(x.nota||'')}</td><td class="num">${plata(num(x.monto),m)}</td><td><button type="button" class="pry-q" data-pa="quitartr" data-id="${esc(x.id)}" aria-label="Quitar transferencia">✕</button></td></tr>`).join('')}</tbody></table></div>`:''}
-       <div class="pry-np pry-nt3"><input type="date" id="pry-tf" value="${hoyP()}" aria-label="Fecha de la transferencia"><input type="text" id="pry-tn" placeholder="Detalle (ej.: su parte del anticipo)" aria-label="Detalle"><input type="text" id="pry-tv" inputmode="decimal" class="num" placeholder="Monto" value="${c.debo?(m==='USD'?usd(c.debo):gs(c.debo)):''}" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="transf">Registrar transferencia</button></div>`:''}</section>
+   <section class="pry-sec"><div class="pry-sh"><h3>Colaboración</h3>${c.col?`<button type="button" class="btn sm" data-pa="colagregar">+ Agregar colaborador</button>`:''}</div>
+     <label class="pry-chk"><input type="checkbox" data-pa="colabsi" ${p.colab.si?'checked':''}> Este proyecto es colaborativo con uno o más colegas</label>
+     ${p.colab.si?vColab(p,c,m):''}</section>
 
    <section class="pry-sec"><h3>Notas e historial</h3>
      <div class="pry-nn"><input type="text" id="pry-nt" placeholder="Agregar una nota (ej.: pidió cambiar la fachada, reunión el jueves)"><button type="button" class="btn sm" data-pa="nota">Agregar</button></div>
@@ -5010,6 +5008,25 @@ function aplicarImp(p,modo){const I=P.imp;const L=listaImp().filter((x,i)=>I.sel
   nota(p,`Presupuesto cargado desde “${I.nombre}”: ${nuevos.length} ítem${nuevos.length===1?'':'s'} · ${plata(nuevos.reduce((s,x)=>s+x.monto,0),p.moneda)}`);P.imp=null;P.verItems=false}
 function dataAFile(a,data){const [h,b]=data.split(',');const bin=atob(b);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new File([u],a.nombre,{type:(h.match(/data:([^;]+)/)||[])[1]||a.tipo||''})}
 
+/* ---------- colaboradores del proyecto ---------- */
+const COLS=['#1f7a5a','#2f6fbf','#b87800','#8a4fbf','#c0504d','#3c8d93'];
+function vColab(p,c,m){const G=p.colab.colegas;
+  const rep=`<div class="pry-repb" aria-label="Reparto">${c.mio>0?`<i style="flex:${c.mio};background:var(--ink)" title="Yo ${c.mio}%"></i>`:''}${c.cg.map((x,k)=>x.pct>0?`<i style="flex:${x.pct};background:${COLS[k%COLS.length]}" title="${esc(x.g.nombre)} ${x.pct}%"></i>`:'').join('')}</div>
+    <div class="pry-repl"><span><i style="background:var(--ink)"></i>Yo ${c.mio}% · ${plata(c.miParte,m)} <span class="sub">(cobrado ${plata(c.miCobrado,m)})</span></span>${c.cg.map((x,k)=>`<span><i style="background:${COLS[k%COLS.length]}"></i>${esc(x.g.nombre||'Colaborador '+(k+1))} ${x.pct}% · ${plata(x.parte,m)}</span>`).join('')}</div>
+    ${c.exceso?`<p class="pry-warn">Los porcentajes de los colaboradores suman ${c.colPct}%: más del 100%. Revisalos.</p>`:''}`;
+  return rep+G.map((g,k)=>{const x=c.cg[k];const nm=g.nombre||'Colaborador '+(k+1);
+    return `<div class="pry-cg" style="--cg:${COLS[k%COLS.length]}"><div class="pry-cgh"><span class="pry-cgn">${k+1}</span>
+      <div class="form" style="padding:0;flex:1"><label>Nombre<input type="text" data-pg="${k}" data-f="nombre" value="${esc(g.nombre||'')}" placeholder="Ej.: Arq. María López"></label>
+        <label>Su participación %<input type="number" min="0" max="100" data-pg="${k}" data-f="pct" data-re="1" value="${esc(g.pct??'')}"></label>
+        <label class="wide">Qué hace<input type="text" data-pg="${k}" data-f="nota" value="${esc(g.nota||'')}" placeholder="Ej.: cálculo estructural, dirección de obra"></label></div></div>
+      <div class="pry-res pry-res4"><div><span class="sub">Su parte (${x.pct}%)</span><b>${plata(x.parte,m)}</b></div><div><span class="sub">Le corresponde de lo cobrado</span><b>${plata(x.cobrado,m)}</b></div>
+        <div><span class="sub">Ya le transferiste</span><b class="ok">${plata(x.transferido,m)}</b></div><div><span class="sub">${x.demas?'Le adelantaste de más':'Pendiente de transferir'}</span><b class="${x.debo?'warn':''}">${plata(x.demas||x.debo,m)}</b></div></div>
+      <p class="sub" style="margin:0">Falta que el cliente pague de su parte: <b>${plata(x.falta,m)}</b></p>
+      ${(g.transf||[]).length?`<div class="tw"><table class="pry-pg"><thead><tr><th>Fecha</th><th>Detalle</th><th class="num">Transferido</th><th></th></tr></thead><tbody>${(g.transf||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(t=>`<tr><td>${fch(t.fecha)}</td><td>${esc(t.nota||'')}</td><td class="num">${plata(num(t.monto),m)}</td><td><button type="button" class="pry-q" data-pa="quitartr" data-k="${k}" data-id="${esc(t.id)}" aria-label="Quitar transferencia">✕</button></td></tr>`).join('')}</tbody></table></div>`:''}
+      <div class="pry-np pry-nt3"><input type="date" id="pry-tf-${k}" value="${hoyP()}" aria-label="Fecha de la transferencia"><input type="text" id="pry-tn-${k}" placeholder="Detalle (ej.: su parte del anticipo)" aria-label="Detalle"><input type="text" id="pry-tv-${k}" inputmode="decimal" class="num" placeholder="Monto" value="${x.debo?(m==='USD'?usd(x.debo):gs(x.debo)):''}" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="transf" data-k="${k}">Transferir a ${esc(nm.split(' ').slice(0,2).join(' '))}</button></div>
+      <div class="pry-cgq">${P.quitarCol===k?`<span>¿Quitar a ${esc(nm)}${(g.transf||[]).length?' y sus transferencias':''}?</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="colquitarsi" data-k="${k}">Sí, quitar</button><button type="button" class="btn sm ghost" data-pa="colquitarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="colquitar" data-k="${k}">Quitar colaborador</button>`}</div></div>`}).join('')+
+    `<button type="button" class="btn sm ghost pry-cgadd" data-pa="colagregar">+ Agregar otro colaborador</button>`}
+
 /* ---------- PDFs ---------- */
 function conMembrete(p,f){const E=window.EMPRESAS?window.EMPRESAS():[];const e=E.find(x=>x.id===p.empresa_id)||E[0];
   const prev=window.MEMB_OVR;window.MEMB_OVR=e&&window.MEMB?window.MEMB({empresa:e}):null;try{f(window.MEMB_OVR||(window.MEMB?window.MEMB(null):{nombre:''}))}finally{window.MEMB_OVR=prev}}
@@ -5042,7 +5059,7 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='filtro'){P.filtro=t.dataset.f;if(P.filtro!=='todos'&&P.vista!=='lista'){P.vista='lista'}return mount()}
   if(a==='colab'){P.colab=!P.colab;return mount()}
   if(a==='nuevo'){P.nuevo={};return mount()}
-  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=JSON.parse(JSON.stringify(x));P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
+  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=normColab(JSON.parse(JSON.stringify(x)));P.quitarCol=null;P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
   if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;if(P.edit&&P.t){clearTimeout(P.t);P.t=null;await guardar(P.edit,true)}P.edit=null;P.nuevo=null;return mount()}
   if(!p)return;
   if(a==='estado'){const ne=t.dataset.e;if(ne===p.estado)return;nota(p,`Estado: ${ES(p.estado)[1]} → ${ES(ne)[1]}`);p.estado=ne;if(ne==='aprobado'&&!p.aprobado)p.aprobado=hoyP();
@@ -5052,12 +5069,17 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='pago'){const v=num(document.getElementById('pry-pv').value);if(!v)return toast('Escribí el monto cobrado');
     const x={id:nid(),fecha:document.getElementById('pry-pf').value||hoyP(),concepto:document.getElementById('pry-pc').value.trim()||'Pago',medio:document.getElementById('pry-pm').value,monto:v};
     p.pagos=p.pagos||[];p.pagos.push(x);nota(p,`Cobro registrado: ${plata(v,p.moneda)}${x.concepto?' · '+x.concepto:''}`);await guardar(p,true);toast('Cobro registrado');return mount()}
-  if(a==='transf'){const v=num(document.getElementById('pry-tv').value);if(!v)return toast('Escribí el monto transferido');p.colab.transf=p.colab.transf||[];
-    const x={id:nid(),fecha:document.getElementById('pry-tf').value||hoyP(),nota:document.getElementById('pry-tn').value.trim(),monto:v};p.colab.transf.push(x);
-    nota(p,`Transferencia a ${p.colab.colega||'colega'}: ${plata(v,p.moneda)}${x.nota?' · '+x.nota:''}`);await guardar(p,true);toast('Transferencia registrada');return mount()}
-  if(a==='quitartr'){p.colab.transf=(p.colab.transf||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
+  if(a==='transf'){const k=+t.dataset.k;const g=p.colab.colegas[k];if(!g)return;const v=num(document.getElementById('pry-tv-'+k).value);if(!v)return toast('Escribí el monto transferido');g.transf=g.transf||[];
+    const x={id:nid(),fecha:document.getElementById('pry-tf-'+k).value||hoyP(),nota:document.getElementById('pry-tn-'+k).value.trim(),monto:v};g.transf.push(x);
+    nota(p,`Transferencia a ${g.nombre||'colaborador'}: ${plata(v,p.moneda)}${x.nota?' · '+x.nota:''}`);await guardar(p,true);toast('Transferencia registrada');return mount()}
+  if(a==='quitartr'){const g=p.colab.colegas[+t.dataset.k];if(g)g.transf=(g.transf||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
+  if(a==='colagregar'){normColab(p);p.colab.si=true;const c=cuentas(p);p.colab.colegas.push({id:nid(),nombre:'',pct:c.col?Math.max(0,Math.floor(c.mio/2)):50,nota:'',transf:[]});P.quitarCol=null;autoguardar();mount();
+    const L=document.querySelectorAll('[data-pg][data-f="nombre"]');if(L.length){L[L.length-1].focus();L[L.length-1].scrollIntoView({block:'center'})}return}
+  if(a==='colquitar'){P.quitarCol=+t.dataset.k;return mount()}
+  if(a==='colquitarno'){P.quitarCol=null;return mount()}
+  if(a==='colquitarsi'){const g=p.colab.colegas.splice(+t.dataset.k,1)[0];P.quitarCol=null;if(g)nota(p,`Colaborador quitado: ${g.nombre||'sin nombre'}`);if(!p.colab.colegas.length)p.colab.si=false;await guardar(p,true);return mount()}
   if(a==='quitarpago'){p.pagos=(p.pagos||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
-  if(a==='colabsi'){p.colab={...(p.colab||{mio:50}),si:t.checked};if(p.colab.mio==null)p.colab.mio=50;autoguardar();return mount()}
+  if(a==='colabsi'){normColab(p);p.colab.si=t.checked;if(t.checked&&!p.colab.colegas.length)p.colab.colegas.push({id:nid(),nombre:'',pct:50,nota:'',transf:[]});autoguardar();return mount()}
   if(a==='nota'){const i=document.getElementById('pry-nt');const v=i.value.trim();if(!v)return;nota(p,v);await guardar(p,true);return mount()}
   if(a==='veritems'){P.verItems=!P.verItems;return mount()}
   if(a==='impno'){P.imp=null;return mount()}
@@ -5081,22 +5103,22 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.pf){p[t.dataset.pf]=t.value;autoguardar();if(t.dataset.re)mount();return}
   if(t.dataset.pi!=null){const it=p.items[+t.dataset.pi];if(!it)return;it[t.dataset.f]=t.dataset.f==='monto'?num(t.value):t.value;
     if(t.dataset.f==='monto'){const el=document.getElementById('pry-total');if(el)el.textContent=plata(cuentas(p).total,p.moneda)}autoguardar();return}
-  if(t.dataset.pc){p.colab=p.colab||{si:true};p.colab[t.dataset.pc]=t.dataset.pc==='mio'?num(t.value):t.value;autoguardar();return}
+  if(t.dataset.pg!=null){const g=normColab(p).colab.colegas[+t.dataset.pg];if(!g)return;g[t.dataset.f]=t.dataset.f==='pct'?num(t.value):t.value;autoguardar();return}
 });
 document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;const p=P.edit;if(!p)return;
   if(t.id==='pry-arch'){const f=t.files&&t.files[0];t.value='';if(f)leerArchivo(p,f,true);return}
   if(t.dataset.re){mount()}
   if(t.dataset.pi!=null&&t.dataset.f==='monto'){t.value=num(t.value)?(p.moneda==='USD'?usd(num(t.value)):gs(num(t.value))):''}
-  if(t.dataset.pc==='mio')mount()});
+});
 document.addEventListener('keydown',e=>{if(!dentro(e))return;
   if(e.key==='Escape'&&(P.edit||P.nuevo)){const x=document.querySelector('#pry-root .rs-x');if(x)x.click()}
   if(e.key==='Enter'&&e.target.id==='pry-nt'){e.preventDefault();const b=document.querySelector('[data-pa="nota"]');if(b)b.click()}
-  if(e.key==='Enter'&&e.target.id==='pry-tv'){e.preventDefault();const b=document.querySelector('[data-pa="transf"]');if(b)b.click()}
+  if(e.key==='Enter'&&/^pry-tv-\d+$/.test(e.target.id)){e.preventDefault();const b=document.querySelector(`[data-pa="transf"][data-k="${e.target.id.slice(7)}"]`);if(b)b.click()}
   if(e.key==='Enter'&&e.target.id==='pry-pv'){e.preventDefault();const b=document.querySelector('[data-pa="pago"]');if(b)b.click()}});
 document.addEventListener('submit',async e=>{if(e.target.id!=='pry-nf')return;e.preventDefault();e.stopImmediatePropagation();const fd=Object.fromEntries(new FormData(e.target));
   if(!fd.cliente.trim()||!fd.nombre.trim())return toast('Completá cliente y nombre');
   const p={id:nid(),nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),tipo:fd.tipo,fecha:fd.fecha||hoyP(),pedido:fd.pedido.trim(),estado:'presupuestar',moneda:'Gs',items:[],pagos:[],
-    colab:{si:!!fd.colab,colega:'',mio:50,nota:''},notas:[{id:nid(),fecha:hoyP(),t:'Pedido recibido'}],creado:new Date().toISOString()};
+    colab:{si:!!fd.colab,colegas:fd.colab?[{id:nid(),nombre:'',pct:50,nota:'',transf:[]}]:[]},notas:[{id:nid(),fecha:hoyP(),t:'Pedido recibido'}],creado:new Date().toISOString()};
   await guardar(p,true);P.nuevo=null;P.edit=JSON.parse(JSON.stringify(p));P.estadoG='Guardado';mount();toast('Proyecto creado · ahora cargá el presupuesto')},true);
 
 window.PROY={mount,recargar:()=>{P.lista=null}};
@@ -5181,6 +5203,11 @@ const css=document.createElement('style');css.textContent=`
 .pry-res b.warn,.pry-res4 b.warn{color:var(--warn)}
 @media (max-width:899px){.pry-res4{grid-template-columns:1fr 1fr}.pry-nt3{grid-template-columns:1fr 1fr}.pry-c2{grid-template-columns:1fr}}
 @media (max-width:560px){.pry-res.pry-res4{grid-template-columns:1fr 1fr}.pry-res4 b{font-size:15px}.pry-k{grid-template-columns:1fr 1fr 1fr;gap:6px}.pry-kt{padding:9px}.pry-kt b{font-size:20px}.pry-kt small{display:none}.pry-ct{grid-template-columns:1fr}}
+.pry-repb{display:flex;height:12px;border-radius:99px;overflow:hidden;gap:2px;background:var(--chip)}.pry-repb i{display:block;min-width:4px}
+.pry-repl{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13.5px}.pry-repl>span{display:inline-flex;align-items:center;gap:6px}.pry-repl i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.pry-cg{border:1px solid var(--line);border-left:4px solid var(--cg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
+.pry-cgh{display:flex;gap:10px;align-items:flex-start}.pry-cgn{flex:none;width:26px;height:26px;border-radius:99px;background:var(--cg);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;margin-top:22px}
+.pry-cgq{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.pry-cgadd{align-self:flex-start}
 .pry-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:899px){.pry-k{grid-template-columns:1fr 1fr}.pry-np{grid-template-columns:1fr 1fr}.pry-np .btn{grid-column:1/-1}}
 @media (max-width:560px){.pry-it{grid-template-columns:1fr 120px 30px}.pry-res{grid-template-columns:1fr}.pry-head h2{font-size:28px}.pry-tab{grid-template-columns:1fr}}
