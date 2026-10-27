@@ -160,6 +160,14 @@ button.cell{cursor:pointer}
 .sw.on{color:var(--ok)}.sw.on i{background:var(--ok)}.sw.on i::after{left:18px}.sw:disabled{opacity:.5}
 tr.inact td{opacity:.6}tr.inact td:last-child,tr.inact td:nth-last-child(2){opacity:1}
 @media (prefers-reduced-motion:reduce){.sw i,.sw i::after{transition:none}}
+.nlink{border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}.nlink:hover b,.nlink:hover{text-decoration:underline;text-underline-offset:3px}
+td .nlink{font-weight:600}
+.who .nlink{display:block}.who>small{display:block}
+.gcab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:10px 14px 6px;background:var(--bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1}
+.gcab b{font-size:13px;letter-spacing:.06em;text-transform:uppercase}.gcab span{font-size:12.5px;color:var(--muted)}
+.lista .fila{border-left:4px solid transparent}.lista .fila.st-ok{border-left-color:var(--ok)}.lista .fila.st-par{border-left-color:var(--warn)}.lista .fila.st-no{border-left-color:var(--line)}
+.lista .fila.st-no .who b{color:var(--muted)}
+#fp .chk{align-self:center}
 #cert-root h2,#pres-root h2,#planos-root h2,#ped-root h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;text-transform:uppercase;letter-spacing:.02em}
 #cert-root h3,#pres-root h3,#planos-root h3,#ped-root h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
 #cert-root .sub,#pres-root .sub,#planos-root .sub,#ped-root .sub{color:var(--muted);font-size:14px}
@@ -596,6 +604,9 @@ function vCargar(){
   const d=parse(S.dia);
   let lista=ordenar(S.inactivos?S.personal.filter(deObra):activos());
   if(S.filtro){const f=S.filtro.toLowerCase();lista=lista.filter(p=>(p.nombre+' '+(p.categoria||'')).toLowerCase().includes(f))}
+  const base=lista;const esta=p=>!!S.asis[key(p.id,S.dia)];
+  if(S.verC==='si')lista=lista.filter(esta);else if(S.verC==='no')lista=lista.filter(p=>!esta(p));
+  const GR=['Capataz','Oficiales','Medio oficiales','Ayudantes','Otros'];let gAnt=-1;
   const regs=activos().map(p=>S.asis[key(p.id,S.dia)]).filter(Boolean);
   const hs=regs.reduce((s,r)=>s+r.horas,0);
   const monto=regs.reduce((s,r)=>{const p=S.personal.find(x=>x.id===r.personal_id);return s+r.horas*costoHora(p)},0);
@@ -603,8 +614,9 @@ function vCargar(){
   const filas=lista.map(p=>{
     const r=S.asis[key(p.id,S.dia)];const e=estadoDe(r);const ab=S.abierto===p.id||e==='otro';
     const b=(k,t,cls='')=>`<button data-act="marcar" data-pid="${p.id}" data-k="${k}" class="${e===k?'on '+cls:''}" aria-pressed="${e===k}">${t}</button>`;
-    return `<div class="fila">
-      <div class="who"><b>${esc(p.nombre)}</b><small>${esc(p.categoria||'')}${p.activo===false?' · inactivo':''}</small></div>
+    const g=catRank(p.categoria);let cab='';if(g!==gAnt){gAnt=g;const G=base.filter(x=>catRank(x.categoria)===g);const en=G.filter(esta).length;cab=`<div class="gcab"><b>${GR[g]}</b><span>${en} de ${G.length} en obra</span></div>`}
+    return cab+`<div class="fila st-${r?(e==='completa'?'ok':'par'):'no'}">
+      <div class="who"><button type="button" class="nlink" data-act="editar" data-pid="${p.id}" title="Editar datos"><b>${esc(p.nombre)}</b></button><small>${esc(p.categoria||'')}${p.activo===false?' · inactivo':''}</small></div>
       <div class="acts bar">
         <div class="seg">${b('completa','Completa')}${b('manana','Mañana','parcial')}${b('tarde','Tarde','parcial')}${b('otro','Otro','parcial')}${b('falta','Falta','falta')}</div>
         <span class="hs">${r?fmtH(r.horas)+' h':'—'}</span>
@@ -626,17 +638,18 @@ function vCargar(){
       <span class="dlabel">${DIAS[d.getDay()]} ${dm(S.dia)}</span>
       ${S.dia!==hoy?`<button class="btn ghost" data-act="hoy">Hoy</button>`:''}
     </div>
-    <button class="btn primary" data-act="todos" ${sinMarcar?'':'disabled'}>Marcar ${sinMarcar} sin cargar como jornada completa</button>
+    <div class="bar" style="gap:6px;flex-wrap:wrap"><button class="btn ghost" data-act="copiar-ayer" ${sinMarcar?'':'disabled'} title="Repite lo que cargaste el último día con asistencias">Copiar del día anterior</button><button class="btn primary" data-act="todos" ${sinMarcar?'':'disabled'}>Marcar ${sinMarcar} sin cargar como jornada completa</button></div>
   </div>
   ${avisoLluvia(S.dia)}
   <div class="stats">
     <div class="stat"><small>En obra</small><b>${regs.length}</b></div>
-    <div class="stat"><small>Sin cargar</small><b>${sinMarcar}</b></div>
+    <div class="stat"><small>No están / sin cargar</small><b>${sinMarcar}</b></div>
     <div class="stat"><small>Horas del día</small><b>${fmtH(Math.round(hs*100)/100)||0}</b></div>
     <div class="stat"><small>Costo del día</small><b>${gs(monto)}</b></div>
   </div>
   <div class="bar">
     <input type="text" id="filtro" placeholder="Buscar por nombre o categoría" value="${esc(S.filtro)}" style="flex:1">
+    <div class="bar" style="gap:6px"><button class="chip-p" data-act="ver-c" data-v="" aria-pressed="${!S.verC}">Todos ${base.length}</button><button class="chip-p" data-act="ver-c" data-v="si" aria-pressed="${S.verC==='si'}">En obra ${base.filter(esta).length}</button><button class="chip-p" data-act="ver-c" data-v="no" aria-pressed="${S.verC==='no'}">No están ${base.filter(p=>!esta(p)).length}</button></div>
     <label class="bar sub"><input type="checkbox" id="inactivos" ${S.inactivos?'checked':''}> Ver inactivos</label>
   </div>
   <div class="panel lista">${filas||`<div class="fila sub">${S.obra?'Esta obra todavía no tiene personal. Agregalo en la pestaña Personal.':'Creá tu primera obra en Ajustes.'}</div>`}</div>
@@ -988,17 +1001,12 @@ function descargarConstancia(){
   }catch(e){toast('No se pudo generar el PDF')}
 }
 
-function vJornales(){const J=jornales();const L=S.personal.filter(deObra);
-  const cambian=L.filter(p=>{const k=catClave(p.categoria);return k&&Number(p.jornada)!==Number(J[k])}).length;const sinCat=L.filter(p=>!catClave(p.categoria)&&catRank(p.categoria)!==0).length;
-  return `<details class="panel jr" ${S.jrAbierto?'open':''}><summary><b>Jornal por categoría</b><span class="sub">Oficial Gs ${gs(J.oficial)} · Medio oficial Gs ${gs(J.medio)} · Ayudante Gs ${gs(J.ayudante)}</span></summary>
-    <div class="jr-c"><div class="jr-f"><label>Oficial (Gs)<input type="number" id="jr-oficial" step="1000" value="${J.oficial}"></label><label>Medio oficial (Gs)<input type="number" id="jr-medio" step="1000" value="${J.medio}"></label><label>Ayudante (Gs)<input type="number" id="jr-ayudante" step="1000" value="${J.ayudante}"></label></div>
-    <p class="sub" style="margin:0">${cambian?`Al aplicar cambia el jornal de <b>${cambian}</b> persona${cambian===1?'':'s'} de esta obra según su categoría.`:'Todo el personal de esta obra ya tiene el jornal de su categoría.'}${sinCat?` ${sinCat} sin categoría reconocida no se tocan.`:''} El capataz no cambia. Cuando agregás a alguien, el jornal se completa solo según la categoría.</p>
-    <p class="sub" style="margin:0">Ojo: la planilla y la liquidación de semanas anteriores se recalculan con el jornal nuevo. Si ya pagaste una semana con el valor viejo, bajá su liquidación antes de aplicar.</p>
-    <div class="bar"><button class="btn primary" data-act="jornales-aplicar">Guardar y aplicar a esta obra</button><button class="btn ghost" data-act="jornales-guardar">Solo guardar los valores</button></div></div></details>`}
-function vPersonal(){
-  const e=S.edit;
-  const form=e?`<form class="panel form" id="fp">
-    <h3 style="grid-column:1/-1">${e.id?'Editar':'Agregar'} personal</h3>
+/* ventana emergente para agregar o editar a una persona (desde Personal o desde Cargar) */
+function vEditPer(){const e=S.edit;if(!e)return '';
+  return `<div class="rs-ov" data-act="cancelar"></div><div class="rs-win" role="dialog" aria-modal="true" aria-label="${e.id?'Editar':'Agregar'} personal">
+    <div class="rs-wh"><b>${e.id?'Editar '+esc(e.nombre||'personal'):'Agregar personal'}</b><button type="button" class="rs-x" data-act="cancelar" aria-label="Cerrar">✕</button></div>
+    <div class="rs-wc"><form class="form" id="fp" style="padding:0">
+    
     <label>N°<input type="number" id="p-numero" name="numero" value="${e.numero??''}"></label>
     <label>Nombre<input type="text" id="p-nombre" name="nombre" value="${esc(e.nombre||'')}" required></label>
     <label>Categoría<input type="text" id="p-categoria" name="categoria" value="${esc(e.categoria||'')}" placeholder="OFICIAL, MEDIO OFICIAL, AYUDANTE" list="p-cats"></label><datalist id="p-cats"><option value="OFICIAL"><option value="MEDIO OFICIAL"><option value="AYUDANTE"><option value="CAPATAZ"></datalist>
@@ -1008,14 +1016,24 @@ function vPersonal(){
     <label>Obra<select id="p-obra" name="obra_id">${S.obras.filter(o=>o.activa!==false||o.id===e.obra_id).map(o=>`<option value="${o.id}" ${o.id===(e.obra_id||S.obra)?'selected':''}>${esc(o.nombre)}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" id="p-activo" name="activo" ${e.activo!==false?'checked':''}> Activo en obra</label>
     <div class="bar" style="grid-column:1/-1"><button class="btn primary">Guardar</button><button type="button" class="btn ghost" data-act="cancelar">Cancelar</button></div>
-  </form>`:'';
+  </form></div></div>`}
+function vJornales(){const J=jornales();const L=S.personal.filter(deObra);
+  const cambian=L.filter(p=>{const k=catClave(p.categoria);return k&&Number(p.jornada)!==Number(J[k])}).length;const sinCat=L.filter(p=>!catClave(p.categoria)&&catRank(p.categoria)!==0).length;
+  return `<details class="panel jr" ${S.jrAbierto?'open':''}><summary><b>Jornal por categoría</b><span class="sub">Oficial Gs ${gs(J.oficial)} · Medio oficial Gs ${gs(J.medio)} · Ayudante Gs ${gs(J.ayudante)}</span></summary>
+    <div class="jr-c"><div class="jr-f"><label>Oficial (Gs)<input type="number" id="jr-oficial" step="1000" value="${J.oficial}"></label><label>Medio oficial (Gs)<input type="number" id="jr-medio" step="1000" value="${J.medio}"></label><label>Ayudante (Gs)<input type="number" id="jr-ayudante" step="1000" value="${J.ayudante}"></label></div>
+    <p class="sub" style="margin:0">${cambian?`Al aplicar cambia el jornal de <b>${cambian}</b> persona${cambian===1?'':'s'} de esta obra según su categoría.`:'Todo el personal de esta obra ya tiene el jornal de su categoría.'}${sinCat?` ${sinCat} sin categoría reconocida no se tocan.`:''} El capataz no cambia. Cuando agregás a alguien, el jornal se completa solo según la categoría.</p>
+    <p class="sub" style="margin:0">Ojo: la planilla y la liquidación de semanas anteriores se recalculan con el jornal nuevo. Si ya pagaste una semana con el valor viejo, bajá su liquidación antes de aplicar.</p>
+    <div class="bar"><button class="btn primary" data-act="jornales-aplicar">Guardar y aplicar a esta obra</button><button class="btn ghost" data-act="jornales-guardar">Solo guardar los valores</button></div></div></details>`}
+function vPersonal(){
+  const e=S.edit;
+  const form='';
   return `
   <div class="bar between"><div><h2>Personal</h2><div class="sub">${esc(nombreObra())}</div></div><button class="btn primary" data-act="nuevo" ${S.obra?'':'disabled'}>Agregar personal</button></div>
   ${form}${vJornales()}
   ${(()=>{const L=S.personal.filter(deObra);const na=L.filter(p=>p.activo!==false).length;return `<div class="bar" style="gap:6px;flex-wrap:wrap;align-items:center"><button class="chip-p" data-act="ver-per" data-v="" aria-pressed="${!S.verPer}">Todos ${L.length}</button><button class="chip-p" data-act="ver-per" data-v="act" aria-pressed="${S.verPer==='act'}">Activos ${na}</button><button class="chip-p" data-act="ver-per" data-v="ina" aria-pressed="${S.verPer==='ina'}">Inactivos ${L.length-na}</button><span class="sub" style="margin-left:auto">Tocá el interruptor para activar o desactivar a alguien</span></div>`})()}
   <div class="panel tw"><table>
     <thead><tr><th>N°</th><th>Nombre</th><th>Categoría</th><th>C.I.</th><th class="n">Jornada Gs</th><th class="n">Hora Gs</th><th>Calce</th><th>Estado</th><th></th></tr></thead>
-    <tbody>${ordenar(S.personal.filter(deObra).filter(p=>S.verPer==='act'?p.activo!==false:S.verPer==='ina'?p.activo===false:true)).map(p=>`<tr class="${p.activo===false?'inact':''}"><td class="n">${p.numero??''}</td><td>${esc(p.nombre)}</td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
+    <tbody>${ordenar(S.personal.filter(deObra).filter(p=>S.verPer==='act'?p.activo!==false:S.verPer==='ina'?p.activo===false:true)).map(p=>`<tr class="${p.activo===false?'inact':''}"><td class="n">${p.numero??''}</td><td><button type="button" class="nlink" data-act="editar" data-pid="${p.id}">${esc(p.nombre)}</button></td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
       <td class="n">${gs(p.jornada)}</td><td class="n">${gs(costoHora(p))}</td><td>${esc(p.calce??'')}</td>
       <td><button type="button" class="sw ${p.activo===false?'':'on'}" role="switch" aria-checked="${p.activo!==false}" data-act="toggle-activo" data-pid="${p.id}" aria-label="${esc(p.nombre)}: ${p.activo===false?'inactivo':'activo'}"><i></i><span>${p.activo===false?'Inactivo':'Activo'}</span></button></td>
       <td><button class="btn ghost" data-act="editar" data-pid="${p.id}">Editar</button></td></tr>`).join('')}</tbody>
@@ -1081,7 +1099,7 @@ function render(){
     ${S.tab==='inicio'||S.tab==='proyectos'?'':S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
     ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
-  <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
+  <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}${S.edit&&(S.tab==='personal'||S.tab==='cargar')?vEditPer():''}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
   if(S.tab==='presupuesto'&&window.PRES)window.PRES.mount();
   if(S.tab==='planos'&&window.PLANOS)window.PLANOS.mount();
@@ -1104,6 +1122,7 @@ async function guardarAsis(pid,campos){
   await DB.upsertAsis({personal_id:pid,fecha:S.dia,obra_id:S.obra,ent_am:r.ent_am,sal_am:r.sal_am,ent_pm:r.ent_pm,sal_pm:r.sal_pm,horas:r.horas,obs:r.obs||''});
   toast('Guardado');
 }
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&S.edit&&document.querySelector('.rs-win #fp')){S.edit=null;render()}});
 document.addEventListener('click',async ev=>{
   const t=ev.target.closest('[data-tab],[data-act]');if(!t)return;
   if(t.dataset.tab){S.tab=t.dataset.tab;if(esP(S.tab))S.lastP=S.tab;if(S.tab==='inicio'&&window.INICIO)window.INICIO.refrescar();S.edit=null;render();return refrescar()}
@@ -1125,6 +1144,14 @@ document.addEventListener('click',async ev=>{
     if(k==='otro'){S.abierto=S.abierto===pid?null:pid;return render()}
     S.abierto=null;return guardarAsis(pid,presets()[k]);
   }
+  if(a==='ver-c'){S.verC=t.dataset.v||'';return render()}
+  if(a==='copiar-ayer'){let f=null;const fechas=[...new Set(Object.values(S.asis).filter(r=>r.fecha<S.dia&&enObra(r)).map(r=>r.fecha))].sort();f=fechas[fechas.length-1];
+    if(!f){try{const desde=addD(S.dia,-31);const L=await DB.asistencias(desde,addD(S.dia,-1));const F=[...new Set(L.filter(enObra).map(r=>r.fecha))].sort();f=F[F.length-1];if(f)L.filter(r=>r.fecha===f&&enObra(r)).forEach(r=>S.asis[key(r.personal_id,r.fecha)]=r)}catch(e){}}
+    if(!f)return toast('No encontré un día anterior con asistencias');
+    const faltan=activos().filter(p=>!S.asis[key(p.id,S.dia)]&&S.asis[key(p.id,f)]);if(!faltan.length)return toast('No hay nada para copiar');
+    for(const p of faltan){const o=S.asis[key(p.id,f)];const r={personal_id:p.id,fecha:S.dia,obra_id:S.obra,ent_am:o.ent_am,sal_am:o.sal_am,ent_pm:o.ent_pm,sal_pm:o.sal_pm,obs:''};r.horas=horasDe(r);S.asis[key(p.id,S.dia)]=r}
+    render();for(const p of faltan){await DB.upsertAsis({...S.asis[key(p.id,S.dia)]})}
+    return toast(`Copiados ${faltan.length} del ${DIAS[parse(f).getDay()].toLowerCase()} ${dm(f)}`)}
   if(a==='todos'){
     const P=presets().completa;const faltan=activos().filter(p=>!S.asis[key(p.id,S.dia)]);
     for(const p of faltan){const r={personal_id:p.id,fecha:S.dia,obra_id:S.obra,...P,obs:''};r.horas=horasDe(r);S.asis[key(p.id,S.dia)]=r}
