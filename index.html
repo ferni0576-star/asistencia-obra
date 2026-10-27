@@ -150,6 +150,16 @@ button.cell{cursor:pointer}
   .firmas div{flex:1;border-top:1px solid #000;padding-top:4px;font-size:12px;text-align:center}
   th,td{padding:4px 6px}
 }
+.jr{padding:0}.jr>summary{cursor:pointer;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:12px 14px}
+.jr-c{display:flex;flex-direction:column;gap:10px;padding:0 14px 14px}.jr-f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.jr-f label{display:flex;flex-direction:column;gap:4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.jr-f input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:15px}
+.sw{display:inline-flex;align-items:center;gap:8px;border:0;background:none;cursor:pointer;padding:4px 2px;font:600 13px inherit;color:var(--muted)}
+.sw i{position:relative;width:36px;height:20px;border-radius:99px;background:var(--line);transition:background .15s;flex:none}
+.sw i::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:99px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.25);transition:left .15s}
+.sw.on{color:var(--ok)}.sw.on i{background:var(--ok)}.sw.on i::after{left:18px}.sw:disabled{opacity:.5}
+tr.inact td{opacity:.6}tr.inact td:last-child,tr.inact td:nth-last-child(2){opacity:1}
+@media (prefers-reduced-motion:reduce){.sw i,.sw i::after{transition:none}}
 #cert-root h2,#pres-root h2,#planos-root h2,#ped-root h2{font-family:var(--f-display);font-weight:700;font-size:28px;margin:0;text-transform:uppercase;letter-spacing:.02em}
 #cert-root h3,#pres-root h3,#planos-root h3,#ped-root h3{font-family:var(--f-display);font-weight:600;font-size:20px;margin:0}
 #cert-root .sub,#pres-root .sub,#planos-root .sub,#ped-root .sub{color:var(--muted);font-size:14px}
@@ -546,7 +556,12 @@ const deObra=p=>p.obra_id===S.obra;
 const enObra=r=>r.obra_id?r.obra_id===S.obra:(S.personal.find(p=>p.id===r.personal_id)?.obra_id===S.obra);
 const activos=()=>S.personal.filter(p=>p.activo!==false&&deObra(p));
 function elegirObra(id){S.obra=id;try{localStorage.setItem('obra_sel',id)}catch(e){}}
-const ordenar=l=>l.slice().sort((a,b)=>(a.numero??999)-(b.numero??999)||a.nombre.localeCompare(b.nombre));
+/* orden del personal: capataz/encargado, oficiales, medio oficiales, ayudantes y el resto; dentro de cada grupo por N° y nombre */
+const catRank=c=>{const t=String(c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return /capataz|encargad/.test(t)?0:/medio|\bmed\b|med\.|m\. ?of|1\/2 ?of/.test(t)?2:/oficial/.test(t)?1:/ayud|peon/.test(t)?3:4};
+const catClave=c=>['','oficial','medio','ayudante',''][catRank(c)];
+const ordenar=l=>l.slice().sort((a,b)=>catRank(a.categoria)-catRank(b.categoria)||(a.numero??999)-(b.numero??999)||a.nombre.localeCompare(b.nombre));
+const JORNAL_DEF={oficial:150000,medio:135000,ayudante:100000};
+const jornales=()=>({...JORNAL_DEF,...((typeof S!=='undefined'&&S.aj&&S.aj.jornales)||{})});
 function periodo(ref){const d=parse(ref);const off=(d.getDay()-Number(S.aj.inicioSemana)+7)%7;const a=addD(ref,-off);return{a,b:addD(a,6)}}
 const ndias=(a,b)=>Math.round((parse(b)-parse(a))/864e5)+1;
 const diasDe=({a,b})=>Array.from({length:ndias(a,b)},(_,i)=>addD(a,i));
@@ -973,15 +988,22 @@ function descargarConstancia(){
   }catch(e){toast('No se pudo generar el PDF')}
 }
 
+function vJornales(){const J=jornales();const L=S.personal.filter(deObra);
+  const cambian=L.filter(p=>{const k=catClave(p.categoria);return k&&Number(p.jornada)!==Number(J[k])}).length;const sinCat=L.filter(p=>!catClave(p.categoria)&&catRank(p.categoria)!==0).length;
+  return `<details class="panel jr" ${S.jrAbierto?'open':''}><summary><b>Jornal por categoría</b><span class="sub">Oficial Gs ${gs(J.oficial)} · Medio oficial Gs ${gs(J.medio)} · Ayudante Gs ${gs(J.ayudante)}</span></summary>
+    <div class="jr-c"><div class="jr-f"><label>Oficial (Gs)<input type="number" id="jr-oficial" step="1000" value="${J.oficial}"></label><label>Medio oficial (Gs)<input type="number" id="jr-medio" step="1000" value="${J.medio}"></label><label>Ayudante (Gs)<input type="number" id="jr-ayudante" step="1000" value="${J.ayudante}"></label></div>
+    <p class="sub" style="margin:0">${cambian?`Al aplicar cambia el jornal de <b>${cambian}</b> persona${cambian===1?'':'s'} de esta obra según su categoría.`:'Todo el personal de esta obra ya tiene el jornal de su categoría.'}${sinCat?` ${sinCat} sin categoría reconocida no se tocan.`:''} El capataz no cambia. Cuando agregás a alguien, el jornal se completa solo según la categoría.</p>
+    <p class="sub" style="margin:0">Ojo: la planilla y la liquidación de semanas anteriores se recalculan con el jornal nuevo. Si ya pagaste una semana con el valor viejo, bajá su liquidación antes de aplicar.</p>
+    <div class="bar"><button class="btn primary" data-act="jornales-aplicar">Guardar y aplicar a esta obra</button><button class="btn ghost" data-act="jornales-guardar">Solo guardar los valores</button></div></div></details>`}
 function vPersonal(){
   const e=S.edit;
   const form=e?`<form class="panel form" id="fp">
     <h3 style="grid-column:1/-1">${e.id?'Editar':'Agregar'} personal</h3>
     <label>N°<input type="number" id="p-numero" name="numero" value="${e.numero??''}"></label>
     <label>Nombre<input type="text" id="p-nombre" name="nombre" value="${esc(e.nombre||'')}" required></label>
-    <label>Categoría<input type="text" id="p-categoria" name="categoria" value="${esc(e.categoria||'')}" placeholder="OFICIAL, AYUDANTE…"></label>
+    <label>Categoría<input type="text" id="p-categoria" name="categoria" value="${esc(e.categoria||'')}" placeholder="OFICIAL, MEDIO OFICIAL, AYUDANTE" list="p-cats"></label><datalist id="p-cats"><option value="OFICIAL"><option value="MEDIO OFICIAL"><option value="AYUDANTE"><option value="CAPATAZ"></datalist>
     <label>C.I.<input type="text" id="p-ci" name="ci" value="${esc(e.ci||'')}"></label>
-    <label>Jornada completa (Gs)<input type="number" id="p-jornada" name="jornada" step="1000" value="${e.jornada??''}" required></label>
+    <label>Jornada completa (Gs)<input type="number" id="p-jornada" name="jornada" step="1000" value="${e.jornada??''}" required data-auto="${e.jornada?'':'1'}"></label>
     <label>Calce<input type="text" id="p-calce" name="calce" value="${esc(e.calce??'')}"></label>
     <label>Obra<select id="p-obra" name="obra_id">${S.obras.filter(o=>o.activa!==false||o.id===e.obra_id).map(o=>`<option value="${o.id}" ${o.id===(e.obra_id||S.obra)?'selected':''}>${esc(o.nombre)}</option>`).join('')}</select></label>
     <label class="chk"><input type="checkbox" id="p-activo" name="activo" ${e.activo!==false?'checked':''}> Activo en obra</label>
@@ -989,12 +1011,13 @@ function vPersonal(){
   </form>`:'';
   return `
   <div class="bar between"><div><h2>Personal</h2><div class="sub">${esc(nombreObra())}</div></div><button class="btn primary" data-act="nuevo" ${S.obra?'':'disabled'}>Agregar personal</button></div>
-  ${form}
+  ${form}${vJornales()}
+  ${(()=>{const L=S.personal.filter(deObra);const na=L.filter(p=>p.activo!==false).length;return `<div class="bar" style="gap:6px;flex-wrap:wrap;align-items:center"><button class="chip-p" data-act="ver-per" data-v="" aria-pressed="${!S.verPer}">Todos ${L.length}</button><button class="chip-p" data-act="ver-per" data-v="act" aria-pressed="${S.verPer==='act'}">Activos ${na}</button><button class="chip-p" data-act="ver-per" data-v="ina" aria-pressed="${S.verPer==='ina'}">Inactivos ${L.length-na}</button><span class="sub" style="margin-left:auto">Tocá el interruptor para activar o desactivar a alguien</span></div>`})()}
   <div class="panel tw"><table>
     <thead><tr><th>N°</th><th>Nombre</th><th>Categoría</th><th>C.I.</th><th class="n">Jornada Gs</th><th class="n">Hora Gs</th><th>Calce</th><th>Estado</th><th></th></tr></thead>
-    <tbody>${ordenar(S.personal.filter(deObra)).map(p=>`<tr><td class="n">${p.numero??''}</td><td>${esc(p.nombre)}</td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
+    <tbody>${ordenar(S.personal.filter(deObra).filter(p=>S.verPer==='act'?p.activo!==false:S.verPer==='ina'?p.activo===false:true)).map(p=>`<tr class="${p.activo===false?'inact':''}"><td class="n">${p.numero??''}</td><td>${esc(p.nombre)}</td><td>${esc(p.categoria||'')}</td><td>${esc(p.ci||'')}</td>
       <td class="n">${gs(p.jornada)}</td><td class="n">${gs(costoHora(p))}</td><td>${esc(p.calce??'')}</td>
-      <td><span class="pill ${p.activo===false?'off':''}">${p.activo===false?'Inactivo':'Activo'}</span></td>
+      <td><button type="button" class="sw ${p.activo===false?'':'on'}" role="switch" aria-checked="${p.activo!==false}" data-act="toggle-activo" data-pid="${p.id}" aria-label="${esc(p.nombre)}: ${p.activo===false?'inactivo':'activo'}"><i></i><span>${p.activo===false?'Inactivo':'Activo'}</span></button></td>
       <td><button class="btn ghost" data-act="editar" data-pid="${p.id}">Editar</button></td></tr>`).join('')}</tbody>
   </table></div>
   <p class="sub">Costo hora = jornada ÷ ${S.aj.horasJornada} horas. Un inactivo deja de aparecer en la carga diaria, pero su historial queda.</p>`;
@@ -1111,6 +1134,16 @@ document.addEventListener('click',async ev=>{
   if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);S.editDesc=null;render();return toast('Descuento eliminado')}
   if(a==='editdesc'){S.editDesc=t.dataset.id;return render()}
   if(a==='canceldesc'){S.editDesc=null;return render()}
+  if(a==='ver-per'){S.verPer=t.dataset.v||'';return render()}
+  if(a==='toggle-activo'){const p=S.personal.find(x=>x.id===t.dataset.pid);if(!p)return;const nv=p.activo===false;t.disabled=true;
+    try{const g=await DB.savePersonal({...p,activo:nv});const i=S.personal.findIndex(x=>x.id===p.id);S.personal[i]={...S.personal[i],...g,activo:nv};render();return toast(`${p.nombre}: ${nv?'activo':'inactivo'}`)}
+    catch(e){t.disabled=false;return toast('No se pudo cambiar el estado')}}
+  if(a==='jornales-aplicar'||a==='jornales-guardar'){const J={oficial:Number(document.getElementById('jr-oficial').value)||0,medio:Number(document.getElementById('jr-medio').value)||0,ayudante:Number(document.getElementById('jr-ayudante').value)||0};
+    if(!J.oficial||!J.medio||!J.ayudante)return toast('Completá los tres jornales');S.jrAbierto=true;S.aj={...S.aj,jornales:J};try{await DB.saveAjustes(S.aj)}catch(e){}
+    if(a==='jornales-guardar'){render();return toast('Jornales guardados')}
+    let n=0;for(const p of S.personal.filter(deObra)){const k=catClave(p.categoria);if(!k||Number(p.jornada)===J[k])continue;
+      try{const g=await DB.savePersonal({...p,jornada:J[k]});const i=S.personal.findIndex(x=>x.id===p.id);S.personal[i]={...S.personal[i],...g,jornada:J[k]};n++}catch(e){}}
+    render();return toast(n?`Jornal actualizado a ${n} persona${n===1?'':'s'}`:'No había jornales para cambiar')}
   if(a==='nuevo'){S.edit={activo:true,obra_id:S.obra,numero:(Math.max(0,...S.personal.filter(deObra).map(p=>p.numero||0))+1)};return render()}
   if(a==='editar'){S.edit={...S.personal.find(p=>p.id===t.dataset.pid)};return render()}
   if(a==='cancelar'){S.edit=null;return render()}
@@ -1130,6 +1163,8 @@ document.addEventListener('click',async ev=>{
   if(a==='salir'){await SB.auth.signOut();location.reload()}
 });
 let deb={};
+document.addEventListener('input',ev=>{if(ev.target.id!=='p-categoria')return;const j=document.getElementById('p-jornada');if(!j||j.dataset.auto!=='1')return;const k=catClave(ev.target.value);if(k)j.value=jornales()[k]});
+document.addEventListener('input',ev=>{if(ev.target.id==='p-jornada')ev.target.dataset.auto='';});
 document.addEventListener('input',ev=>{
   const t=ev.target;
   if(t.id==='filtro'){S.filtro=t.value;return render()}
@@ -2465,7 +2500,7 @@ function encabezado(rows){
       else if(c.cant==null&&/^cant/.test(x))c.cant=k;
       else if(c.mat==null&&/costo ?mat|^material|c\.? ?mat|precio mat/.test(x)&&!/^t\.|total/.test(x))c.mat=k;
       else if(c.mo==null&&/(m\.? ?de ?obra|mano de obra|^m\.?o\.?$|costo m\.? ?o)/.test(x)&&!/^t\.|total/.test(x))c.mo=k;
-      else if(c.pu==null&&/precio unit|p\.? ?unit|costo unit/.test(x)&&!/total/.test(x))c.pu=k;
+      else if(c.pu==null&&/p[r]?ecio unit|p\.? ?unit|costo unit/.test(x)&&!/total/.test(x))c.pu=k;
       else if(c.ind==null&&/^indice/.test(x))c.ind=k;
       else if(c.acum==null&&/^acumulado/.test(x))c.acum=k;});
     if(c.desc!=null&&c.cant!=null&&(c.mat!=null||c.pu!=null)){
@@ -2480,8 +2515,14 @@ function leerHoja(h){
     if(!(cant>0)){if(n&&/^\d+$/.test(n)&&d){rubro=n+'. '+d.toUpperCase();sector=''}else if(d&&!n){sector=d}else if(n&&d&&!/\./.test(n)){rubro=n+'. '+d.toUpperCase();sector=''}continue}
     let mat=c.mat!=null?nnum(r[c.mat])||0:0,mo=c.mo!=null?nnum(r[c.mo])||0:0;
     if(c.mat==null&&c.mo==null&&c.pu!=null)mat=nnum(r[c.pu])||0;
+    /* fila con N° entero (1, 2, 9…) y cantidad: es un rubro. Si tiene precio es un rubro de un solo ítem (ej.: "2 Replanteo 70 m2");
+       si no tiene precio es el título de un rubro con su superficie (ej.: "9 Cubierta de techo 80,65 m2") y los ítems vienen abajo */
+    let nIt=n;
+    if(n&&/^\d+$/.test(n)&&d){rubro=n+'. '+d.toUpperCase();sector='';if(!(mat+mo))continue;nIt=n+'.1'}
+    /* en planillas con un solo precio, las filas de "Mano de obra" van a mano de obra */
+    if(c.mat==null&&c.mo==null&&/^mano de obra\b|^m\.? ?de ?o(bra)?\b/.test(nrm(d))){mo=mat;mat=0}
     if(c.ind!=null&&ind==null){const v=nnum(r[c.ind]);if(v>0)ind=v}
-    const id='p'+(++num);items.push({id,rubro:rubro||'SIN RUBRO',sector,n,desc:d,unidad:String(r[c.un]??'').trim(),cant:Math.round(cant*10000)/10000,mat,mo});
+    const id='p'+(++num);items.push({id,rubro:rubro||'SIN RUBRO',sector,n:nIt,desc:d,unidad:String(r[c.un]??'').trim(),cant:Math.round(cant*10000)/10000,mat,mo});
     if(c.acum!=null){const a=nnum(r[c.acum]);if(a>0)acums[id]=Math.min(a,cant)}}
   const m2=(txt.match(/superficie a construir[^0-9]*([\d.,]*\d)/i)||[])[1];
   return{hoja:h.n,items,ind:ind||1,acums,m2:m2?window.numES(m2):null,cols:c}}
