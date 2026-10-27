@@ -362,7 +362,7 @@ const AJ_DEF={empresa:'Avaroga Arquitectura S.A',obra:'Locales comerciales · Va
 const EMP_DEF={id:'avaroga',nombre:'Avaroga Arquitectura S.A',ruc:'80130705-8',prof:'Arq. Hugo Gaona',tel:'+595 987 179275',
   dir:'Juan L. Mallorquín Nro. 1220 c/ Cerro Corá – 3er Piso',email:'avarogaarq@gmail.com',ciudad:'Encarnación, Paraguay',logo:null};
 function empresas(){const L=(typeof S!=='undefined'&&S.aj&&Array.isArray(S.aj.empresas)&&S.aj.empresas.length)?S.aj.empresas:[{...EMP_DEF,nombre:(typeof S!=='undefined'&&S.aj&&S.aj.empresa)||EMP_DEF.nombre}];return L}
-function MEMB(o){if(o===undefined&&typeof obraAct==='function')o=obraAct();const e=(o&&o.empresa&&o.empresa.nombre)?o.empresa:empresas()[0];
+function MEMB(o){if(window.MEMB_OVR)return window.MEMB_OVR;if(o===undefined&&typeof obraAct==='function')o=obraAct();const e=(o&&o.empresa&&o.empresa.nombre)?o.empresa:empresas()[0];
   return{...EMP_DEF,...e,logo:e.logo||(e.id==='avaroga'&&typeof AVAROGA_LOGO!=='undefined'?AVAROGA_LOGO:null)}}
 window.MEMB=MEMB;window.EMPRESAS=empresas;window.EMP_DEF=EMP_DEF;
 /* dibuja el membrete arriba de cada hoja: logo (respeta proporción), nombre y contacto */
@@ -417,6 +417,9 @@ function backendLocal(){
         d.contratistas=SEMILLA_CONTRATISTAS.map(c=>({...JSON.parse(JSON.stringify(c)),id:uid(),obra_id:o?o.id:null}));save()}
       return d.contratistas.filter(c=>c.obra_id===oid).map(c=>JSON.parse(JSON.stringify(c)))},
     async delContratista(id){d.contratistas=d.contratistas.filter(x=>x.id!==id);save()},
+    async proyectos(){if(!d.proyectos){d.proyectos=JSON.parse(JSON.stringify(SEMILLA_PRY));save()}return JSON.parse(JSON.stringify(d.proyectos))},
+    async saveProyecto(p){d.proyectos=d.proyectos||[];const i=d.proyectos.findIndex(x=>x.id===p.id);if(i>=0)d.proyectos[i]=p;else d.proyectos.unshift(p);save()},
+    async delProyecto(id){d.proyectos=(d.proyectos||[]).filter(x=>x.id!==id);save()},
     async saveContratista(c){const v=JSON.parse(JSON.stringify(c));const i=d.contratistas.findIndex(x=>x.id===c.id);if(i>=0)d.contratistas[i]=v;else d.contratistas.push(v);save()},
     async presupuesto(oid){if(!d.presupuestos){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.presupuestos=[];
         if(SEMILLA_PRES&&o)d.presupuestos.push({...JSON.parse(JSON.stringify(SEMILLA_PRES)),obra_id:o.id});save()}
@@ -483,6 +486,9 @@ function backendNube(sb){
     async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
     async contratistas(oid){if(!oid)return[];return ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'))},
     async delContratista(id){ok(await sb.from('contratistas').delete().eq('id',id))},
+    async proyectos(){return ok(await sb.from('proyectos').select('id,datos,actualizado').order('actualizado',{ascending:false})).map(r=>({...r.datos,id:r.id}))},
+    async saveProyecto(p){const{id,...datos}=p;ok(await sb.from('proyectos').upsert({id,datos,actualizado:new Date().toISOString()}))},
+    async delProyecto(id){ok(await sb.from('proyectos').delete().eq('id',id))},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
     async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
       return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
@@ -1030,22 +1036,24 @@ function vLogin(err=''){
 
 const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['ot','OT'],['personal','Personal'],['ajustes','Ajustes']];
 const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['tareas','Tareas']];
-const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='obra';
+const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='obra'&&t!=='proyectos';
 function render(){
+  if((window.CLI||window.COL)&&S.tab==='proyectos')S.tab='inicio';
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
   if(window.COL&&!['inicio','obra'].includes(S.tab)&&(S.tab==='ajustes'||!window.COL.mods.includes(esP(S.tab)?'personal':S.tab)))S.tab='obra';
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
-    ${S.tab==='inicio'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${S.tab==='inicio'&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'?'':`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
+    ${S.tab==='inicio'||S.tab==='proyectos'?`<span>${esc(S.aj.empresa||'')}</span>`:S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
+    ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
   if(S.tab==='presupuesto'&&window.PRES)window.PRES.mount();
   if(S.tab==='planos'&&window.PLANOS)window.PLANOS.mount();
   if(S.tab==='materiales'&&window.MATERIALES)window.MATERIALES.mount();
+  if(S.tab==='proyectos'&&window.PROY)window.PROY.mount();
   if(S.tab==='inicio'&&window.INICIO)window.INICIO.mount();
   if(S.tab==='obra'&&window.RESUMEN)window.RESUMEN.mount();
   if(window.APROB)window.APROB.check();
@@ -1191,6 +1199,8 @@ function exportarExcel(){
 
 /* ---------- puentes con el módulo de contratistas ---------- */
 window.ASIS_OBRA=()=>obraAct();
+window.PRYB={list:()=>DB.proyectos(),save:p=>DB.saveProyecto(p),del:id=>DB.delProyecto(id)};
+const SEMILLA_PRY=[];
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
@@ -3484,7 +3494,8 @@ async function respaldo(lista){
   try{const R=[];for(const o of lista)R.push(await juntar(o));
     const nombre=lista.length===1?`Respaldo_${limpio(lista[0].nombre)}_${hoyI()}`:`Respaldo_todas_las_obras_${hoyI()}`;
     let accesos=[];try{accesos=window.USR?(await window.USR.list())||[]:[]}catch(e){}
-    const json={app:'Control de Obras',version:2,empresa:S.aj.empresa,fecha:new Date().toISOString(),ajustes:S.aj,accesos,obras:R};
+    let proyectos=[];try{if(window.PRYB)proyectos=await window.PRYB.list()}catch(e){}
+    const json={app:'Control de Obras',version:2,empresa:S.aj.empresa,fecha:new Date().toISOString(),ajustes:S.aj,accesos,obras:R,proyectos};
     if(window.XLSX){const wb=XLSX.utils.book_new();R.forEach((r,k)=>hojas(wb,r,R.length>1?String(k+1):''));await window.BAJAR_XLSX(wb,nombre+'.xlsx')}
     await window.BAJAR(nombre+'.json',new Blob([JSON.stringify(json,null,1)],{type:'application/json'}));
   }catch(e){console.error(e);toast('No se pudo preparar el respaldo')}
@@ -4682,6 +4693,281 @@ const css=document.createElement('style');css.textContent=`
 })();
 
 (function(){
+/* ============ Proyectos: cartera de pedidos de clientes, presupuestos, cobros y colaboraciones ============ */
+const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
+const P={lista:null,cargando:false,vista:LS('pry_vista')||'tablero',filtro:'todos',q:'',colab:false,abierto:null,edit:null,nuevo:null,t:null,estadoG:'',borrar:false,err:null};
+const ESTADOS=[
+  ['presupuestar','Por presupuestar','Pedido recibido · falta preparar el presupuesto'],
+  ['enviado','Enviado al cliente','Presupuesto enviado · esperando aprobación'],
+  ['aprobado','Aprobado · en curso','Presupuesto aprobado · se está trabajando'],
+  ['pausa','En pausa','Frenado por el cliente o a la espera de algo'],
+  ['terminado','Terminado','Proyecto entregado'],
+  ['rechazado','No aprobado','El cliente no siguió']];
+const TIPOS=['Anteproyecto','Proyecto ejecutivo','Proyecto + dirección de obra','Dirección de obra','Interiorismo','Regularización / aprobación municipal','Relevamiento','Otro'];
+const ES=k=>ESTADOS.find(e=>e[0]===k)||ESTADOS[0];
+const nid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+const hoyP=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const num=s=>{if(typeof s==='number')return s;const t=String(s||'').replace(/[^\d,.-]/g,'');if(!t)return 0;return Number(t.replace(/\./g,'').replace(',','.'))||0};
+const usd=n=>(Math.round((n||0)*100)/100).toLocaleString('es-PY',{minimumFractionDigits:0,maximumFractionDigits:2});
+const plata=(n,m)=>m==='USD'?'US$ '+usd(n):'Gs '+gs(n);
+const corto=(n,m)=>{if(m==='USD')return 'US$ '+usd(n);const a=Math.abs(n);return a>=1e9?'Gs '+(n/1e9).toFixed(1).replace('.',',')+' mil M':a>=1e6?'Gs '+(n/1e6).toFixed(a>=1e8?0:1).replace('.',',')+' M':'Gs '+gs(n)};
+const fch=s=>{if(!s)return '';const[a,b,c]=String(s).slice(0,10).split('-');return `${c}/${b}/${a}`};
+const dias=s=>s?Math.round((new Date(hoyP())-new Date(String(s).slice(0,10)))/864e5):null;
+const hace=s=>{const d=dias(s);return d==null?'':d<=0?'hoy':d===1?'ayer':d<31?`hace ${d} días`:d<365?`hace ${Math.round(d/30)} ${Math.round(d/30)===1?'mes':'meses'}`:`hace ${Math.round(d/365)} año${Math.round(d/365)>1?'s':''}`};
+function cuentas(p){const total=(p.items||[]).reduce((s,i)=>s+num(i.monto),0);const cobrado=(p.pagos||[]).reduce((s,x)=>s+num(x.monto),0);
+  const falta=Math.max(0,total-cobrado);const pct=total?Math.min(100,Math.round(cobrado/total*100)):0;const mio=p.colab&&p.colab.si?Math.max(0,Math.min(100,num(p.colab.mio))):100;
+  return{total,cobrado,falta,pct,mio,miParte:total*mio/100,miCobrado:cobrado*mio/100}}
+const permitido=()=>!window.CLI&&!window.COL;
+
+/* ---------- datos ---------- */
+async function cargar(forzar){if(P.cargando||(!forzar&&P.lista))return;P.cargando=true;P.err=null;
+  try{P.lista=(await window.PRYB.list())||[]}catch(e){P.lista=P.lista||[];P.err=e&&e.message||'error'}P.cargando=false;mount()}
+async function guardar(p,silencio){p.actualizado=new Date().toISOString();try{await window.PRYB.save(JSON.parse(JSON.stringify(p)));const i=P.lista.findIndex(x=>x.id===p.id);if(i>=0)P.lista[i]=JSON.parse(JSON.stringify(p));else P.lista.unshift(JSON.parse(JSON.stringify(p)));
+    P.estadoG='Guardado';if(!silencio)toast('Proyecto guardado')}catch(e){P.estadoG='No se pudo guardar';toast(/proyectos/i.test(e&&e.message||'')?'Falta pegar el SQL 23 de Proyectos en Supabase':'No se pudo guardar el proyecto')}
+  const g=document.getElementById('pry-g');if(g)g.textContent=P.estadoG}
+function autoguardar(){P.estadoG='Guardando…';const g=document.getElementById('pry-g');if(g)g.textContent=P.estadoG;clearTimeout(P.t);P.t=setTimeout(()=>{if(P.edit)guardar(P.edit,true)},700)}
+
+/* ---------- vista general ---------- */
+function filtrados(){const q=P.q.trim().toLowerCase();return(P.lista||[]).filter(p=>(P.filtro==='todos'||p.estado===P.filtro||(P.filtro==='cobrar'&&cuentas(p).falta>0&&['aprobado','terminado'].includes(p.estado)))&&(!P.colab||(p.colab&&p.colab.si))&&
+  (!q||[p.nombre,p.cliente,p.tipo,p.pedido,p.colab&&p.colab.colega].join(' ').toLowerCase().includes(q)))}
+function kpis(){const L=P.lista||[];const n=e=>L.filter(p=>p.estado===e);const sum=(A,f)=>A.reduce((s,p)=>s+(p.moneda==='USD'?0:f(cuentas(p))),0);
+  const env=n('enviado'),apr=n('aprobado');const porCobrar=L.filter(p=>['aprobado','terminado'].includes(p.estado));
+  const K=[['presupuestar','Por presupuestar',n('presupuestar').length,'pedidos esperando tu presupuesto'],
+    ['enviado','Esperando respuesta',env.length,env.length?corto(sum(env,c=>c.total))+' en presupuestos enviados':'nada pendiente del cliente'],
+    ['aprobado','En curso',apr.length,apr.length?corto(sum(apr,c=>c.total))+' aprobados':'sin proyectos activos'],
+    ['cobrar','Por cobrar',corto(sum(porCobrar,c=>c.falta)),'de proyectos aprobados y terminados']];
+  return `<div class="pry-k">${K.map(([f,t,v,s])=>`<button class="pry-kt ${P.filtro===f?'on':''}" data-pa="filtro" data-f="${P.filtro===f?'todos':f}"><span class="sub">${t}</span><b>${v}</b><small>${esc(s)}</small></button>`).join('')}</div>`}
+function chipEstado(e){return `<span class="pry-es e-${e}">${ES(e)[1]}</span>`}
+function barra(c,m){return `<div class="pry-bar" title="Cobrado ${c.pct}%"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>Cobrado ${corto(c.cobrado,m)}</span><span>${c.falta?'Falta '+corto(c.falta,m):'Todo cobrado'}</span></div>`}
+function tarjeta(p){const c=cuentas(p);let pie='';
+  if(p.estado==='presupuestar')pie=`<span class="sub">Pedido ${hace(p.fecha)}</span>`;
+  else if(p.estado==='enviado')pie=`<span class="sub">${c.total?corto(c.total,p.moneda)+' · ':''}enviado ${hace(p.envio)||'—'}</span>`;
+  else if(['aprobado','terminado'].includes(p.estado)&&c.total)pie=barra(c,p.moneda);
+  else if(c.total)pie=`<span class="sub">${corto(c.total,p.moneda)}</span>`;
+  return `<button class="pry-card" data-pa="abrir" data-id="${esc(p.id)}"><b>${esc(p.nombre||'Sin nombre')}</b><span class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</span>
+    ${p.colab&&p.colab.si?`<span class="pry-col">Con ${esc(p.colab.colega||'colega')}</span>`:''}${pie}</button>`}
+function tablero(L){const cols=ESTADOS.filter(([k])=>k!=='rechazado'||L.some(p=>p.estado==='rechazado'));
+  return `<div class="pry-tab">${cols.map(([k,t,d])=>{const C=L.filter(p=>(p.estado||'presupuestar')===k);return `<section class="pry-colm e-${k}"><header><b>${t}</b><span>${C.length}</span></header><p class="sub">${d}</p>
+    <div class="pry-cards">${C.map(tarjeta).join('')||'<div class="pry-vacio">—</div>'}</div></section>`}).join('')}</div>`}
+function lista(L){if(!L.length)return `<div class="panel pry-vacio2">No hay proyectos con ese filtro.</div>`;
+  return `<div class="panel tw"><table class="pry-tl"><thead><tr><th>Proyecto</th><th>Estado</th><th class="num">Presupuesto</th><th>Cobros</th><th>Colega</th><th>Movimiento</th></tr></thead><tbody>
+  ${L.map(p=>{const c=cuentas(p);return `<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre||'Sin nombre')}</b><div class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</div></td><td>${chipEstado(p.estado)}</td>
+    <td class="num">${c.total?plata(c.total,p.moneda):'—'}</td><td style="min-width:170px">${c.total&&['aprobado','terminado','pausa'].includes(p.estado)?barra(c,p.moneda):'<span class="sub">—</span>'}</td>
+    <td>${p.colab&&p.colab.si?esc(p.colab.colega||'Sí')+(c.mio<100?` <span class="sub">(${100-c.mio}%)</span>`:''):'<span class="sub">No</span>'}</td><td class="sub">${hace(p.actualizado||p.fecha)}</td></tr>`}).join('')}</tbody></table></div>`}
+function html(){
+  if(!permitido())return `<div class="panel" style="padding:20px">Esta sección es solo para la dirección.</div>`;
+  if(!P.lista){cargar();return `<p class="sub">Cargando proyectos…</p>`}
+  const L=filtrados().sort((a,b)=>(b.actualizado||b.fecha||'')>(a.actualizado||a.fecha||'')?1:-1);const T=P.lista||[];
+  const cuenta=k=>T.filter(p=>p.estado===k).length;
+  return `<section class="pry">
+  <div class="pry-head"><div><div class="sub">Pedidos de clientes · presupuestos · cobros</div><h2>Proyectos</h2></div>
+    <div class="pry-hb"><div class="pry-seg" role="group" aria-label="Vista"><button data-pa="vista" data-v="tablero" aria-pressed="${P.vista==='tablero'}">Tablero</button><button data-pa="vista" data-v="lista" aria-pressed="${P.vista==='lista'}">Lista</button></div>
+    <button class="btn primary" data-pa="nuevo">+ Nuevo proyecto</button></div></div>
+  ${P.err?`<div class="panel pry-aviso">No se pudieron leer los proyectos. Si es la primera vez, pegá el archivo <b>23_proyectos.sql</b> en Supabase (SQL Editor → Run).</div>`:''}
+  ${T.length?kpis():''}
+  ${T.length?`<div class="pry-bar2"><input type="search" id="pry-q" placeholder="Buscar cliente, proyecto o colega…" value="${esc(P.q)}">
+    <div class="pry-chips"><button class="chip-p" data-pa="filtro" data-f="todos" aria-pressed="${P.filtro==='todos'}">Todos ${T.length}</button>${P.vista==='lista'?ESTADOS.filter(([k])=>cuenta(k)).map(([k,t])=>`<button class="chip-p" data-pa="filtro" data-f="${k}" aria-pressed="${P.filtro===k}">${t} ${cuenta(k)}</button>`).join(''):''}
+    <button class="chip-p" data-pa="colab" aria-pressed="${P.colab}">Con colegas ${T.filter(p=>p.colab&&p.colab.si).length}</button></div></div>`:''}
+  ${T.length?(P.vista==='lista'?lista(L):tablero(L)):`<div class="panel pry-vacio2"><b>Todavía no cargaste proyectos.</b><p class="sub">Cargá cada pedido de un cliente: qué te pidió, el presupuesto que le pasaste, en qué estado está y lo que ya te pagó.</p><button class="btn primary" data-pa="nuevo">+ Cargar el primero</button></div>`}
+  </section>${P.nuevo?vNuevo():''}${P.edit?vDetalle():''}`}
+
+/* ---------- alta rápida ---------- */
+function vNuevo(){const n=P.nuevo;return `<div class="rs-ov" data-pa="cerrar"></div><div class="rs-win pry-win" role="dialog" aria-modal="true" aria-label="Nuevo proyecto">
+  <div class="rs-wh"><b>Nuevo proyecto</b><button class="rs-x" data-pa="cerrar" aria-label="Cerrar">✕</button></div>
+  <form class="rs-wc" id="pry-nf"><div class="form" style="padding:0">
+    <label class="wide">Cliente<input name="cliente" required value="${esc(n.cliente||'')}" placeholder="Ej.: Gerardo Arévalos"></label>
+    <label class="wide">Nombre del proyecto<input name="nombre" required value="${esc(n.nombre||'')}" placeholder="Ej.: Vivienda unifamiliar Arévalos"></label>
+    <label>Tipo<select name="tipo">${TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></label>
+    <label>Fecha del pedido<input type="date" name="fecha" value="${hoyP()}"></label>
+    <label class="wide">¿Qué te pidió?<textarea name="pedido" rows="3" placeholder="Ej.: casa de 2 dormitorios en terreno de 12x30, quiere quincho y piscina"></textarea></label>
+    <label class="wide pry-chk"><input type="checkbox" name="colab"> Es colaborativo con otro colega</label>
+  </div><div class="bar"><button class="btn primary">Crear proyecto</button><button type="button" class="btn ghost" data-pa="cerrar">Cancelar</button></div></form></div>`}
+
+/* ---------- ficha del proyecto ---------- */
+function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';const E=window.EMPRESAS?window.EMPRESAS():[];
+  const paso=ESTADOS.findIndex(e=>e[0]===p.estado);
+  return `<div class="rs-ov" data-pa="cerrar"></div><div class="rs-win ancho pry-win" role="dialog" aria-modal="true" aria-label="${esc(p.nombre)}">
+  <div class="rs-wh"><div style="min-width:0"><b>${esc(p.nombre||'Proyecto')}</b><div class="sub">${esc(p.cliente||'')} · <span id="pry-g">${esc(P.estadoG||'Los cambios se guardan solos')}</span></div></div><button class="rs-x" data-pa="cerrar" aria-label="Cerrar">✕</button></div>
+  <div class="rs-wc" id="pry-wc">
+   <div class="pry-steps" role="group" aria-label="Estado">${ESTADOS.map(([k,t],i)=>`<button type="button" data-pa="estado" data-e="${k}" class="e-${k} ${p.estado===k?'on':''} ${i<paso&&paso<4&&i<3?'hecho':''}" aria-pressed="${p.estado===k}">${t}</button>`).join('')}</div>
+   <p class="sub" style="margin:-4px 0 0">${ES(p.estado)[2]}${p.estado==='enviado'&&p.envio?` · enviado ${hace(p.envio)}`:''}</p>
+
+   <section class="pry-sec"><h3>Pedido del cliente</h3><div class="form" style="padding:0">
+     <label>Cliente<input type="text" data-pf="cliente" value="${esc(p.cliente||'')}"></label>
+     <label>Teléfono / contacto<input type="text" data-pf="contacto" value="${esc(p.contacto||'')}" placeholder="Ej.: 0985 123 456"></label>
+     <label class="wide">Nombre del proyecto<input type="text" data-pf="nombre" value="${esc(p.nombre||'')}"></label>
+     <label>Tipo<select data-pf="tipo">${TIPOS.map(t=>`<option ${t===p.tipo?'selected':''}>${t}</option>`).join('')}</select></label>
+     <label>Fecha del pedido<input type="date" data-pf="fecha" value="${esc(p.fecha||'')}"></label>
+     <label class="wide">¿Qué te pidió?<textarea data-pf="pedido" rows="3">${esc(p.pedido||'')}</textarea></label></div></section>
+
+   <section class="pry-sec"><div class="pry-sh"><h3>Presupuesto que le pasaste</h3><div class="pry-sha"><label class="pry-mini">Moneda<select data-pf="moneda" data-re="1"><option ${m==='Gs'?'selected':''}>Gs</option><option ${m==='USD'?'selected':''} value="USD">US$</option></select></label>
+       <button type="button" class="btn sm" data-pa="pdfpres" ${c.total?'':'disabled'}>PDF presupuesto</button></div></div>
+     <div class="pry-items">${(p.items||[]).map((it,i)=>`<div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>`).join('')}
+       <button type="button" class="btn sm ghost" data-pa="item">+ Agregar ítem</button></div>
+     <div class="pry-tot"><span>Total del presupuesto</span><b id="pry-total">${plata(c.total,m)}</b></div>
+     <div class="form" style="padding:0">
+       <label>Fecha en que lo enviaste<input type="date" data-pf="envio" value="${esc(p.envio||'')}"></label>
+       <label>Membrete del PDF<select data-pf="empresa_id">${E.map(x=>`<option value="${esc(x.id)}" ${x.id===(p.empresa_id||E[0]&&E[0].id)?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></label>
+       <label class="wide">Forma de pago acordada<input type="text" data-pf="forma_pago" value="${esc(p.forma_pago||'')}" placeholder="Ej.: 40% al aprobar, 30% al entregar planos, 30% final"></label>
+       <label class="wide">Enlace al presupuesto enviado (Drive, WhatsApp, correo)<span class="pry-ln"><input type="text" data-pf="enlace" value="${esc(p.enlace||'')}" placeholder="https://…">${/^https?:\/\//.test(p.enlace||'')?`<a class="btn sm" href="${esc(p.enlace)}" target="_blank" rel="noopener">Abrir</a>`:''}</span></label></div></section>
+
+   <section class="pry-sec"><div class="pry-sh"><h3>Cobros · control de desembolsos</h3><button type="button" class="btn sm" data-pa="pdfcta" ${c.total||c.cobrado?'':'disabled'}>PDF estado de cuenta</button></div>
+     <div class="pry-res"><div><span class="sub">Presupuesto</span><b>${plata(c.total,m)}</b></div><div><span class="sub">Ya cobrado</span><b class="ok">${plata(c.cobrado,m)}</b></div><div><span class="sub">Falta cobrar</span><b class="${c.falta?'warn':''}">${plata(c.falta,m)}</b></div></div>
+     ${c.total?`<div class="pry-bar big"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>${c.pct}% cobrado</span><span>${(p.pagos||[]).length} pago${(p.pagos||[]).length===1?'':'s'}</span></div>`:''}
+     ${(p.pagos||[]).length?`<div class="tw"><table class="pry-pg"><thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th class="num">Monto</th><th class="num">Saldo</th><th></th></tr></thead><tbody>
+       ${(()=>{let s=c.total;return (p.pagos||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(x=>{s-=num(x.monto);return `<tr><td>${fch(x.fecha)}</td><td>${esc(x.concepto||'')}</td><td class="sub">${esc(x.medio||'')}</td><td class="num">${plata(num(x.monto),m)}</td><td class="num sub">${plata(Math.max(0,s),m)}</td><td><button type="button" class="pry-q" data-pa="quitarpago" data-id="${esc(x.id)}" aria-label="Quitar pago">✕</button></td></tr>`}).join('')})()}</tbody></table></div>`:'<p class="sub" style="margin:0">Todavía no registraste cobros.</p>'}
+     <div class="pry-np"><input type="date" id="pry-pf" value="${hoyP()}" aria-label="Fecha del cobro"><input type="text" id="pry-pc" placeholder="Concepto (ej.: Anticipo 40%)" aria-label="Concepto"><select id="pry-pm" aria-label="Medio"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select><input type="text" id="pry-pv" inputmode="decimal" class="num" placeholder="Monto" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="pago">Registrar cobro</button></div></section>
+
+   <section class="pry-sec"><h3>Colaboración</h3>
+     <label class="pry-chk"><input type="checkbox" data-pa="colabsi" ${p.colab&&p.colab.si?'checked':''}> Este proyecto es colaborativo con otro colega</label>
+     ${p.colab&&p.colab.si?`<div class="form" style="padding:0;margin-top:8px"><label>Colega<input type="text" data-pc="colega" value="${esc(p.colab.colega||'')}" placeholder="Ej.: Arq. María López"></label>
+       <label>Mi participación %<input data-pc="mio" type="number" min="0" max="100" value="${esc(p.colab.mio??50)}" data-re="1"></label>
+       <label class="wide">Quién hace qué<input type="text" data-pc="nota" value="${esc(p.colab.nota||'')}" placeholder="Ej.: yo hago el proyecto, ella la dirección de obra"></label></div>
+       <div class="pry-rep"><div><span class="sub">Mi parte (${c.mio}%)</span><b>${plata(c.miParte,m)}</b><small>cobrado ${plata(c.miCobrado,m)}</small></div><div><span class="sub">${esc(p.colab.colega||'Colega')} (${100-c.mio}%)</span><b>${plata(c.total-c.miParte,m)}</b><small>cobrado ${plata(c.cobrado-c.miCobrado,m)}</small></div></div>`:''}</section>
+
+   <section class="pry-sec"><h3>Notas e historial</h3>
+     <div class="pry-nn"><input type="text" id="pry-nt" placeholder="Agregar una nota (ej.: pidió cambiar la fachada, reunión el jueves)"><button type="button" class="btn sm" data-pa="nota">Agregar</button></div>
+     <ul class="pry-hist">${(p.notas||[]).slice().reverse().map(n=>`<li><span class="sub">${fch(n.fecha)}</span> ${esc(n.t)}</li>`).join('')||'<li class="sub">Sin notas todavía.</li>'}</ul></section>
+
+   <div class="pry-del">${P.borrar?`<span>¿Eliminar este proyecto y sus cobros? No se puede deshacer.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="borrarsi">Sí, eliminar</button><button type="button" class="btn sm ghost" data-pa="borrarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="borrar">Eliminar proyecto</button>`}</div>
+  </div></div>`}
+
+/* ---------- PDFs ---------- */
+function conMembrete(p,f){const E=window.EMPRESAS?window.EMPRESAS():[];const e=E.find(x=>x.id===p.empresa_id)||E[0];
+  const prev=window.MEMB_OVR;window.MEMB_OVR=e&&window.MEMB?window.MEMB({empresa:e}):null;try{f(window.MEMB_OVR||(window.MEMB?window.MEMB(null):{nombre:''}))}finally{window.MEMB_OVR=prev}}
+function pdfPres(p){if(!window.PDFK||!PDFK.ok())return;const c=cuentas(p);const m=p.moneda||'Gs';
+  conMembrete(p,mb=>{const doc=PDFK.nuevo();let y=PDFK.titulo(doc,'PRESUPUESTO DE HONORARIOS PROFESIONALES',[['Proyecto:',p.nombre],['Cliente:',p.cliente],['Tipo de trabajo:',p.tipo],['Fecha:',fch(p.envio||hoyP())]]);
+    if(p.pedido){doc.setFont('times','normal');doc.setFontSize(10);const t=doc.splitTextToSize('Alcance: '+p.pedido,182);doc.text(t,14,y);y+=t.length*4.6+3}
+    y=PDFK.tabla(doc,{startY:y,head:[['N°','Concepto','Monto']],body:(p.items||[]).map((it,i)=>[i+1,it.concepto||'',plata(num(it.monto),m)]),foot:[['','TOTAL',plata(c.total,m)]],
+      columnStyles:{0:{cellWidth:12,halign:'center'},2:{cellWidth:48,halign:'right'}}});
+    if(p.forma_pago){doc.setFont('times','bold');doc.setFontSize(10);doc.text('Forma de pago:',14,y+8);doc.setFont('times','normal');const t=doc.splitTextToSize(p.forma_pago,150);doc.text(t,14+doc.getTextWidth('Forma de pago: '),y+8);y+=8+t.length*4.6}
+    PDFK.firmas(doc,y+4,['Profesional\n'+(mb.prof||'')+'\n'+mb.nombre,'Conformidad del cliente\n'+(p.cliente||'')]);
+    PDFK.cerrar(doc,'Presupuesto '+(p.nombre||'proyecto'))})}
+function pdfCta(p){if(!window.PDFK||!PDFK.ok())return;const c=cuentas(p);const m=p.moneda||'Gs';
+  conMembrete(p,mb=>{const doc=PDFK.nuevo();let y=PDFK.titulo(doc,'ESTADO DE CUENTA · CONTROL DE DESEMBOLSOS',[['Proyecto:',p.nombre],['Cliente:',p.cliente],['Presupuesto aprobado:',plata(c.total,m)],['Fecha:',fch(hoyP())]]);
+    let s=c.total;const body=(p.pagos||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map((x,i)=>{s-=num(x.monto);return[i+1,fch(x.fecha),x.concepto||'',x.medio||'',plata(num(x.monto),m),plata(Math.max(0,s),m)]});
+    y=PDFK.tabla(doc,{startY:y,head:[['N°','Fecha','Concepto','Medio','Monto','Saldo']],body:body.length?body:[['','','Sin cobros registrados','','','']],foot:[['','','TOTAL COBRADO','',plata(c.cobrado,m),plata(c.falta,m)]],
+      columnStyles:{0:{cellWidth:10,halign:'center'},1:{cellWidth:22},4:{halign:'right',cellWidth:34},5:{halign:'right',cellWidth:34}}});
+    doc.setFont('times','bold');doc.setFontSize(10.5);doc.text(`Cobrado: ${plata(c.cobrado,m)} (${c.pct}%)   ·   Saldo pendiente: ${plata(c.falta,m)}`,14,y+8);
+    PDFK.firmas(doc,y+10,['Profesional\n'+(mb.prof||'')+'\n'+mb.nombre,'Cliente\n'+(p.cliente||'')]);
+    PDFK.cerrar(doc,'Estado de cuenta '+(p.nombre||'proyecto'))})}
+
+/* ---------- montaje y eventos ---------- */
+function mount(){const root=document.getElementById('pry-root');if(!root)return;const wc=document.getElementById('pry-wc');const sc=wc?wc.scrollTop:0;
+  const f=document.activeElement&&document.activeElement.id;root.innerHTML=html();const w2=document.getElementById('pry-wc');if(w2)w2.scrollTop=sc;
+  if(f==='pry-q'){const q=document.getElementById('pry-q');if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length)}}
+  document.body.classList.toggle('rs-modal',!!(P.edit||P.nuevo))}
+const dentro=e=>{const r=document.getElementById('pry-root');return r&&r.contains(e.target)};
+function nota(p,t){p.notas=p.notas||[];p.notas.push({id:nid(),fecha:hoyP(),t})}
+document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.target.closest('[data-pa]');if(!t)return;const a=t.dataset.pa;const p=P.edit;
+  if(a==='vista'){P.vista=t.dataset.v;LS('pry_vista',P.vista);if(P.vista==='tablero'&&!['todos','cobrar'].includes(P.filtro))P.filtro='todos';return mount()}
+  if(a==='filtro'){P.filtro=t.dataset.f;if(!['todos','cobrar'].includes(P.filtro)&&P.vista==='tablero'){P.vista='lista'}return mount()}
+  if(a==='colab'){P.colab=!P.colab;return mount()}
+  if(a==='nuevo'){P.nuevo={};return mount()}
+  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=JSON.parse(JSON.stringify(x));P.estadoG='';P.borrar=false}return mount()}
+  if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;if(P.edit&&P.t){clearTimeout(P.t);P.t=null;await guardar(P.edit,true)}P.edit=null;P.nuevo=null;return mount()}
+  if(!p)return;
+  if(a==='estado'){const ne=t.dataset.e;if(ne===p.estado)return;nota(p,`Estado: ${ES(p.estado)[1]} → ${ES(ne)[1]}`);p.estado=ne;if(ne==='enviado'&&!p.envio)p.envio=hoyP();if(ne==='aprobado'&&!p.aprobado)p.aprobado=hoyP();
+    await guardar(p,true);toast('Estado: '+ES(ne)[1]);return mount()}
+  if(a==='item'){p.items=p.items||[];p.items.push({id:nid(),concepto:'',monto:0});mount();const L=document.querySelectorAll('[data-f="concepto"]');if(L.length)L[L.length-1].focus();return}
+  if(a==='quitarit'){p.items.splice(+t.dataset.i,1);autoguardar();return mount()}
+  if(a==='pago'){const v=num(document.getElementById('pry-pv').value);if(!v)return toast('Escribí el monto cobrado');
+    const x={id:nid(),fecha:document.getElementById('pry-pf').value||hoyP(),concepto:document.getElementById('pry-pc').value.trim()||'Pago',medio:document.getElementById('pry-pm').value,monto:v};
+    p.pagos=p.pagos||[];p.pagos.push(x);nota(p,`Cobro registrado: ${plata(v,p.moneda)}${x.concepto?' · '+x.concepto:''}`);await guardar(p,true);toast('Cobro registrado');return mount()}
+  if(a==='quitarpago'){p.pagos=(p.pagos||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
+  if(a==='colabsi'){p.colab={...(p.colab||{mio:50}),si:t.checked};if(p.colab.mio==null)p.colab.mio=50;autoguardar();return mount()}
+  if(a==='nota'){const i=document.getElementById('pry-nt');const v=i.value.trim();if(!v)return;nota(p,v);await guardar(p,true);return mount()}
+  if(a==='pdfpres')return pdfPres(p);
+  if(a==='pdfcta')return pdfCta(p);
+  if(a==='borrar'){P.borrar=true;return mount()}
+  if(a==='borrarno'){P.borrar=false;return mount()}
+  if(a==='borrarsi'){try{await window.PRYB.del(p.id);P.lista=P.lista.filter(x=>x.id!==p.id);P.edit=null;P.borrar=false;toast('Proyecto eliminado')}catch(err){toast('No se pudo eliminar')}return mount()}
+});
+document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
+  if(t.id==='pry-q'){P.q=t.value;return mount()}
+  const p=P.edit;if(!p)return;
+  if(t.dataset.pf){p[t.dataset.pf]=t.value;autoguardar();if(t.dataset.re)mount();return}
+  if(t.dataset.pi!=null){const it=p.items[+t.dataset.pi];if(!it)return;it[t.dataset.f]=t.dataset.f==='monto'?num(t.value):t.value;
+    if(t.dataset.f==='monto'){const el=document.getElementById('pry-total');if(el)el.textContent=plata(cuentas(p).total,p.moneda)}autoguardar();return}
+  if(t.dataset.pc){p.colab=p.colab||{si:true};p.colab[t.dataset.pc]=t.dataset.pc==='mio'?num(t.value):t.value;autoguardar();return}
+});
+document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;const p=P.edit;if(!p)return;
+  if(t.dataset.re){mount()}
+  if(t.dataset.pi!=null&&t.dataset.f==='monto'){t.value=num(t.value)?(p.moneda==='USD'?usd(num(t.value)):gs(num(t.value))):''}
+  if(t.dataset.pc==='mio')mount()});
+document.addEventListener('keydown',e=>{if(!dentro(e))return;
+  if(e.key==='Escape'&&(P.edit||P.nuevo)){const x=document.querySelector('#pry-root .rs-x');if(x)x.click()}
+  if(e.key==='Enter'&&e.target.id==='pry-nt'){e.preventDefault();const b=document.querySelector('[data-pa="nota"]');if(b)b.click()}
+  if(e.key==='Enter'&&e.target.id==='pry-pv'){e.preventDefault();const b=document.querySelector('[data-pa="pago"]');if(b)b.click()}});
+document.addEventListener('submit',async e=>{if(e.target.id!=='pry-nf')return;e.preventDefault();e.stopImmediatePropagation();const fd=Object.fromEntries(new FormData(e.target));
+  if(!fd.cliente.trim()||!fd.nombre.trim())return toast('Completá cliente y nombre');
+  const p={id:nid(),nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),tipo:fd.tipo,fecha:fd.fecha||hoyP(),pedido:fd.pedido.trim(),estado:'presupuestar',moneda:'Gs',items:[],pagos:[],
+    colab:{si:!!fd.colab,colega:'',mio:50,nota:''},notas:[{id:nid(),fecha:hoyP(),t:'Pedido recibido'}],creado:new Date().toISOString()};
+  await guardar(p,true);P.nuevo=null;P.edit=JSON.parse(JSON.stringify(p));P.estadoG='Guardado';mount();toast('Proyecto creado · ahora cargá el presupuesto')},true);
+
+window.PROY={mount,recargar:()=>{P.lista=null}};
+
+const css=document.createElement('style');css.textContent=`
+.pry{display:flex;flex-direction:column;gap:14px}
+.pry-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}.pry-head h2{margin:0;font-size:34px}
+.pry-hb{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pry-seg{display:inline-flex;background:var(--chip);border-radius:10px;padding:3px}.pry-seg button{border:0;background:none;padding:7px 14px;border-radius:8px;font-weight:600;cursor:pointer;color:var(--ink);font-family:inherit;font-size:14px}
+.pry-seg button[aria-pressed="true"]{background:var(--panel);box-shadow:0 1px 3px rgb(0 0 0/.12)}
+.pry-k{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pry-kt{display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;color:var(--ink);font-family:inherit}
+.pry-kt b{font-size:24px;font-family:var(--f-display);letter-spacing:.01em}.pry-kt small{color:var(--muted);font-size:12.5px}.pry-kt.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+.pry-bar2{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pry-bar2 input[type=search]{flex:1 1 260px;max-width:380px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit}
+.pry-chips{display:flex;gap:6px;flex-wrap:wrap}
+.pry-tab{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;align-items:start}
+.pry-colm{background:var(--chip);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.pry-colm header{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:2px 4px 0}.pry-colm header b{font-size:14.5px}.pry-colm header span{background:var(--panel);border-radius:99px;padding:1px 9px;font-size:13px;font-weight:700}
+.pry-colm>p{margin:0 4px 4px;font-size:12.5px}
+.pry-colm{border-top:4px solid var(--line)}.pry-colm.e-presupuestar{border-top-color:#d08a00}.pry-colm.e-enviado{border-top-color:#2f6fbf}.pry-colm.e-aprobado{border-top-color:var(--ok)}.pry-colm.e-pausa{border-top-color:#8a8f8d}.pry-colm.e-terminado{border-top-color:#1d2321}.pry-colm.e-rechazado{border-top-color:var(--bad)}
+.pry-cards{display:flex;flex-direction:column;gap:8px}
+.pry-card{display:flex;flex-direction:column;gap:4px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;color:var(--ink);font-family:inherit;font-size:14px;width:100%}
+.pry-card:hover{border-color:var(--accent)}.pry-card>b{font-size:15px;line-height:1.25}
+.pry-col{align-self:flex-start;background:#e6ecf7;color:#234f8c;border-radius:99px;padding:1px 9px;font-size:12px;font-weight:600}
+.pry-vacio{color:var(--muted);text-align:center;padding:6px}.pry-vacio2{padding:26px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:8px}
+.pry-aviso{padding:12px 14px;border-left:4px solid var(--warn);background:var(--warn-bg)}
+.pry-bar{height:7px;border-radius:99px;background:var(--chip);overflow:hidden;margin-top:2px}.pry-bar i{display:block;height:100%;background:var(--ok);border-radius:99px}.pry-bar.big{height:12px}
+.pry-card .pry-bar{background:color-mix(in srgb,var(--chip) 70%,var(--line))}
+.pry-bl{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
+.pry-tl tbody tr{cursor:pointer}.pry-tl tbody tr:hover{background:var(--chip)}.pry-tl td{vertical-align:top}
+.pry-es{display:inline-block;border-radius:99px;padding:2px 10px;font-size:12.5px;font-weight:700;white-space:nowrap;background:var(--chip)}
+.pry-es.e-presupuestar{background:var(--warn-bg);color:var(--warn)}.pry-es.e-enviado{background:#e3ecf8;color:#2f5f9e}.pry-es.e-aprobado{background:var(--ok-bg);color:var(--ok)}.pry-es.e-rechazado{background:var(--bad-bg);color:var(--bad)}.pry-es.e-terminado{background:var(--ink);color:var(--panel)}
+.pry-win .rs-wc{gap:14px}
+.pry-win textarea,#pry-nf textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;resize:vertical;box-sizing:border-box}
+@media (max-width:760px){header.top nav.tabs.nav-raiz button,header.top nav.tabs.nav-raiz button:first-child{flex:1 1 0;font-size:14px}}
+.pry-steps{display:flex;gap:6px;flex-wrap:wrap}
+.pry-steps button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:7px 13px;font-weight:600;cursor:pointer;font-family:inherit;font-size:13.5px}
+.pry-steps button.hecho{background:var(--chip)}.pry-steps button.on{border-color:transparent;color:#fff;background:#1d2321}
+.pry-steps button.on.e-presupuestar{background:#b87800}.pry-steps button.on.e-enviado{background:#2f6fbf}.pry-steps button.on.e-aprobado{background:var(--ok)}.pry-steps button.on.e-pausa{background:#6d7471}.pry-steps button.on.e-rechazado{background:var(--bad)}
+.pry-sec{border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.pry-sec h3{margin:0;font-size:16px}.pry-sh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.pry-sha{display:flex;gap:8px;align-items:center}
+.pry-mini{display:flex;align-items:center;gap:6px;font-size:13px}.pry-mini select{padding:5px 8px}
+.pry-items{display:flex;flex-direction:column;gap:6px}.pry-it{display:grid;grid-template-columns:1fr 170px 34px;gap:6px}
+.pry-it input,.pry-np input,.pry-np select,.pry-nn input,.pry-ln input{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;min-width:0}
+.pry-it input.num,.pry-np input.num{text-align:right}
+.pry-q{border:0;background:var(--chip);border-radius:8px;cursor:pointer;color:var(--muted);min-width:30px;min-height:30px}
+.pry-items .btn{align-self:flex-start}
+.pry-tot{display:flex;justify-content:space-between;align-items:center;border-top:2px solid var(--ink);padding-top:8px;font-weight:600}.pry-tot b{font-size:20px}
+.pry-ln{display:flex;gap:6px}.pry-ln input{flex:1}
+.pry-res,.pry-rep{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.pry-rep{grid-template-columns:1fr 1fr}
+.pry-res>div,.pry-rep>div{background:var(--chip);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px;min-width:0}.pry-res b,.pry-rep b{font-size:17px}.pry-rep small{color:var(--muted)}
+.pry-res b.ok{color:var(--ok)}.pry-res b.warn{color:var(--warn)}
+.pry-np{display:grid;grid-template-columns:150px 1fr 140px 150px auto;gap:6px;align-items:center}
+.pry-nn{display:flex;gap:6px}.pry-nn input{flex:1}
+.pry-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;max-height:220px;overflow:auto}.pry-hist li{font-size:14px;border-bottom:1px dashed var(--line);padding-bottom:4px}
+.pry-chk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;font-weight:600;text-transform:none!important;letter-spacing:0!important}
+.pry-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:899px){.pry-k{grid-template-columns:1fr 1fr}.pry-np{grid-template-columns:1fr 1fr}.pry-np .btn{grid-column:1/-1}}
+@media (max-width:560px){.pry-it{grid-template-columns:1fr 120px 30px}.pry-res{grid-template-columns:1fr}.pry-head h2{font-size:28px}.pry-tab{grid-template-columns:1fr}}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .pry-col{background:#1e2c42;color:#9cc0f0}:root:not([data-theme="light"]) .pry-es.e-enviado{background:#1e2c42;color:#9cc0f0}}
+:root[data-theme="dark"] .pry-col,:root[data-theme="dark"] .pry-es.e-enviado{background:#1e2c42;color:#9cc0f0}
+`;document.head.appendChild(css);
+})();
+
+(function(){
 /* ============ Menú lateral (pantallas anchas): navegación, sub-secciones y avisos a la izquierda ============ */
 const ICS={
  inicio:'<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/>',
@@ -4691,11 +4977,12 @@ const ICS={
  presupuesto:'<circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.6-1-1.7-1.6-3-1.6-1.7 0-3 1-3 2.3s1.2 1.9 3 2.2 3 .9 3 2.3-1.3 2.3-3 2.3c-1.4 0-2.5-.6-3.1-1.7M12 6v1.6M12 16.7V18"/>',
  planos:'<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
  materiales:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+ proyectos:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M8 13h8M8 16.5h5"/>',
  tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>'};
 const svg=k=>`<svg class="side-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICS[k]||''}</svg>`;
 const SUBS='main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p';
 const ancho=()=>window.matchMedia('(min-width:900px)').matches;
-const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(['contratistas','presupuesto','planos','materiales','tareas'].includes(t))return t;return 'personal'};
+const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(t==='proyectos')return 'proyectos';if(['contratistas','presupuesto','planos','materiales','tareas'].includes(t))return t;return 'personal'};
 let pend=false;
 function armar(){pend=false;const nav=document.querySelector('header.top nav.tabs');if(!nav)return;
   nav.querySelectorAll('button[data-tab]').forEach(b=>{if(!b.querySelector('.side-ic'))b.insertAdjacentHTML('afterbegin',svg(claveDe(b)))});
