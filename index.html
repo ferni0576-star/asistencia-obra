@@ -763,7 +763,11 @@ const PDFK={
   cerrar(doc,nombre){const{W,H}=this.dims(doc);const m=MEMB();const emp=m.nombre;const n=doc.getNumberOfPages();
     for(let i=1;i<=n;i++){doc.setPage(i);membretePdf(doc,m,this.ML,this.MR,W,10);
       doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text('©'+new Date().getFullYear()+' | '+emp,this.ML,H-8);doc.text('Pág. '+i+' de '+n,W-this.MR,H-8,{align:'right'})}
+    if(this.capturar){this.capturado=new File([doc.output('blob')],nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf',{type:'application/pdf'});return}
     BAJAR(nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf',doc.output('blob'))}
+  ,
+  /* arma el PDF en memoria (para compartir) en vez de descargarlo */
+  archivo(fn){this.capturar=true;this.capturado=null;try{fn()}finally{this.capturar=false}return this.capturado}
 };
 window.PDFK=PDFK;
 const obraTxt=()=>{const o=obraAct();return o?o.nombre:'—'};
@@ -2813,7 +2817,7 @@ function vLista(){
       <div class="m-info"><b>${esc(p.ref||'Sin referencia')} ${window.APROB?window.APROB.chip('pedido',p.id):''}</b><span class="sub">${fch(p.fecha)}${p.proveedor?' · '+esc(p.proveedor):''} · ${n} ítem${n===1?'':'s'}${t?' · Gs '+gs(t):''}</span>
         <span class="m-prog" aria-label="${ok} de ${n} llegaron"><i style="width:${n?Math.round(ok/n*100):0}%"></i></span></div>
       <div class="m-est">${badge(e)}<span class="sub num">${ok}/${n}</span></div></button>
-      <div class="m-acc"><span class="sub">Descargar:</span><button class="btn sm" data-mact="pdf-ped" data-id="${p.id}">PDF</button><button class="btn sm" data-mact="xls-ped" data-id="${p.id}">Excel</button></div></div>`}).join('')
+      <div class="m-acc"><span class="sub">Descargar:</span><button class="btn sm" data-mact="pdf-ped" data-id="${p.id}">PDF</button><button class="btn sm" data-mact="xls-ped" data-id="${p.id}">Excel</button><button class="btn sm m-wab" data-mact="wa-ped" data-id="${p.id}">WhatsApp</button></div></div>`}).join('')
     ||`<div class="panel sub" style="padding:16px">${L.length?'No hay pedidos con ese filtro.':'Todavía no hay pedidos en esta obra. Creá el primero con “+ Nuevo pedido”.'}</div>`}</div>`;
 }
 
@@ -2845,7 +2849,7 @@ function vVer(){
     <div class="bar between"><h2>Pedido N° ${esc(p.numero)}</h2>${badge(e)}</div>
     <div class="m-meta"><span><small>Fecha</small>${fch(p.fecha)}</span><span><small>Referencia</small>${esc(p.ref||'—')}</span>${p.proveedor?`<span><small>Proveedor elegido</small>${esc(p.proveedor)}</span>`:''}<span><small>Llegaron</small><b class="num">${ok} de ${n}</b></span>${t?`<span><small>Total</small><b class="num">Gs ${gs(t)}</b></span>`:''}</div>
     ${p.nota?`<div class="sub">${esc(p.nota)}</div>`:''}
-    <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
+    <div class="m-desc"><b>Descargar pedido</b><button class="btn primary" data-mact="pdf-ped">PDF</button><button class="btn primary" data-mact="xls-ped">Excel</button><button class="btn m-wab" data-mact="wa-ped">Enviar por WhatsApp</button><button class="btn" data-mact="pdf-rec">PDF recepción</button></div>
   </div>
   ${window.CLI?'':provResumen(p)}
   <div class="panel">
@@ -2991,6 +2995,21 @@ function vFaltantes(){
   ||'<div class="panel" style="padding:16px">Todo lo pedido llegó a obra. 👍</div>'}`;
 }
 
+/* ---------- títulos de rubros e ítems del presupuesto de la obra, para elegir la referencia ---------- */
+const rubLimpio=r=>{let t=String(r||'').replace(/^\s*\d+[.)-]?\s*/,'').replace(/\(.*?\)/g,'').replace(/\s+/g,' ').trim();t=t.toLowerCase();return t.charAt(0).toUpperCase()+t.slice(1)};
+function itCorto(desc,rub){let t=String(desc||'').replace(/\s+/g,' ').trim();t=t.split(/\.\s|\.$| - |;|: /)[0].replace(/\b(medidas|esp\.?|espesor|profundidad|profundiad)\b.*$/i,'').replace(/[\s,.-]+$/,'').trim();
+  if(!t)return '';if(/^(de|para|con|en|sobre|bajo)\s/i.test(t))t=rub+' '+t.charAt(0).toLowerCase()+t.slice(1);t=t.charAt(0).toUpperCase()+t.slice(1);return t.length>60?t.slice(0,58).replace(/\s\S*$/,'')+'…':t}
+function armarRubros(doc){const its=(doc&&doc.items)||[];const G=new Map();
+  its.forEach(i=>{if(!i.rubro)return;const t=rubLimpio(i.rubro);if(!t)return;const g=G.get(t)||{t,its:new Set()};const c=itCorto(i.desc,t);if(c&&c.toLowerCase()!==t.toLowerCase())g.its.add(c);G.set(t,g)});
+  return [...G.values()].map(g=>({t:g.t,its:[...g.its]}))}
+async function cargarRubros(){const oid=M.oid;if(!window.PDB||!oid)return;try{const d=await window.PDB.get(oid);if(M.oid!==oid)return;M.rub=armarRubros(d);M.rubOid=oid}catch(e){M.rub=M.rub||[]}
+  const el=document.getElementById('m-rubpick');if(el)el.outerHTML=vRubros();const dl=document.getElementById('m-refs');if(dl&&M.form)dl.innerHTML=[...new Set([...(M.rub||[]).flatMap(r=>[r.t,...r.its]),...M.lista.map(p=>(p.ref||'').trim())].filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}
+function vRubros(){const R=M.rub||[];
+  if(!R.length)return `<div id="m-rubpick" class="m-rubpick vacio"><span class="sub">${M.rubOid===M.oid?'Cuando cargues el presupuesto de la obra, acá vas a poder elegir sus rubros.':'Buscando rubros del presupuesto…'}</span></div>`;
+  return `<details id="m-rubpick" class="m-rubpick"><summary>Elegir del presupuesto <span class="sub">· ${R.length} rubros</span></summary>
+    <input type="search" id="m-rubq" placeholder="Buscar: zapatas, columnas, mampostería…" aria-label="Buscar rubro o ítem">
+    <div class="m-rubs">${R.map(r=>`<details class="m-rub" data-txt="${esc((r.t+' '+r.its.join(' ')).toLowerCase())}"><summary><span>${esc(r.t)}</span>${r.its.length?`<small>${r.its.length}</small>`:''}</summary>
+      <div class="m-rits"><button type="button" class="m-rb fuerte" data-mref="${esc(r.t)}">Usar “${esc(r.t)}”</button>${r.its.map(x=>`<button type="button" class="m-rb" data-mref="${esc(x)}" data-txt="${esc(x.toLowerCase())}">${esc(x)}</button>`).join('')}</div></details>`).join('')}</div></details>`}
 function vForm(){
   const f=M.form;const hist=sugerencias();
   return `
@@ -2999,11 +3018,11 @@ function vForm(){
     <div class="form">
       <label>N° de pedido<input type="text" inputmode="numeric" name="numero" value="${esc(f.numero)}" required></label>
       <label>Fecha<input type="date" name="fecha" value="${esc(f.fecha)}" required></label>
-      <label class="wide">Referencia (rubro / destino)<input type="text" name="ref" value="${esc(f.ref)}" placeholder="Ej.: VIGA INFERIOR, VALLADO DE OBRA 152 ML" list="m-refs"></label>
+      <div class="wide m-refw"><label>Referencia (rubro / destino)<input type="text" name="ref" id="m-ref" value="${esc(f.ref)}" placeholder="Ej.: Hormigón armado, Zapatas, Vallado de obra" list="m-refs"></label>${vRubros()}</div>
       <label>Proveedor elegido por el cliente<input type="text" name="proveedor" value="${esc(f.proveedor||'')}" list="m-provs"></label>
       <label class="wide">Nota (opcional)<input type="text" name="nota" value="${esc(f.nota||'')}"></label>
     </div>
-    <datalist id="m-refs">${[...new Set(M.lista.map(p=>(p.ref||'').trim()).filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
+    <datalist id="m-refs">${[...new Set([...(M.rub||[]).flatMap(r=>[r.t,...r.its]),...M.lista.map(p=>(p.ref||'').trim())].filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
     <datalist id="m-provs">${[...new Set([...(PV.lista||[]).map(x=>x.nombre),...M.lista.map(p=>(p.proveedor||'').trim())].filter(Boolean))].map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
     <datalist id="m-mats">${hist.map(h=>`<option value="${esc(h.desc)}">`).join('')}</datalist>
     <datalist id="m-uds">${[...new Set(['Unidad','Kg','m3','m2','ml','Metros','Bolsa','Paquete','Caja','Rollo','Litros',...hist.map(h=>h.ud)].filter(Boolean))].map(u=>`<option value="${esc(u)}">`).join('')}</datalist>
@@ -3022,7 +3041,7 @@ function vForm(){
     <div class="bar between" style="padding:12px 14px;border-top:1px solid var(--line)">
       <button type="button" class="btn" data-mact="agregar">+ Agregar material</button>
       <span class="sub">Total: <b class="num" id="m-total">Gs ${gs(total(f))}</b></span>
-      <div class="bar"><button class="btn" name="bajar" value="pdf">Guardar y bajar PDF</button><button class="btn" name="bajar" value="xls">Guardar y bajar Excel</button><button class="btn primary" name="bajar" value="">Guardar pedido</button></div>
+      <div class="bar"><button class="btn" name="bajar" value="pdf">Guardar y bajar PDF</button><button class="btn" name="bajar" value="xls">Guardar y bajar Excel</button><button class="btn m-wab" name="bajar" value="wa">Guardar y enviar por WhatsApp</button><button class="btn primary" name="bajar" value="">Guardar pedido</button></div>
     </div>
   </form>`;
 }
@@ -3050,6 +3069,37 @@ window.MATERIALES_PEDIDOS=()=>M.lista;
 
 /* ---------- PDF ---------- */
 function encabezado(p){const o=OB()||{};return[['N°:',String(p.numero)],['Fecha:',fch(p.fecha)],['Obra:',o.nombre],['Ubicación:',o.ubicacion],['Ref.:',p.ref],['Proveedor:',p.proveedor]]}
+/* ---------- enviar por WhatsApp sin descargar: compartir el PDF o mandar el pedido como texto ---------- */
+const WA={p:null};
+const puedeCompartir=()=>{try{return !!(navigator.canShare&&navigator.canShare({files:[new File(['x'],'x.pdf',{type:'application/pdf'})]}))}catch(e){return false}};
+function textoSolicitud(p){const o=OB()||{};const emp=window.MEMB?window.MEMB().nombre:'';const conP=p.items.some(i=>Number(i.precio)>0);const tot=p.items.reduce((s,i)=>s+(Number(i.precio)||0)*(Number(i.cant)||0),0);
+  return `*Pedido de materiales N° ${p.numero}*\nObra: ${o.nombre||''}${o.ubicacion?' – '+o.ubicacion:''}${p.ref?'\nReferencia: '+p.ref:''}\nFecha: ${fch(p.fecha)}\n\n`+
+    p.items.map((i,k)=>`${k+1}. ${i.desc} – ${fq(i.cant)} ${i.ud||''}${conP&&i.precio?` (Gs ${gs(i.precio*i.cant)})`:''}`).join('\n')+(conP&&tot?`\n\n*Total: Gs ${gs(tot)}*`:'')+(p.nota?`\n\nNota: ${p.nota}`:'')+(emp?`\n\n${emp}`:'')}
+function waNumeroDe(p){const v=(PV.lista||[]).find(x=>x.nombre&&x.nombre===p.proveedor);return v?(v.whatsapp||v.telefono||''):''}
+function abrirWA(p){WA.p=p;WA.modo=null;pintarWA();if(PV.lista==null&&window.PVB)cargarPV()}
+function waHref(){const n=telWA((document.getElementById('wa-num')||{}).value||'');const t=(document.getElementById('wa-txt')||{}).value||'';return `https://wa.me/${n}?text=${encodeURIComponent(t)}`}
+function pintarWA(){let el=document.getElementById('wa-modal');if(!WA.p){if(el)el.remove();document.body.classList.remove('rs-modal');return}
+  if(!el){el=document.createElement('div');el.id='wa-modal';document.body.appendChild(el)}
+  const p=WA.p;const sh=puedeCompartir();const txt=textoSolicitud(p);const num=waNumeroDe(p);
+  el.innerHTML=`<div class="rs-ov" data-wa="cerrar"></div><div class="rs-win" role="dialog" aria-modal="true" aria-label="Enviar por WhatsApp">
+    <div class="rs-wh"><b>Enviar pedido N° ${esc(p.numero)} por WhatsApp</b><button class="rs-x" data-wa="cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="rs-wc wa-c">
+      <button type="button" class="wa-op ${sh?'':'off'}" data-wa="pdf" ${sh?'':'aria-disabled="true"'}><span class="wa-ic">PDF</span><span><b>Compartir el PDF</b><small>${sh?'Se abre el menú de compartir: elegí WhatsApp y el contacto. El PDF va adjunto y no se guarda en tu equipo.':'Este navegador no permite adjuntar archivos al compartir. Desde el celular sí funciona; en la computadora probá con Chrome o Edge actualizados.'}</small></span></button>
+      <div class="wa-op wa-txt"><span class="wa-ic">Aa</span><div><b>Enviar como mensaje</b><small>Se abre WhatsApp con el pedido escrito. Funciona en cualquier equipo.</small>
+        <label>Número (opcional · si lo dejás vacío elegís el contacto en WhatsApp)<input type="text" id="wa-num" inputmode="tel" value="${esc(num)}" placeholder="Ej.: 0985 123 456"></label>
+        <label>Mensaje<textarea id="wa-txt" rows="8">${esc(txt)}</textarea></label>
+        <a class="btn primary wa-go" id="wa-go" href="https://wa.me/${telWA(num)}?text=${encodeURIComponent(txt)}" target="_blank" rel="noopener" data-wa="ir">Abrir WhatsApp</a></div></div>
+    </div></div>`;document.body.classList.add('rs-modal');const x=el.querySelector('.rs-x');if(x)x.focus()}
+async function compartirPDF(p){if(!window.PDFK||!window.PDFK.ok())return;let f=null;try{f=window.PDFK.archivo(()=>pdfPedido(p))}catch(e){f=null}
+  if(!f)return toast('No se pudo armar el PDF');
+  try{await navigator.share({files:[f],title:'Pedido N° '+p.numero,text:`Pedido de materiales N° ${p.numero}${p.ref?' · '+p.ref:''}`});WA.p=null;pintarWA();toast('Pedido compartido')}
+  catch(e){if(e&&e.name==='AbortError')return;toast('No se pudo compartir el archivo: usá "Enviar como mensaje"')}}
+document.addEventListener('click',e=>{const m=e.target.closest('#wa-modal');if(!m)return;const t=e.target.closest('[data-wa]');if(!t)return;const a=t.dataset.wa;
+  if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;WA.p=null;return pintarWA()}
+  if(a==='pdf'){if(t.classList.contains('off'))return toast('Usá "Enviar como mensaje" en este equipo');return compartirPDF(WA.p)}
+  if(a==='ir'){t.href=waHref();setTimeout(()=>{WA.p=null;pintarWA()},300)}});
+document.addEventListener('input',e=>{if(e.target.id==='wa-num'||e.target.id==='wa-txt'){const g=document.getElementById('wa-go');if(g)g.href=waHref()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&WA.p){WA.p=null;pintarWA()}});
 function pdfPedido(p){
   if(!PDFK.ok())return;const doc=PDFK.nuevo('portrait');
   let y=PDFK.titulo(doc,'PEDIDO DE MATERIALES',encabezado(p));
@@ -3115,8 +3165,11 @@ const dentro=e=>{const r=document.getElementById('ped-root');return r&&r.contain
 const nuevoForm=base=>({id:nid(),obra_id:M.oid,numero:String(proximo()),fecha:hoyM(),ref:base?base.ref:'',proveedor:base?base.proveedor||'':'',nota:'',
   sugeridos:base&&base.sugeridos?JSON.parse(JSON.stringify(base.sugeridos)).map(x=>({...x,obs:''})):[],items:base?base.items.map(i=>({id:nid(),desc:i.desc,ud:i.ud,cant:i.cant,precio:i.precio||0})):[1,2,3].map(()=>({id:nid(),desc:'',ud:'',cant:null,precio:0}))});
 function marcar(p,i,ok){if(ok){i.rec={cant:i.cant!=null?Number(i.cant):null,fecha:(i.rec&&i.rec.fecha)||hoyM(),obs:(i.rec&&i.rec.obs)||''}}else{if(i.rec&&i.rec.obs)i.rec={cant:0,fecha:'',obs:i.rec.obs};else delete i.rec}}
+document.addEventListener('input',e=>{if(e.target.id!=='m-rubq')return;const q=e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#m-rubpick .m-rub').forEach(d=>{const hay=!q||d.dataset.txt.includes(q);d.hidden=!hay;d.open=!!q&&hay;d.querySelectorAll('.m-rb[data-txt]').forEach(b=>b.hidden=!!q&&!b.dataset.txt.includes(q)&&!d.querySelector('summary span').textContent.toLowerCase().includes(q))})});
 document.addEventListener('click',async e=>{
   if(!dentro(e))return;
+  const rb=e.target.closest('[data-mref]');if(rb){const i=document.getElementById('m-ref');if(i){i.value=rb.dataset.mref;i.dispatchEvent(new Event('input',{bubbles:true}))}const d=document.getElementById('m-rubpick');if(d)d.open=false;if(i)i.focus();toast('Referencia: '+rb.dataset.mref);return}
   const tb=e.target.closest('[data-mtab]');if(tb){if(tb.dataset.mtab==='computo'&&window.COMPUTO)window.COMPUTO.reset();M.tab=tb.dataset.mtab;M.vista='lista';M.confirm=false;render();return}
   const t=e.target.closest('[data-mact]');if(!t)return;const a=t.dataset.mact;const p=M.lista.find(x=>x.id===(t.dataset.id||M.sel));
   if(a==='pv-nuevo'){PV.edit={nombre:t.dataset.n||'',rubros:t.dataset.r&&t.dataset.r!=='Otros'?[t.dataset.r]:[]};if(M.vista==='ver'){M.vista='lista';M.tab='proveedores'}else M.tab='proveedores';render();window.scrollTo(0,0);return}
@@ -3133,20 +3186,21 @@ document.addEventListener('click',async e=>{
   if(a==='sug-lista'){M.elegir=!M.elegir;M.pq='';return render()}
   if(a==='elegido'&&p){const x=p.sugeridos[+t.dataset.k];p.proveedor=p.proveedor===x.nombre?'':x.nombre;render();await guardar(p);return toast(p.proveedor?'Proveedor elegido por el cliente: '+x.nombre:'Elección quitada')}
   if(a==='asignar'&&p){const pv=PV.lista.find(x=>x.id===t.dataset.pv);if(!pv)return;p.proveedor=pv.nombre;render();await guardar(p);return toast('Proveedor asignado al pedido')}
-  if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();window.scrollTo(0,0);return}
+  if(a==='nuevo'){M.form=nuevoForm(null);M.vista='editar';render();cargarRubros();window.scrollTo(0,0);return}
   if(a==='filtro'){M.filtro=t.dataset.f;return render()}
   if(a==='provver'){M.provAbierto=M.sel;return render()}
   if(a==='provcerrar'){M.provAbierto=null;document.body.classList.remove('rs-modal');return render()}
   if(a==='ver'){M.provAbierto=null;M.sel=t.dataset.id;M.vista='ver';M.confirm=false;M.abierto={};render();window.scrollTo(0,0);return}
   if(a==='volver'){M.provAbierto=null;M.vista='lista';M.tab='pedidos';M.confirm=false;return render()}
   if(a==='abrir'){M.abierto[t.dataset.iid]=!M.abierto[t.dataset.iid];return render()}
-  if(a==='editar'&&p){M.form=JSON.parse(JSON.stringify(p));M.form.numero=String(p.numero);M.vista='editar';return render()}
-  if(a==='duplicar'&&p){M.form=nuevoForm(p);M.vista='editar';render();window.scrollTo(0,0);return toast('Copia lista: revisá cantidades y guardá')}
+  if(a==='editar'&&p){M.form=JSON.parse(JSON.stringify(p));M.form.numero=String(p.numero);M.vista='editar';render();return cargarRubros()}
+  if(a==='duplicar'&&p){M.form=nuevoForm(p);M.vista='editar';render();cargarRubros();window.scrollTo(0,0);return toast('Copia lista: revisá cantidades y guardá')}
   if(a==='conf'){M.confirm=true;return render()}
   if(a==='borrar'&&p){try{await window.MDB.del(p.id);if(window.APROB)window.APROB.quitar(M.oid,'pedido',p.id);M.lista=M.lista.filter(x=>x.id!==p.id);M.vista='lista';M.confirm=false;render();toast('Pedido borrado')}catch(err){toast('No se pudo borrar')}return}
   if(a==='todo'&&p){p.items.forEach(i=>{if(estItem(i)!=='ok')marcar(p,i,true)});render();await guardar(p);return toast('Todo marcado como llegado')}
   if(a==='nada'&&p){p.items.forEach(i=>marcar(p,i,false));render();return guardar(p)}
   if(a==='pdf-ped'&&p)return pdfPedido(p);
+  if(a==='wa-ped'&&p)return abrirWA(p);
   if(a==='pdf-rec'&&p)return pdfRecepcion(p);
   if(a==='xls-ped'&&p)return xlsPedido(p);
   if(a==='pdf-falt')return pdfFaltantes();
@@ -3202,7 +3256,7 @@ document.addEventListener('submit',async e=>{
   F.obra_id=M.oid;const i=M.lista.findIndex(x=>x.id===F.id);
   try{await window.MDB.save(F)}catch(err){return toast('No se pudo guardar en la base. Revisá la conexión.')}
   if(i>=0)M.lista[i]=F;else M.lista.push(F);M.sel=F.id;M.form=null;M.vista='ver';if(window.APROB&&(i<0||window.APROB.get('pedido',F.id)))apbPed(F);render();window.scrollTo(0,0);toast(i>=0?'Pedido actualizado':'Pedido guardado');
-  if(quiere==='pdf')pdfPedido(F);else if(quiere==='xls')xlsPedido(F);
+  if(quiere==='pdf')pdfPedido(F);else if(quiere==='xls')xlsPedido(F);else if(quiere==='wa')abrirWA(F);
 },true);
 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&M.provAbierto&&document.getElementById('ped-root')){M.provAbierto=null;document.body.classList.remove('rs-modal');render()}});
@@ -3284,7 +3338,29 @@ const css=document.createElement('style');css.textContent=`
   .m-it [data-mf="ud"]{grid-column:2/3}.m-it [data-mf="cant"]{grid-column:3/4}.m-it [data-mf="precio"]{grid-column:2/4}
   .m-it .m-k{grid-row:1}.m-it [data-mact="quitar"]{grid-row:1;grid-column:4}
   .m-chk{grid-template-columns:auto 1fr}.m-chk>.btn{grid-column:2;justify-self:start;padding:2px 0}
-}`;document.head.appendChild(css);
+}
+#ped-root .form .m-refw,.form .m-refw,.m-refw{display:flex;flex-direction:column;gap:6px;grid-column:1/-1;min-width:0}
+.m-rubpick{border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--panel)}.m-rubpick.vacio{border-style:dashed;font-size:13px}
+.m-rubpick>summary{cursor:pointer;font-weight:600;font-size:14px;padding:3px 0}
+.m-rubpick[open]>summary{margin-bottom:8px}
+.m-rubpick input[type=search]{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;margin-bottom:8px;box-sizing:border-box}
+.m-rubs{display:flex;flex-direction:column;gap:4px;max-height:340px;overflow:auto}
+.m-rub{border-radius:8px;background:var(--chip)}.m-rub>summary{cursor:pointer;display:flex;justify-content:space-between;gap:8px;padding:7px 10px;font-weight:600;font-size:14px;list-style:none}
+.m-rub>summary::-webkit-details-marker{display:none}.m-rub>summary small{background:var(--panel);border-radius:99px;padding:0 8px;font-size:12px;color:var(--muted)}
+.m-rub[open]>summary{border-bottom:1px solid var(--line)}
+.m-rits{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px}
+.m-rb{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:5px 11px;font:500 13px inherit;cursor:pointer;text-align:left}
+.m-rb:hover{border-color:var(--accent)}.m-rb.fuerte{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.m-wab{background:#1f8f4e!important;color:#fff!important;border-color:#1f8f4e!important}
+.wa-c{gap:12px}
+.wa-op{display:flex;gap:12px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--panel);color:var(--ink);font:inherit;width:100%}
+button.wa-op{cursor:pointer}button.wa-op:hover{border-color:#1f8f4e}.wa-op.off{opacity:.6;cursor:not-allowed}
+.wa-op b{display:block;font-size:15px}.wa-op small{display:block;color:var(--muted);font-size:13px;line-height:1.35}
+.wa-ic{flex:none;width:38px;height:38px;border-radius:10px;background:#1f8f4e;color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.wa-txt>div{display:flex;flex-direction:column;gap:8px;flex:1;min-width:0}.wa-txt label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.wa-txt input,.wa-txt textarea{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;font-size:14px;width:100%;box-sizing:border-box}
+.wa-txt textarea{resize:vertical;font-size:13.5px}.wa-go{align-self:flex-start;background:#1f8f4e!important;border-color:#1f8f4e!important;color:#fff!important;text-decoration:none}
+`;document.head.appendChild(css);
 })();
 
 (function(){
@@ -4840,8 +4916,8 @@ function normColab(p){const c=p.colab||{si:false};if(!Array.isArray(c.colegas)){
   p.colab.si=p.colab.colegas.length>0;return p}
 const colegas=p=>normColab(p).colab.colegas;
 const nombres=p=>colegas(p).map(g=>g.nombre||'colega').join(', ');
-const PCOL=['#2f6fbf','#8a4fbf','#c0504d','#b87800','#3c8d93','#1f7a5a'];
-const colorDe=(p,id)=>id==='yo'?'var(--ink)':PCOL[Math.max(0,colegas(p).findIndex(g=>g.id===id))%PCOL.length];
+const PCOL=['#2f6fbf','#8a4fbf','#c0504d','#b87800','#3c8d93','#6d4c41'];
+const colorDe=(p,id)=>id==='yo'?'#1f7a5a':PCOL[Math.max(0,colegas(p).findIndex(g=>g.id===id))%PCOL.length];
 const corta=n=>{const w=String(n||'').trim().split(/\s+/);return w.length>2?w.slice(0,2).join(' '):w.join(' ')||'Colega'};
 const ini=n=>String(n||'?').replace(/^(arq|ing|lic|dr|dra)\.?\s+/i,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
 function repDe(it,ids){const r=it.rep||{yo:100};const L=Object.entries(r).filter(([k,v])=>num(v)>0&&(k==='yo'||ids.has(k)));const s=L.reduce((a,[,v])=>a+num(v),0);if(!s)return{yo:1};const o={};L.forEach(([k,v])=>o[k]=num(v)/s);return o}
@@ -4965,7 +5041,7 @@ function vPres(p,c,m){const E=window.EMPRESAS?window.EMPRESAS():[];const G=coleg
        <label class="btn sm primary pry-up">Subir PDF o Excel<input type="file" id="pry-arch" accept=".pdf,.xlsx,.xls,.xlsm,.csv,application/pdf" hidden></label>
        <button type="button" class="btn sm" data-pa="pdfpres" ${c.total?'':'disabled'}>PDF presupuesto</button></div></div>
      ${vArchivos(p)}${vImp(p)}
-     <div class="pry-fb ${G.length?'con':''}"><div class="pry-items">${G.length?'<p class="sub" style="margin:0">Tocá quién hace cada ítem. Si marcás a dos o más, se reparte en partes iguales; con <b>%</b> ponés otro porcentaje.</p>':''}
+     <div class="pry-fb ${G.length?'con':''}"><div class="pry-items">${G.length?vAyudaRep(p,gente):''}
        ${items.map((it,i)=>vItem(p,it,i,m,gente)).join('')}
        ${(p.items||[]).length>14?`<button type="button" class="btn sm ghost" data-pa="veritems">${P.verItems?'Mostrar menos':'Ver los '+p.items.length+' ítems'}</button>`:''}
        <button type="button" class="btn sm ghost" data-pa="item">+ Agregar ítem</button>
@@ -4978,11 +5054,22 @@ function vPres(p,c,m){const E=window.EMPRESAS?window.EMPRESAS():[];const G=coleg
        <label>Membrete del PDF<select data-pf="empresa_id">${E.map(x=>`<option value="${esc(x.id)}" ${x.id===(p.empresa_id||E[0]&&E[0].id)?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></label>
        <label class="wide">Forma de pago acordada<input type="text" data-pf="forma_pago" value="${esc(p.forma_pago||'')}" placeholder="Ej.: 40% al aprobar, 30% al entregar planos, 30% final"></label>
        <label class="wide">Enlace al presupuesto enviado (Drive, WhatsApp, correo)<span class="pry-ln"><input type="text" data-pf="enlace" value="${esc(p.enlace||'')}" placeholder="https://…">${/^https?:\/\//.test(p.enlace||'')?`<a class="btn sm" href="${esc(p.enlace)}" target="_blank" rel="noopener">Abrir</a>`:''}</span></label></div></section>`}
-function vItem(p,it,i,m,gente){const ids=new Set(colegas(p).map(g=>g.id));const r=repDe(it,ids);const multi=Object.keys(r).length>1;const raw=it.rep||{};const suma=gente.reduce((s,x)=>s+num(raw[x.id]||0),0);
-  return `<div class="pry-it2"><div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>
-    ${gente.length>1?`<div class="pry-chp">${gente.map(x=>{const on=r[x.id]>0;return `<button type="button" data-pa="rep" data-i="${i}" data-p="${esc(x.id)}" aria-pressed="${on}"><span class="pry-dot" style="background:${colorDe(p,x.id)}">${x.id==='yo'?'Yo':esc(ini(x.nombre))}</span>${x.id==='yo'?'Yo':esc(corta(x.nombre))}${on&&multi?`<span class="pry-pct">${Math.round(r[x.id]*100)}%</span>`:''}</button>`}).join('')}<button type="button" class="pry-pbtn" data-pa="reppct" data-i="${i}" aria-pressed="${P.pctOpen===i}">%</button></div>
-      ${P.pctOpen===i?`<div class="pry-chp">${gente.map(x=>`<label class="pry-pin">${x.id==='yo'?'Yo':esc(corta(x.nombre))}<input type="number" min="0" max="100" id="rp-${i}-${esc(x.id)}" data-rp="${i}" data-p="${esc(x.id)}" value="${Math.round(num(raw[x.id]||0)*100)/100||''}">%</label>`).join('')}${Math.round(suma)!==100?`<span class="pry-wtxt">Suman ${Math.round(suma)}%: se reparte en esa proporción</span>`:''}</div>`:''}
-      <div class="pry-split" aria-hidden="true">${gente.map(x=>r[x.id]?`<i style="flex:${r[x.id]};background:${colorDe(p,x.id)}"></i>`:'').join('')}</div>`:''}</div>`}
+function nomP(x){return x.id==='yo'?'Yo':corta(x.nombre)}
+function quienHizo(p,it,gente){const ids=new Set(colegas(p).map(g=>g.id));const r=repDe(it,ids);const L=gente.filter(x=>r[x.id]>0);
+  if(L.length===1)return L[0].id==='yo'?'Lo hiciste vos':`Lo hizo ${esc(nomP(L[0]))}`;
+  const igual=L.every(x=>Math.abs(r[x.id]-1/L.length)<0.005);const nm=L.map(x=>esc(nomP(x)));const lista=nm.slice(0,-1).join(', ')+' y '+nm[nm.length-1];
+  return igual?`Lo hicieron ${lista} · ${L.length===2?'mitad cada uno':'partes iguales'}`:'Lo hicieron '+L.map(x=>`${esc(nomP(x))} ${Math.round(r[x.id]*100)}%`).join(' · ')}
+function vAyudaRep(p,gente){const ids=new Set(colegas(p).map(g=>g.id));const its=(p.items||[]).filter(it=>num(it.monto)||it.concepto);
+  const firma=it=>JSON.stringify(Object.entries(repDe(it,ids)).map(([k,v])=>[k,Math.round(v*100)]).sort());
+  const viejo=its.length>1&&its.every(it=>firma(it)===firma(its[0]))&&Object.keys(repDe(its[0],ids)).length>1;
+  return `<div class="pry-ayr"><p class="sub" style="margin:0">En cada ítem tocá el nombre de quien lo hizo. Si lo hicieron entre varios, marcá a todos y se reparte en partes iguales. Tocá un nombre marcado para sacarlo. Con <b>%</b> ponés otro porcentaje.</p>
+    ${viejo?`<p class="pry-warn" style="margin:0">Todos los ítems tienen el mismo reparto general que usabas antes (${esc(quienHizo(p,its[0],gente).replace(/^Lo hicieron /,''))}). Marcá quién hizo cada uno, o empezá de cero.</p>`:''}
+    <div class="pry-ayb"><button type="button" class="btn sm ghost" data-pa="todoyo">Marcar todos los ítems como hechos por mí</button></div></div>`}
+function vItem(p,it,i,m,gente){const ids=new Set(colegas(p).map(g=>g.id));const r=repDe(it,ids);const raw=it.rep||{};const suma=gente.reduce((s,x)=>s+num(raw[x.id]||0),0);
+  return `<div class="pry-it2"><div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Lámina de implantación, Anteproyecto, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>
+    ${gente.length>1?`<div class="pry-chp" role="group" aria-label="Quién hizo este ítem"><span class="pry-lh">Lo hizo:</span>${gente.map(x=>{const on=r[x.id]>0;return `<button type="button" data-pa="rep" data-i="${i}" data-p="${esc(x.id)}" aria-pressed="${on}" style="--c:${colorDe(p,x.id)}"><span class="pry-dot" style="background:${colorDe(p,x.id)}">${x.id==='yo'?'Yo':esc(ini(x.nombre))}</span>${esc(nomP(x))}${on?'<span class="pry-ok2" aria-hidden="true">✓</span>':''}</button>`}).join('')}<button type="button" class="pry-pbtn" data-pa="reppct" data-i="${i}" aria-pressed="${P.pctOpen===i}" title="Poner porcentajes distintos">%</button></div>
+      ${P.pctOpen===i?`<div class="pry-chp">${gente.map(x=>`<label class="pry-pin">${esc(nomP(x))}<input type="number" min="0" max="100" id="rp-${i}-${esc(x.id)}" data-rp="${i}" data-p="${esc(x.id)}" value="${Math.round(num(raw[x.id]||0)*100)/100||''}">%</label>`).join('')}${Math.round(suma)!==100?`<span class="pry-wtxt">Suman ${Math.round(suma)}%: se reparte en esa proporción</span>`:''}</div>`:''}
+      <div class="pry-qh"><div class="pry-split" aria-hidden="true">${gente.map(x=>r[x.id]?`<i style="flex:${r[x.id]};background:${colorDe(p,x.id)}"></i>`:'').join('')}</div><span>${quienHizo(p,it,gente)}${num(it.monto)?'':' · falta el monto'}</span></div>`:''}</div>`}
 function vCobros(p,c,m){return `<section class="pry-sec"><div class="pry-sh"><h3>Cobros del cliente</h3><button type="button" class="btn sm" data-pa="pdfcta" ${c.total||c.cobrado?'':'disabled'}>PDF estado de cuenta</button></div>
      <div class="pry-res"><div><span class="sub">Presupuesto</span><b>${plata(c.total,m)}</b></div><div><span class="sub">Ya cobrado</span><b class="ok">${plata(c.cobrado,m)}</b></div><div><span class="sub">Falta cobrar</span><b class="${c.falta?'warn':''}">${plata(c.falta,m)}</b></div></div>
      ${c.total?`<div class="pry-bar big"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>${c.pct}% cobrado</span><span>${(p.pagos||[]).length} pago${(p.pagos||[]).length===1?'':'s'}</span></div>`:''}
@@ -5089,6 +5176,7 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
     p.colab.colegas.push({id:nid(),nombre:v,transf:[]});p.colab.si=true;nota(p,'Colega agregado: '+v);await guardar(p,true);toast(v+' agregado · marcá qué ítems hace');return mount()}
   if(a==='rep'){const it=p.items[+t.dataset.i];if(!it)return;const ids=new Set(colegas(p).map(g=>g.id));let on=Object.keys(repDe(it,ids));const k=t.dataset.p;
     on=on.includes(k)?on.filter(x=>x!==k):[...on,k];if(!on.length)on=[k];it.rep={};on.forEach(x=>it.rep[x]=Math.round(10000/on.length)/100);autoguardar();return mount()}
+  if(a==='todoyo'){p.items.forEach(it=>it.rep={yo:100});nota(p,'Reparto reiniciado: todos los ítems a mi nombre');autoguardar();toast('Listo: ahora marcá qué ítems hicieron tus colegas');return mount()}
   if(a==='reppct'){P.pctOpen=P.pctOpen===+t.dataset.i?-1:+t.dataset.i;return mount()}
   if(a==='pagarya'){const k=+t.dataset.k;const x=cuentas(p).cg[k];if(!x||x.debo<=0)return;x.g.transf=x.g.transf||[];const v=p.moneda==='USD'?Math.round(x.debo*100)/100:Math.round(x.debo);
     x.g.transf.push({id:nid(),fecha:hoyP(),nota:'Su parte de lo cobrado',monto:v});nota(p,`Le pasaste a ${x.g.nombre||'colega'} ${plata(v,p.moneda)}`);await guardar(p,true);toast('Pago a '+(x.g.nombre||'colega')+' registrado');return mount()}
@@ -5256,7 +5344,14 @@ const css=document.createElement('style');css.textContent=`
 .pry-fb:not(.con) .pry-it2{border:0;padding:0}
 .pry-chp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .pry-chp button{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:3px 10px 3px 3px;font:600 13px var(--f-body,inherit);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
-.pry-chp button[aria-pressed="true"]{border-color:var(--ink);background:var(--chip)}.pry-chp button[aria-pressed="false"] .pry-dot{opacity:.35}
+.pry-chp button[aria-pressed="true"]{border-color:var(--c,var(--ink));background:var(--c,var(--ink));color:#fff}
+.pry-chp button[aria-pressed="true"] .pry-dot{background:rgb(255 255 255/.25)!important;color:#fff}
+.pry-chp button[aria-pressed="false"]{border-style:dashed;color:var(--muted)}.pry-chp button[aria-pressed="false"] .pry-dot{opacity:.4}
+.pry-chp .pry-pbtn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--panel)}
+.pry-lh{font-size:12.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-right:2px}
+.pry-ok2{font-weight:800;margin-left:1px}
+.pry-qh{display:flex;flex-direction:column;gap:4px}.pry-qh>span{font-size:13px;color:var(--muted)}
+.pry-ayr{display:flex;flex-direction:column;gap:8px}.pry-ayb{display:flex;gap:8px;flex-wrap:wrap}
 .pry-chp .pry-pbtn{padding:3px 11px}.pry-pct{font-size:12px;color:var(--muted)}
 .pry-pin{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;font-size:13px;text-transform:none!important;letter-spacing:0!important}.pry-pin input{width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 .pry-wtxt{color:var(--warn);font-size:12.5px}
