@@ -4813,7 +4813,7 @@ window.LEERPRES={leer,aNum,interpretar};
 (function(){
 /* ============ Proyectos: cartera de pedidos de clientes, presupuestos, cobros y colaboraciones ============ */
 const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
-const P={lista:null,cargando:false,vista:LS('pry_vista')||'tablero',filtro:'todos',q:'',colab:false,abierto:null,edit:null,nuevo:null,t:null,estadoG:'',borrar:false,err:null};
+const P={lista:null,cargando:false,vista:LS('pry_vista')||'cartera',filtro:'todos',q:'',colab:false,abierto:null,edit:null,nuevo:null,t:null,estadoG:'',borrar:false,err:null};
 const ESTADOS=[
   ['presupuestar','Por presupuestar','Pedido recibido · presupuesto en preparación o esperando respuesta'],
   ['aprobado','Aprobado · en curso','Presupuesto aprobado · se está trabajando'],
@@ -4831,16 +4831,28 @@ const corto=(n,m)=>{if(m==='USD')return 'US$ '+usd(n);const a=Math.abs(n);return
 const fch=s=>{if(!s)return '';const[a,b,c]=String(s).slice(0,10).split('-');return `${c}/${b}/${a}`};
 const dias=s=>s?Math.round((new Date(hoyP())-new Date(String(s).slice(0,10)))/864e5):null;
 const hace=s=>{const d=dias(s);return d==null?'':d<=0?'hoy':d===1?'ayer':d<31?`hace ${d} días`:d<365?`hace ${Math.round(d/30)} ${Math.round(d/30)===1?'mes':'meses'}`:`hace ${Math.round(d/365)} año${Math.round(d/365)>1?'s':''}`};
-/* colaboración: uno o más colegas, cada uno con su % y sus transferencias (convierte el formato viejo de un solo colega) */
-function normColab(p){const c=p.colab||{si:false};if(!Array.isArray(c.colegas)){const L=[];if(c.si||c.colega)L.push({id:nid(),nombre:c.colega||'',pct:Math.max(0,100-(c.mio==null?50:num(c.mio))),nota:c.nota||'',transf:c.transf||[]});p.colab={si:!!c.si,colegas:L}}return p}
-const nombres=p=>(normColab(p).colab.colegas||[]).map(g=>g.nombre||'colega').join(', ');
+/* colaboración: colegas del proyecto + reparto por ítem (it.rep = {yo:%, idColega:%}). Convierte los formatos viejos. */
+function normColab(p){const c=p.colab||{si:false};if(!Array.isArray(c.colegas)){const L=[];if(c.si||c.colega)L.push({id:nid(),nombre:c.colega||'',pct:Math.max(0,100-(c.mio==null?50:num(c.mio))),nota:c.nota||'',transf:c.transf||[]});p.colab={si:!!c.si,colegas:L}}
+  p.items=p.items||[];
+  if(!p.repV){const G=p.colab.si?p.colab.colegas:[];const sum=G.reduce((s,g)=>s+Math.max(0,num(g.pct)),0);
+    p.items.forEach(it=>{if(!it.rep){const r={};G.forEach(g=>{const q=num(g.pct);if(q>0)r[g.id]=q});const yo=Math.max(0,100-sum);if(yo>0||!Object.keys(r).length)r.yo=yo||100;it.rep=r}});p.repV=2}
+  p.items.forEach(it=>{if(!it.rep||!Object.keys(it.rep).length)it.rep={yo:100}});
+  p.colab.si=p.colab.colegas.length>0;return p}
+const colegas=p=>normColab(p).colab.colegas;
+const nombres=p=>colegas(p).map(g=>g.nombre||'colega').join(', ');
+const PCOL=['#2f6fbf','#8a4fbf','#c0504d','#b87800','#3c8d93','#1f7a5a'];
+const colorDe=(p,id)=>id==='yo'?'var(--ink)':PCOL[Math.max(0,colegas(p).findIndex(g=>g.id===id))%PCOL.length];
+const corta=n=>{const w=String(n||'').trim().split(/\s+/);return w.length>2?w.slice(0,2).join(' '):w.join(' ')||'Colega'};
+const ini=n=>String(n||'?').replace(/^(arq|ing|lic|dr|dra)\.?\s+/i,'').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase()||'?';
+function repDe(it,ids){const r=it.rep||{yo:100};const L=Object.entries(r).filter(([k,v])=>num(v)>0&&(k==='yo'||ids.has(k)));const s=L.reduce((a,[,v])=>a+num(v),0);if(!s)return{yo:1};const o={};L.forEach(([k,v])=>o[k]=num(v)/s);return o}
 function cuentas(p){normColab(p);const total=(p.items||[]).reduce((s,i)=>s+num(i.monto),0);const cobrado=(p.pagos||[]).reduce((s,x)=>s+num(x.monto),0);
-  const falta=Math.max(0,total-cobrado);const pct=total?Math.min(100,Math.round(cobrado/total*100)):0;
-  const col=!!(p.colab.si&&p.colab.colegas.length);
-  const cg=col?p.colab.colegas.map(g=>{const q=Math.max(0,num(g.pct));const parte=total*q/100,cob=cobrado*q/100,tr=(g.transf||[]).reduce((s,x)=>s+num(x.monto),0);
-    return{g,pct:q,parte,cobrado:cob,falta:Math.max(0,parte-cob),transferido:tr,debo:Math.max(0,cob-tr),demas:Math.max(0,tr-cob)}}):[];
-  const colPct=cg.reduce((s,x)=>s+x.pct,0);const mio=Math.max(0,100-colPct);const miParte=total*mio/100,miCobrado=cobrado*mio/100;const S=k=>cg.reduce((s,x)=>s+x[k],0);
-  return{total,cobrado,falta,pct,mio,miParte,miCobrado,miFalta:Math.max(0,miParte-miCobrado),col,cg,colPct,exceso:colPct>100,
+  const falta=Math.max(0,total-cobrado);const pct=total?Math.min(100,Math.round(cobrado/total*100)):0;const G=p.colab.colegas;const ids=new Set(G.map(g=>g.id));
+  const parts={yo:0};G.forEach(g=>parts[g.id]=0);p.items.forEach(it=>{const r=repDe(it,ids);Object.entries(r).forEach(([k,v])=>parts[k]+=num(it.monto)*v)});
+  const f=total?Math.min(1,cobrado/total):0;
+  const cg=G.map(g=>{const parte=parts[g.id]||0,cob=parte*f,tr=(g.transf||[]).reduce((s,x)=>s+num(x.monto),0);
+    return{g,pct:total?Math.round(parte/total*100):0,parte,cobrado:cob,falta:Math.max(0,parte-cob),transferido:tr,debo:Math.max(0,cob-tr),demas:Math.max(0,tr-cob)}});
+  const S=k=>cg.reduce((s,x)=>s+x[k],0);const miParte=parts.yo,miCobrado=miParte*f;
+  return{total,cobrado,falta,pct,f,parts,mio:total?Math.round(miParte/total*100):100,miParte,miCobrado,miFalta:Math.max(0,miParte-miCobrado),col:G.length>0,cg,
     colTotal:S('parte'),colCobrado:S('cobrado'),colFalta:S('falta'),transferido:S('transferido'),debo:S('debo'),demas:S('demas')}}
 const permitido=()=>!window.CLI&&!window.COL;
 
@@ -4853,62 +4865,64 @@ async function guardar(p,silencio){p.actualizado=new Date().toISOString();try{aw
 function autoguardar(){P.estadoG='Guardando…';const g=document.getElementById('pry-g');if(g)g.textContent=P.estadoG;clearTimeout(P.t);P.t=setTimeout(()=>{if(P.edit)guardar(P.edit,true)},700)}
 
 /* ---------- vista general ---------- */
-function filtrados(){const q=P.q.trim().toLowerCase();return(P.lista||[]).filter(p=>(P.filtro==='todos'||p.estado===P.filtro)&&(!P.colab||(p.colab&&p.colab.si))&&
+const ACTIVOS=['aprobado','terminado','pausa'];
+function filtrados(){const q=P.q.trim().toLowerCase();return(P.lista||[]).filter(p=>(P.filtro==='todos'||p.estado===P.filtro)&&(!P.colab||colegas(p).length)&&
   (!q||[p.nombre,p.cliente,p.tipo,p.pedido,nombres(p)].join(' ').toLowerCase().includes(q)))}
-function kpis(){const L=P.lista||[];const n=e=>L.filter(p=>p.estado===e);const sum=(A,f)=>A.reduce((s,p)=>s+(p.moneda==='USD'?0:f(cuentas(p))),0);
-  const pre=n('presupuestar'),apr=n('aprobado'),pau=n('pausa');const env=pre.filter(p=>p.envio).length;
-  const K=[['presupuestar','Por presupuestar',pre.length,pre.length?(env?`${env} con presupuesto ya enviado`:'pedidos esperando tu presupuesto'):'nada pendiente'],
-    ['aprobado','En curso',apr.length,apr.length?corto(sum(apr,c=>c.total))+' aprobados':'sin proyectos activos'],
-    ['pausa','En pausa',pau.length,pau.length?'frenados por el cliente':'ninguno frenado']];
-  return `<div class="pry-k">${K.map(([f,t,v,s])=>`<button class="pry-kt ${P.filtro===f?'on':''}" data-pa="filtro" data-f="${P.filtro===f?'todos':f}"><span class="sub">${t}</span><b>${v}</b><small>${esc(s)}</small></button>`).join('')}</div>`}
+/* las tres respuestas de arriba: me deben, es mío, debo pasar */
+function resumen(){const L=(P.lista||[]).filter(p=>ACTIVOS.includes(p.estado));const R={Gs:{a:0,b:0,c:0},USD:{a:0,b:0,c:0}};
+  L.forEach(p=>{const c=cuentas(p);const r=R[p.moneda==='USD'?'USD':'Gs'];r.a+=c.falta;r.b+=c.miFalta;r.c+=c.debo});
+  const v=k=>`<b class="num">${corto(R.Gs[k],'Gs')}</b>${R.USD[k]?`<small class="num">+ ${corto(R.USD[k],'USD')}</small>`:''}`;
+  return `<div class="pry-r3"><div class="w"><span class="sub">Te deben tus clientes</span>${v('a')}<small>de trabajos aprobados</small></div>
+    <div class="o"><span class="sub">Es tuyo de eso</span>${v('b')}<small>lo que te queda después de colegas</small></div>
+    <div class="w"><span class="sub">Tenés que pasar a colegas</span>${v('c')}<small>de lo que ya cobraste</small></div></div>`}
 function chipEstado(e){return `<span class="pry-es e-${e}">${ES(e)[1]}</span>`}
 function barra(c,m){return `<div class="pry-bar" title="Cobrado ${c.pct}%"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>Cobrado ${corto(c.cobrado,m)}</span><span>${c.falta?'Falta '+corto(c.falta,m):'Todo cobrado'}</span></div>`}
+function frase(p,c){const m=p.moneda;
+  if(p.estado==='rechazado')return 'El cliente no siguió con el proyecto.';
+  if(p.estado==='presupuestar')return p.envio?`Le mandaste un presupuesto de ${corto(c.total,m)} ${hace(p.envio)}. Esperando respuesta.`:c.total?`Presupuesto de ${corto(c.total,m)} listo. Falta enviarlo.`:`Pedido ${hace(p.fecha)}. Falta preparar el presupuesto.`;
+  if(!c.total)return 'Aprobado sin presupuesto cargado. Cargá los ítems para seguir los cobros.';
+  return (c.falta?`Te faltan cobrar <span class="w">${corto(c.falta,m)}</span> de ${corto(c.total,m)}`:`Cobrado completo: ${corto(c.total,m)}`)+(c.col?` · con ${esc(nombres(p))}`:'')+(c.debo>0.5?` · <span class="w">tenés que pasarles ${corto(c.debo,m)}</span>`:'')+'.'}
+function cartera(L){if(!L.length)return `<div class="panel pry-vacio2">No hay proyectos con ese filtro.</div>`;
+  return `<div class="pry-rows">${L.map(p=>{const c=cuentas(p);const m=p.moneda;const act=ACTIVOS.includes(p.estado)&&c.total;
+    return `<button type="button" class="pry-row" data-pa="abrir" data-id="${esc(p.id)}"><div class="pry-rt"><b>${esc(p.nombre||'Sin nombre')}</b>${chipEstado(p.estado)}<p class="pry-say">${frase(p,c)}</p><span class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</span></div>
+      <div class="pry-rm">${act?`<span>Cobrado ${c.pct}%</span><div class="pry-bar"><i style="width:${c.pct}%"></i></div>`:'<span>Sin cobros todavía</span><div class="pry-bar"></div>'}<span>${c.col&&c.total?`Tuyo: ${corto(c.miParte,m)} de ${corto(c.total,m)}`:c.total?'Todo tuyo':''}</span></div></button>`}).join('')}</div>`}
 function tarjeta(p){const c=cuentas(p);let pie='';
   if(p.estado==='presupuestar')pie=p.envio?`<span class="pry-env">Presupuesto enviado ${hace(p.envio)}${c.total?' · '+corto(c.total,p.moneda):''}</span>`:`<span class="sub">Pedido ${hace(p.fecha)} · falta presupuestar</span>`;
   else if(['aprobado','terminado'].includes(p.estado)&&c.total)pie=barra(c,p.moneda);
   else if(c.total)pie=`<span class="sub">${corto(c.total,p.moneda)}</span>`;
   return `<button class="pry-card" data-pa="abrir" data-id="${esc(p.id)}"><b>${esc(p.nombre||'Sin nombre')}</b><span class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</span>
-    ${cuentas(p).col?`<span class="pry-col">Con ${esc(nombres(p))}</span>`:''}${pie}</button>`}
+    ${c.col?`<span class="pry-col">Con ${esc(nombres(p))}</span>`:''}${pie}</button>`}
 function tablero(L){const cols=ESTADOS.filter(([k])=>k!=='rechazado'||L.some(p=>p.estado==='rechazado'));
   return `<div class="pry-tab">${cols.map(([k,t,d])=>{const C=L.filter(p=>(p.estado||'presupuestar')===k);return `<section class="pry-colm e-${k}"><header><b>${t}</b><span>${C.length}</span></header><p class="sub">${d}</p>
     <div class="pry-cards">${C.map(tarjeta).join('')||'<div class="pry-vacio">—</div>'}</div></section>`}).join('')}</div>`}
-function lista(L){if(!L.length)return `<div class="panel pry-vacio2">No hay proyectos con ese filtro.</div>`;
-  return `<div class="panel tw"><table class="pry-tl"><thead><tr><th>Proyecto</th><th>Estado</th><th class="num">Presupuesto</th><th>Cobros</th><th>Colega</th><th>Movimiento</th></tr></thead><tbody>
-  ${L.map(p=>{const c=cuentas(p);return `<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre||'Sin nombre')}</b><div class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</div></td><td>${chipEstado(p.estado)}</td>
-    <td class="num">${c.total?plata(c.total,p.moneda):'—'}</td><td style="min-width:170px">${c.total&&['aprobado','terminado','pausa'].includes(p.estado)?barra(c,p.moneda):'<span class="sub">—</span>'}</td>
-    <td>${c.col?c.cg.map(x=>`${esc(x.g.nombre||'colega')} <span class="sub">(${x.pct}%)</span>`).join('<br>'):'<span class="sub">No</span>'}</td><td class="sub">${hace(p.actualizado||p.fecha)}</td></tr>`}).join('')}</tbody></table></div>`}
-/* ---------- Cobros: suma de todos los trabajos, mi parte y la de cada colega ---------- */
-function cobros(T){const V=T.filter(p=>{const c=cuentas(p);return c.total>0&&(['aprobado','terminado','pausa'].includes(p.estado)||c.cobrado>0)});
-  if(!V.length)return `<div class="panel pry-vacio2"><b>Todavía no hay trabajos aprobados.</b><p class="sub">Cuando un proyecto pasa a “Aprobado”, aparece acá con lo cobrado y lo que falta.</p></div>`;
-  const mons=[...new Set(V.map(p=>p.moneda==='USD'?'USD':'Gs'))].sort((a,b)=>a==='Gs'?-1:1);
-  return mons.map(m=>{const L=V.filter(p=>(p.moneda==='USD'?'USD':'Gs')===m).map(p=>({p,c:cuentas(p)}));const S=k=>L.reduce((s,x)=>s+x.c[k],0);
-    const cols=new Map();L.forEach(x=>x.c.cg.forEach(y=>{const k=(y.g.nombre||'Colega sin nombre').trim();const g=cols.get(k)||{n:0,colTotal:0,colCobrado:0,transferido:0,debo:0,colFalta:0,demas:0};
-      g.n++;g.colTotal+=y.parte;g.colCobrado+=y.cobrado;g.transferido+=y.transferido;g.debo+=y.debo;g.colFalta+=y.falta;g.demas+=y.demas;cols.set(k,g)}));
-    const pct=S('total')?Math.round(S('cobrado')/S('total')*100):0;
-    return `<section class="pry-cob">${mons.length>1?`<h3 class="pry-cm">${m==='USD'?'Trabajos en dólares':'Trabajos en guaraníes'}</h3>`:''}
-    <div class="pry-ct"><div class="pry-ctt"><span class="sub">Total de los trabajos (${L.length})</span><b>${plata(S('total'),m)}</b></div><div class="pry-ctt"><span class="sub">Cobrado a clientes</span><b class="ok">${plata(S('cobrado'),m)}</b></div><div class="pry-ctt"><span class="sub">Falta cobrar a clientes</span><b class="warn">${plata(S('falta'),m)}</b></div></div>
-    <div class="pry-bar big"><i style="width:${pct}%"></i></div><div class="pry-bl"><span>${pct}% cobrado de todos los trabajos</span><span>${L.filter(x=>x.c.falta>0).length} con saldo pendiente</span></div>
-    <div class="pry-c2"><div class="panel pry-cp"><h3>Mi parte</h3><dl><dt>Me corresponde en total</dt><dd>${plata(S('miParte'),m)}</dd><dt>Ya cobré</dt><dd class="ok">${plata(S('miCobrado'),m)}</dd><dt>Me falta cobrar</dt><dd class="warn">${plata(S('miFalta'),m)}</dd></dl></div>
-      <div class="panel pry-cp"><h3>Parte de colegas</h3>${cols.size?`<dl><dt>Les corresponde en total</dt><dd>${plata(S('colTotal'),m)}</dd><dt>El cliente ya pagó de su parte</dt><dd>${plata(S('colCobrado'),m)}</dd><dt>Ya les transferí</dt><dd class="ok">${plata(S('transferido'),m)}</dd><dt>Tengo que transferirles</dt><dd class="${S('debo')?'warn':''}">${plata(S('debo'),m)}</dd><dt>Falta que el cliente pague de su parte</dt><dd>${plata(S('colFalta'),m)}</dd></dl>`:'<p class="sub">No hay trabajos compartidos.</p>'}</div></div>
-    ${cols.size?`<div class="panel tw"><table class="pry-tl"><thead><tr><th>Colega</th><th class="num">Su parte</th><th class="num">Cobrado de su parte</th><th class="num">Le transferí</th><th class="num">Le debo transferir</th><th class="num">Falta cobrar al cliente</th></tr></thead><tbody>
-      ${[...cols].map(([k,g])=>`<tr class="sin"><td><b>${esc(k)}</b><div class="sub">${g.n} trabajo${g.n===1?'':'s'}</div></td><td class="num">${plata(g.colTotal,m)}</td><td class="num">${plata(g.colCobrado,m)}</td><td class="num">${plata(g.transferido,m)}</td><td class="num"><b class="${g.debo?'warn':''}">${plata(g.debo,m)}</b>${g.demas?`<div class="sub">adelantado ${plata(g.demas,m)}</div>`:''}</td><td class="num">${plata(g.colFalta,m)}</td></tr>`).join('')}</tbody></table></div>`:''}
-    <div class="panel tw"><table class="pry-tl"><thead><tr><th>Trabajo</th><th class="num">Total</th><th class="num">Cobrado</th><th class="num">Falta cobrar</th><th class="num">Mi parte por cobrar</th><th class="num">Colega por cobrar</th><th class="num">A transferir</th></tr></thead><tbody>
-      ${L.sort((a,b)=>b.c.falta-a.c.falta).map(({p,c})=>`<tr data-pa="abrir" data-id="${esc(p.id)}"><td><b>${esc(p.nombre)}</b><div class="sub">${esc(p.cliente||'')} · ${ES(p.estado)[1]}${c.col?' · con '+esc(nombres(p)):''}</div></td><td class="num">${plata(c.total,m)}</td><td class="num">${plata(c.cobrado,m)}</td><td class="num">${c.falta?`<b class="warn">${plata(c.falta,m)}</b>`:'<span class="ok">✓</span>'}</td><td class="num">${plata(c.miFalta,m)}</td><td class="num">${c.col?plata(c.colFalta,m):'<span class="sub">—</span>'}</td><td class="num">${c.col?(c.debo?`<b class="warn">${plata(c.debo,m)}</b>`:'<span class="ok">✓</span>'):'<span class="sub">—</span>'}</td></tr>`).join('')}</tbody></table></div></section>`}).join('')}
+/* ---------- cuentas con colegas: una tarjeta por colega, con lo que le debés hoy ---------- */
+function flujo(toca,cob,pas,m){return `<div class="pry-flow"><div><span class="sub">Le toca</span><b>${corto(toca,m)}</b></div><span aria-hidden="true">→</span><div><span class="sub">El cliente ya pagó de su parte</span><b>${corto(cob,m)}</b></div><span aria-hidden="true">→</span><div><span class="sub">Ya le pasaste</span><b>${corto(pas,m)}</b></div></div>`}
+function deboTxt(debo,demas){return debo>0.5?'Le debés hoy':demas>0.5?'Le adelantaste':'Estás al día'}
+function cuentasGlob(T){const V=T.filter(p=>ACTIVOS.includes(p.estado)||cuentas(p).cobrado>0);const G=new Map();
+  V.forEach(p=>{const c=cuentas(p);const m=p.moneda==='USD'?'USD':'Gs';c.cg.forEach(x=>{const k=(x.g.nombre||'Colega sin nombre').trim().toLowerCase()+'|'+m;
+    const g=G.get(k)||{nombre:(x.g.nombre||'Colega sin nombre').trim(),m,toca:0,cob:0,pas:0,debo:0,demas:0,falta:0,ps:[]};g.toca+=x.parte;g.cob+=x.cobrado;g.pas+=x.transferido;g.debo+=x.debo;g.demas+=x.demas;g.falta+=x.falta;g.ps.push({p,x});G.set(k,g)})});
+  const cards=[...G.values()].sort((a,b)=>b.debo-a.debo);
+  return `${cards.length?`<div class="pry-acc">${cards.map(g=>`<div class="panel pry-accc"><div class="pry-who"><span class="pry-dot" style="background:${PCOL[0]}">${esc(ini(g.nombre))}</span><b>${esc(g.nombre)}</b><span class="sub">${g.ps.length} trabajo${g.ps.length===1?'':'s'}</span></div>
+      <div><span class="sub">${deboTxt(g.debo,g.demas)}</span><div class="pry-bignum ${g.debo>0.5?'w':'o'}">${plata(g.debo||g.demas,g.m)}</div></div>
+      ${flujo(g.toca,g.cob,g.pas,g.m)}<p class="sub" style="margin:0">Todavía falta que los clientes paguen ${corto(g.falta,g.m)} de su parte.</p>
+      <ul class="pry-pl">${g.ps.map(({p,x})=>`<li><button type="button" data-pa="abrir" data-id="${esc(p.id)}" data-paso="cuentas"><span>${esc(p.nombre)}</span><b class="${x.debo>0.5?'w':''}">${x.debo>0.5?'le debés '+corto(x.debo,g.m):x.demas>0.5?'adelantado '+corto(x.demas,g.m):'al día'}</b></button></li>`).join('')}</ul></div>`).join('')}</div>`
+    :`<div class="panel pry-vacio2"><b>No tenés trabajos compartidos.</b><p class="sub">En la ficha de un proyecto, en "Presupuesto y reparto", agregá a tus colegas y marcá qué ítems hace cada uno.</p></div>`}`}
 function html(){
   if(!permitido())return `<div class="panel" style="padding:20px">Esta sección es solo para la dirección.</div>`;
   if(!P.lista){cargar();return `<p class="sub">Cargando proyectos…</p>`}
+  if(P.vista==='lista')P.vista='cartera';if(P.vista==='cobros')P.vista='cuentas';
   const L=filtrados().sort((a,b)=>(b.actualizado||b.fecha||'')>(a.actualizado||a.fecha||'')?1:-1);const T=P.lista||[];
   const cuenta=k=>T.filter(p=>p.estado===k).length;
   return `<section class="pry">
   <div class="pry-head"><div><div class="sub">Pedidos de clientes · presupuestos · cobros</div><h2>Proyectos</h2></div>
-    <div class="pry-hb"><div class="pry-seg" role="group" aria-label="Vista"><button data-pa="vista" data-v="tablero" aria-pressed="${P.vista==='tablero'}">Tablero</button><button data-pa="vista" data-v="lista" aria-pressed="${P.vista==='lista'}">Lista</button><button data-pa="vista" data-v="cobros" aria-pressed="${P.vista==='cobros'}">Cobros</button></div>
+    <div class="pry-hb"><div class="pry-seg" role="group" aria-label="Vista"><button data-pa="vista" data-v="cartera" aria-pressed="${P.vista==='cartera'}">Cartera</button><button data-pa="vista" data-v="tablero" aria-pressed="${P.vista==='tablero'}">Por estado</button><button data-pa="vista" data-v="cuentas" aria-pressed="${P.vista==='cuentas'}">Cuentas con colegas</button></div>
     <button class="btn primary" data-pa="nuevo">+ Nuevo proyecto</button></div></div>
   ${P.err?`<div class="panel pry-aviso">No se pudieron leer los proyectos. Si es la primera vez, pegá el archivo <b>23_proyectos.sql</b> en Supabase (SQL Editor → Run).</div>`:''}
-  ${T.length&&P.vista!=='cobros'?kpis():''}
-  ${T.length&&P.vista!=='cobros'?`<div class="pry-bar2"><input type="search" id="pry-q" placeholder="Buscar cliente, proyecto o colega…" value="${esc(P.q)}">
-    <div class="pry-chips"><button class="chip-p" data-pa="filtro" data-f="todos" aria-pressed="${P.filtro==='todos'}">Todos ${T.length}</button>${P.vista==='lista'?ESTADOS.filter(([k])=>cuenta(k)).map(([k,t])=>`<button class="chip-p" data-pa="filtro" data-f="${k}" aria-pressed="${P.filtro===k}">${t} ${cuenta(k)}</button>`).join(''):''}
-    <button class="chip-p" data-pa="colab" aria-pressed="${P.colab}">Con colegas ${T.filter(p=>p.colab&&p.colab.si).length}</button></div></div>`:''}
-  ${T.length?(P.vista==='cobros'?cobros(T):P.vista==='lista'?lista(L):tablero(L)):`<div class="panel pry-vacio2"><b>Todavía no cargaste proyectos.</b><p class="sub">Cargá cada pedido de un cliente: qué te pidió, el presupuesto que le pasaste, en qué estado está y lo que ya te pagó.</p><button class="btn primary" data-pa="nuevo">+ Cargar el primero</button></div>`}
+  ${T.length?resumen():''}
+  ${T.length&&P.vista!=='cuentas'?`<div class="pry-bar2"><input type="search" id="pry-q" placeholder="Buscar cliente, proyecto o colega…" value="${esc(P.q)}">
+    <div class="pry-chips"><button class="chip-p" data-pa="filtro" data-f="todos" aria-pressed="${P.filtro==='todos'}">Todos ${T.length}</button>${P.vista==='cartera'?ESTADOS.filter(([k])=>cuenta(k)).map(([k,t])=>`<button class="chip-p" data-pa="filtro" data-f="${k}" aria-pressed="${P.filtro===k}">${t} ${cuenta(k)}</button>`).join(''):''}
+    <button class="chip-p" data-pa="colab" aria-pressed="${P.colab}">Con colegas ${T.filter(p=>colegas(p).length).length}</button></div></div>`:''}
+  ${T.length?(P.vista==='cuentas'?cuentasGlob(T):P.vista==='tablero'?tablero(L):cartera(L)):`<div class="panel pry-vacio2"><b>Todavía no cargaste proyectos.</b><p class="sub">Cargá cada pedido de un cliente: qué te pidió, el presupuesto que le pasaste, en qué estado está y lo que ya te pagó.</p><button class="btn primary" data-pa="nuevo">+ Cargar el primero</button></div>`}
   </section>${P.nuevo?vNuevo():''}${P.edit?vDetalle():''}`}
 
 /* ---------- alta rápida ---------- */
@@ -4920,57 +4934,77 @@ function vNuevo(){const n=P.nuevo;return `<div class="rs-ov" data-pa="cerrar"></
     <label>Tipo<select name="tipo">${TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></label>
     <label>Fecha del pedido<input type="date" name="fecha" value="${hoyP()}"></label>
     <label class="wide">¿Qué te pidió?<textarea name="pedido" rows="3" placeholder="Ej.: casa de 2 dormitorios en terreno de 12x30, quiere quincho y piscina"></textarea></label>
-    <label class="wide pry-chk"><input type="checkbox" name="colab"> Es colaborativo con uno o más colegas</label>
+    <label class="wide">Colegas que participan (opcional)<input name="colegas" placeholder="Ej.: Arq. Laura Giménez, Ing. Pablo Sosa"><span class="sub" style="font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:400">Separalos con coma. Después marcás qué ítems hace cada uno.</span></label>
   </div><div class="bar"><button class="btn primary">Crear proyecto</button><button type="button" class="btn ghost" data-pa="cerrar">Cancelar</button></div></form></div>`}
 
-/* ---------- ficha del proyecto ---------- */
-function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';const E=window.EMPRESAS?window.EMPRESAS():[];
-  const paso=ESTADOS.findIndex(e=>e[0]===p.estado);
+/* ---------- ficha del proyecto: estado arriba y pasos en pestañas ---------- */
+const PASOS=[['pedido','Pedido'],['presupuesto','Presupuesto y reparto'],['cobros','Cobros'],['cuentas','Colegas'],['historial','Historial']];
+function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';const paso=P.paso||'presupuesto';
+  const pe=ESTADOS.findIndex(e=>e[0]===p.estado);
+  const badge={presupuesto:c.total?corto(c.total,m):'',cobros:c.total&&ACTIVOS.includes(p.estado)?c.pct+'%':'',cuentas:c.debo>0.5?'debés '+corto(c.debo,m):''};
   return `<div class="rs-ov" data-pa="cerrar"></div><div class="rs-win ancho pry-win" role="dialog" aria-modal="true" aria-label="${esc(p.nombre)}">
   <div class="rs-wh"><div style="min-width:0"><b>${esc(p.nombre||'Proyecto')}</b><div class="sub">${esc(p.cliente||'')} · <span id="pry-g">${esc(P.estadoG||'Los cambios se guardan solos')}</span></div></div><button class="rs-x" data-pa="cerrar" aria-label="Cerrar">✕</button></div>
-  <div class="rs-wc" id="pry-wc">
-   <div class="pry-steps" role="group" aria-label="Estado">${ESTADOS.map(([k,t],i)=>`<button type="button" data-pa="estado" data-e="${k}" class="e-${k} ${p.estado===k?'on':''} ${i<paso&&paso<4&&i<3?'hecho':''}" aria-pressed="${p.estado===k}">${t}</button>`).join('')}</div>
-   <p class="sub" style="margin:-4px 0 0">${ES(p.estado)[2]}${p.estado==='presupuestar'&&p.envio?` · presupuesto enviado ${hace(p.envio)}`:''}</p>
-
-   <section class="pry-sec"><h3>Pedido del cliente</h3><div class="form" style="padding:0">
+  <div class="pry-top"><div class="pry-steps" role="group" aria-label="Estado">${ESTADOS.map(([k,t],i)=>`<button type="button" data-pa="estado" data-e="${k}" class="e-${k} ${p.estado===k?'on':''} ${i<pe&&pe<3&&i<2?'hecho':''}" aria-pressed="${p.estado===k}">${t}</button>`).join('')}</div>
+    <p class="pry-say" style="margin:0">${frase(p,c)}</p></div>
+  <div class="pry-pasos" role="tablist" aria-label="Pasos del proyecto">${PASOS.map(([k,t],i)=>`<button type="button" role="tab" data-pa="paso" data-p="${k}" aria-selected="${paso===k}"><i>${i+1}</i>${t}${badge[k]?`<small class="${k==='cuentas'?'w':''}">${badge[k]}</small>`:''}</button>`).join('')}</div>
+  <div class="rs-wc" id="pry-wc">${paso==='pedido'?vPedido(p):paso==='cobros'?vCobros(p,c,m):paso==='cuentas'?vCuentas(p,c,m):paso==='historial'?vHist(p):vPres(p,c,m)}</div></div>`}
+function vPedido(p){return `<section class="pry-sec"><h3>Pedido del cliente</h3><div class="form" style="padding:0">
      <label>Cliente<input type="text" data-pf="cliente" value="${esc(p.cliente||'')}"></label>
      <label>Teléfono / contacto<input type="text" data-pf="contacto" value="${esc(p.contacto||'')}" placeholder="Ej.: 0985 123 456"></label>
      <label class="wide">Nombre del proyecto<input type="text" data-pf="nombre" value="${esc(p.nombre||'')}"></label>
      <label>Tipo<select data-pf="tipo">${TIPOS.map(t=>`<option ${t===p.tipo?'selected':''}>${t}</option>`).join('')}</select></label>
      <label>Fecha del pedido<input type="date" data-pf="fecha" value="${esc(p.fecha||'')}"></label>
-     <label class="wide">¿Qué te pidió?<textarea data-pf="pedido" rows="3">${esc(p.pedido||'')}</textarea></label></div></section>
-
+     <label class="wide">¿Qué te pidió?<textarea data-pf="pedido" rows="4">${esc(p.pedido||'')}</textarea></label></div></section>
+   <div class="pry-del">${P.borrar?`<span>¿Eliminar este proyecto y sus cobros? No se puede deshacer.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="borrarsi">Sí, eliminar</button><button type="button" class="btn sm ghost" data-pa="borrarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="borrar">Eliminar proyecto</button>`}</div>`}
+function vPres(p,c,m){const E=window.EMPRESAS?window.EMPRESAS():[];const G=colegas(p);const gente=[{id:'yo',nombre:'Yo'},...G];
+  const items=(p.items||[]).filter((it,i)=>P.verItems||(p.items.length<=14)||i<10);
+  return `<section class="pry-sec"><div class="pry-sh"><h3>Quiénes trabajan</h3><span class="sub">Agregá a tus colegas y después marcá qué ítems hace cada uno</span></div>
+     <div class="pry-team">${gente.map(x=>`<span class="pry-pc"><span class="pry-dot" style="background:${colorDe(p,x.id)}">${x.id==='yo'?'Yo':esc(ini(x.nombre))}</span>${x.id==='yo'?'Yo':esc(x.nombre||'Colega sin nombre')}</span>`).join('')}
+       <span class="pry-addc"><input type="text" id="pry-ncol" placeholder="Nombre del colega (ej.: Arq. Laura Giménez)" aria-label="Nombre del colega"><button type="button" class="btn sm" data-pa="colnuevo">+ Agregar colega</button></span></div></section>
    <section class="pry-sec"><div class="pry-sh"><h3>Presupuesto que le pasaste</h3><div class="pry-sha"><label class="pry-mini">Moneda<select data-pf="moneda" data-re="1"><option ${m==='Gs'?'selected':''}>Gs</option><option ${m==='USD'?'selected':''} value="USD">US$</option></select></label>
        <label class="btn sm primary pry-up">Subir PDF o Excel<input type="file" id="pry-arch" accept=".pdf,.xlsx,.xls,.xlsm,.csv,application/pdf" hidden></label>
        <button type="button" class="btn sm" data-pa="pdfpres" ${c.total?'':'disabled'}>PDF presupuesto</button></div></div>
      ${vArchivos(p)}${vImp(p)}
-     <div class="pry-items">${(p.items||[]).filter((it,i)=>P.verItems||(p.items.length<=14)||i<10).map((it,i)=>`<div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>`).join('')}
+     <div class="pry-fb ${G.length?'con':''}"><div class="pry-items">${G.length?'<p class="sub" style="margin:0">Tocá quién hace cada ítem. Si marcás a dos o más, se reparte en partes iguales; con <b>%</b> ponés otro porcentaje.</p>':''}
+       ${items.map((it,i)=>vItem(p,it,i,m,gente)).join('')}
        ${(p.items||[]).length>14?`<button type="button" class="btn sm ghost" data-pa="veritems">${P.verItems?'Mostrar menos':'Ver los '+p.items.length+' ítems'}</button>`:''}
-       <button type="button" class="btn sm ghost" data-pa="item">+ Agregar ítem</button></div>
-     <div class="pry-tot"><span>Total del presupuesto</span><b id="pry-total">${plata(c.total,m)}</b></div>
+       <button type="button" class="btn sm ghost" data-pa="item">+ Agregar ítem</button>
+       <div class="pry-tot"><span>Total del presupuesto</span><b id="pry-total">${plata(c.total,m)}</b></div></div>
+       ${G.length?`<aside class="pry-side" aria-label="Cuánto le toca a cada uno"><h4>A cada uno le toca</h4>${gente.map(x=>{const v=c.parts[x.id]||0;return `<div class="pry-tr"><span class="pry-dot" style="background:${colorDe(p,x.id)}">${x.id==='yo'?'Yo':esc(ini(x.nombre))}</span><span>${x.id==='yo'?'Yo':esc(x.nombre||'Colega')}<br><span class="sub">${c.total?Math.round(v/c.total*100):0}% del total</span></span><b class="num">${plata(v,m)}</b></div>`}).join('')}
+         <div class="pry-repb" aria-hidden="true">${gente.map(x=>(c.parts[x.id]||0)>0?`<i style="flex:${c.parts[x.id]};background:${colorDe(p,x.id)}"></i>`:'').join('')}</div>
+         <p class="sub" style="margin:0;font-size:12.5px">Cuando el cliente paga, cada uno cobra en la misma proporción.</p></aside>`:''}</div>
      <div class="form" style="padding:0">
        <label>Fecha en que lo enviaste<input type="date" data-pf="envio" value="${esc(p.envio||'')}"></label>
        <label>Membrete del PDF<select data-pf="empresa_id">${E.map(x=>`<option value="${esc(x.id)}" ${x.id===(p.empresa_id||E[0]&&E[0].id)?'selected':''}>${esc(x.nombre)}</option>`).join('')}</select></label>
        <label class="wide">Forma de pago acordada<input type="text" data-pf="forma_pago" value="${esc(p.forma_pago||'')}" placeholder="Ej.: 40% al aprobar, 30% al entregar planos, 30% final"></label>
-       <label class="wide">Enlace al presupuesto enviado (Drive, WhatsApp, correo)<span class="pry-ln"><input type="text" data-pf="enlace" value="${esc(p.enlace||'')}" placeholder="https://…">${/^https?:\/\//.test(p.enlace||'')?`<a class="btn sm" href="${esc(p.enlace)}" target="_blank" rel="noopener">Abrir</a>`:''}</span></label></div></section>
-
-   <section class="pry-sec"><div class="pry-sh"><h3>Cobros · control de desembolsos</h3><button type="button" class="btn sm" data-pa="pdfcta" ${c.total||c.cobrado?'':'disabled'}>PDF estado de cuenta</button></div>
+       <label class="wide">Enlace al presupuesto enviado (Drive, WhatsApp, correo)<span class="pry-ln"><input type="text" data-pf="enlace" value="${esc(p.enlace||'')}" placeholder="https://…">${/^https?:\/\//.test(p.enlace||'')?`<a class="btn sm" href="${esc(p.enlace)}" target="_blank" rel="noopener">Abrir</a>`:''}</span></label></div></section>`}
+function vItem(p,it,i,m,gente){const ids=new Set(colegas(p).map(g=>g.id));const r=repDe(it,ids);const multi=Object.keys(r).length>1;const raw=it.rep||{};const suma=gente.reduce((s,x)=>s+num(raw[x.id]||0),0);
+  return `<div class="pry-it2"><div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>
+    ${gente.length>1?`<div class="pry-chp">${gente.map(x=>{const on=r[x.id]>0;return `<button type="button" data-pa="rep" data-i="${i}" data-p="${esc(x.id)}" aria-pressed="${on}"><span class="pry-dot" style="background:${colorDe(p,x.id)}">${x.id==='yo'?'Yo':esc(ini(x.nombre))}</span>${x.id==='yo'?'Yo':esc(corta(x.nombre))}${on&&multi?`<span class="pry-pct">${Math.round(r[x.id]*100)}%</span>`:''}</button>`}).join('')}<button type="button" class="pry-pbtn" data-pa="reppct" data-i="${i}" aria-pressed="${P.pctOpen===i}">%</button></div>
+      ${P.pctOpen===i?`<div class="pry-chp">${gente.map(x=>`<label class="pry-pin">${x.id==='yo'?'Yo':esc(corta(x.nombre))}<input type="number" min="0" max="100" id="rp-${i}-${esc(x.id)}" data-rp="${i}" data-p="${esc(x.id)}" value="${Math.round(num(raw[x.id]||0)*100)/100||''}">%</label>`).join('')}${Math.round(suma)!==100?`<span class="pry-wtxt">Suman ${Math.round(suma)}%: se reparte en esa proporción</span>`:''}</div>`:''}
+      <div class="pry-split" aria-hidden="true">${gente.map(x=>r[x.id]?`<i style="flex:${r[x.id]};background:${colorDe(p,x.id)}"></i>`:'').join('')}</div>`:''}</div>`}
+function vCobros(p,c,m){return `<section class="pry-sec"><div class="pry-sh"><h3>Cobros del cliente</h3><button type="button" class="btn sm" data-pa="pdfcta" ${c.total||c.cobrado?'':'disabled'}>PDF estado de cuenta</button></div>
      <div class="pry-res"><div><span class="sub">Presupuesto</span><b>${plata(c.total,m)}</b></div><div><span class="sub">Ya cobrado</span><b class="ok">${plata(c.cobrado,m)}</b></div><div><span class="sub">Falta cobrar</span><b class="${c.falta?'warn':''}">${plata(c.falta,m)}</b></div></div>
      ${c.total?`<div class="pry-bar big"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>${c.pct}% cobrado</span><span>${(p.pagos||[]).length} pago${(p.pagos||[]).length===1?'':'s'}</span></div>`:''}
+     ${c.col&&c.cobrado?`<p class="sub" style="margin:0">De lo cobrado: vos ${plata(c.miCobrado,m)}${c.cg.map(x=>` · ${esc(corta(x.g.nombre))} ${plata(x.cobrado,m)}`).join('')}.</p>`:''}
      ${(p.pagos||[]).length?`<div class="tw"><table class="pry-pg"><thead><tr><th>Fecha</th><th>Concepto</th><th>Medio</th><th class="num">Monto</th><th class="num">Saldo</th><th></th></tr></thead><tbody>
        ${(()=>{let s=c.total;return (p.pagos||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(x=>{s-=num(x.monto);return `<tr><td>${fch(x.fecha)}</td><td>${esc(x.concepto||'')}</td><td class="sub">${esc(x.medio||'')}</td><td class="num">${plata(num(x.monto),m)}</td><td class="num sub">${plata(Math.max(0,s),m)}</td><td><button type="button" class="pry-q" data-pa="quitarpago" data-id="${esc(x.id)}" aria-label="Quitar pago">✕</button></td></tr>`}).join('')})()}</tbody></table></div>`:'<p class="sub" style="margin:0">Todavía no registraste cobros.</p>'}
-     <div class="pry-np"><input type="date" id="pry-pf" value="${hoyP()}" aria-label="Fecha del cobro"><input type="text" id="pry-pc" placeholder="Concepto (ej.: Anticipo 40%)" aria-label="Concepto"><select id="pry-pm" aria-label="Medio"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select><input type="text" id="pry-pv" inputmode="decimal" class="num" placeholder="Monto" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="pago">Registrar cobro</button></div></section>
-
-   <section class="pry-sec"><div class="pry-sh"><h3>Colaboración</h3>${c.col?`<button type="button" class="btn sm" data-pa="colagregar">+ Agregar colaborador</button>`:''}</div>
-     <label class="pry-chk"><input type="checkbox" data-pa="colabsi" ${p.colab.si?'checked':''}> Este proyecto es colaborativo con uno o más colegas</label>
-     ${p.colab.si?vColab(p,c,m):''}</section>
-
-   <section class="pry-sec"><h3>Notas e historial</h3>
+     <div class="pry-np"><input type="date" id="pry-pf" value="${hoyP()}" aria-label="Fecha del cobro"><input type="text" id="pry-pc" placeholder="Concepto (ej.: Anticipo 40%)" aria-label="Concepto"><select id="pry-pm" aria-label="Medio"><option>Transferencia</option><option>Efectivo</option><option>Cheque</option><option>Otro</option></select><input type="text" id="pry-pv" inputmode="decimal" class="num" placeholder="Monto" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="pago">Registrar cobro</button></div></section>`}
+function vCuentas(p,c,m){const G=colegas(p);
+  if(!G.length)return `<section class="pry-sec"><h3>Este proyecto es solo tuyo</h3><p class="sub" style="margin:0">Si trabajás con colegas, agregalos acá o en "Presupuesto y reparto" y marcá qué ítems hace cada uno.</p>
+    <span class="pry-addc"><input type="text" id="pry-ncol" placeholder="Nombre del colega" aria-label="Nombre del colega"><button type="button" class="btn sm" data-pa="colnuevo">+ Agregar colega</button></span></section>`;
+  return `<div class="pry-acc">${c.cg.map((x,k)=>{const g=x.g;const nm=g.nombre||'Colega '+(k+1);
+    return `<section class="pry-sec pry-accc" style="--cg:${colorDe(p,g.id)}"><div class="pry-who"><span class="pry-dot" style="background:${colorDe(p,g.id)}">${esc(ini(nm))}</span><input type="text" class="pry-nm" data-pg="${k}" data-f="nombre" value="${esc(g.nombre||'')}" placeholder="Nombre del colega" aria-label="Nombre del colega"><span class="sub">${x.pct}% del presupuesto</span></div>
+      <div><span class="sub">${deboTxt(x.debo,x.demas)}</span><div class="pry-bignum ${x.debo>0.5?'w':'o'}">${plata(x.debo||x.demas,m)}</div></div>
+      ${flujo(x.parte,x.cobrado,x.transferido,m)}
+      <p class="sub" style="margin:0">Todavía falta que el cliente pague ${corto(x.falta,m)} de su parte.${x.parte?'':' No tiene ítems asignados: marcalo en "Presupuesto y reparto".'}</p>
+      <div class="pry-pay">${x.debo>0.5?`<button type="button" class="btn primary" data-pa="pagarya" data-k="${k}">Registrar que le pasé ${corto(x.debo,m)}</button>`:''}<button type="button" class="btn sm ghost" data-pa="otromonto" data-k="${k}" aria-expanded="${P.otro===k}">Otro monto</button></div>
+      ${P.otro===k?`<div class="pry-np pry-nt3"><input type="date" id="pry-tf-${k}" value="${hoyP()}" aria-label="Fecha"><input type="text" id="pry-tn-${k}" placeholder="Detalle (ej.: su parte del anticipo)" aria-label="Detalle"><input type="text" id="pry-tv-${k}" inputmode="decimal" class="num" placeholder="Monto" aria-label="Monto"><button type="button" class="btn sm primary" data-pa="transf" data-k="${k}">Registrar</button></div>`:''}
+      ${(g.transf||[]).length?`<ul class="pry-log">${(g.transf||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(t=>`<li><span>${fch(t.fecha)}${t.nota?' · '+esc(t.nota):''}</span><b class="num">${plata(num(t.monto),m)}</b><button type="button" class="pry-q" data-pa="quitartr" data-k="${k}" data-id="${esc(t.id)}" aria-label="Quitar">✕</button></li>`).join('')}</ul>`:''}
+      <div class="pry-cgq">${P.quitarCol===k?`<span>¿Quitar a ${esc(nm)}? Sus ítems pasan a ser tuyos${(g.transf||[]).length?' y se borran sus pagos':''}.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="colquitarsi" data-k="${k}">Sí, quitar</button><button type="button" class="btn sm ghost" data-pa="colquitarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="colquitar" data-k="${k}">Quitar del proyecto</button>`}</div></section>`}).join('')}</div>`}
+function vHist(p){return `<section class="pry-sec"><h3>Notas e historial</h3>
      <div class="pry-nn"><input type="text" id="pry-nt" placeholder="Agregar una nota (ej.: pidió cambiar la fachada, reunión el jueves)"><button type="button" class="btn sm" data-pa="nota">Agregar</button></div>
-     <ul class="pry-hist">${(p.notas||[]).slice().reverse().map(n=>`<li><span class="sub">${fch(n.fecha)}</span> ${esc(n.t)}</li>`).join('')||'<li class="sub">Sin notas todavía.</li>'}</ul></section>
-
-   <div class="pry-del">${P.borrar?`<span>¿Eliminar este proyecto y sus cobros? No se puede deshacer.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="borrarsi">Sí, eliminar</button><button type="button" class="btn sm ghost" data-pa="borrarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="borrar">Eliminar proyecto</button>`}</div>
-  </div></div>`}
+     <ul class="pry-hist">${(p.notas||[]).slice().reverse().map(n=>`<li><span class="sub">${fch(n.fecha)}</span> ${esc(n.t)}</li>`).join('')||'<li class="sub">Sin notas todavía.</li>'}</ul></section>`}
 
 /* ---------- archivo del presupuesto: guardar, ver y leer ---------- */
 const kb=n=>n>1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
@@ -5002,30 +5036,11 @@ async function leerArchivo(p,file,guardarlo){if(!window.LEERPRES)return toast('N
   catch(e){P.imp={nombre:file.name,R:{items:[],rubros:[],avisos:['No pude leer el archivo ('+(e&&e.message||'formato no reconocido')+').'],meta:{},moneda:'Gs',suma:0}}}
   mount();const el=document.querySelector('.pry-imp');if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'})}
 function aplicarImp(p,modo){const I=P.imp;const L=listaImp().filter((x,i)=>I.sel[i]);if(!L.length)return toast('No hay ítems seleccionados');
-  const nuevos=L.map(x=>({id:nid(),concepto:x.concepto,monto:Math.round(x.monto*100)/100}));
+  const nuevos=L.map(x=>({id:nid(),concepto:x.concepto,monto:Math.round(x.monto*100)/100,rep:{yo:100}}));
   p.items=modo==='sumar'?[...(p.items||[]).filter(x=>x.concepto||num(x.monto)),...nuevos]:nuevos;
   p.moneda=I.R.moneda||p.moneda;const M=I.R.meta||{};if(!p.envio&&M.fecha)p.envio=M.fecha;if(!p.forma_pago&&M.forma)p.forma_pago=M.forma;
   nota(p,`Presupuesto cargado desde “${I.nombre}”: ${nuevos.length} ítem${nuevos.length===1?'':'s'} · ${plata(nuevos.reduce((s,x)=>s+x.monto,0),p.moneda)}`);P.imp=null;P.verItems=false}
 function dataAFile(a,data){const [h,b]=data.split(',');const bin=atob(b);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new File([u],a.nombre,{type:(h.match(/data:([^;]+)/)||[])[1]||a.tipo||''})}
-
-/* ---------- colaboradores del proyecto ---------- */
-const COLS=['#1f7a5a','#2f6fbf','#b87800','#8a4fbf','#c0504d','#3c8d93'];
-function vColab(p,c,m){const G=p.colab.colegas;
-  const rep=`<div class="pry-repb" aria-label="Reparto">${c.mio>0?`<i style="flex:${c.mio};background:var(--ink)" title="Yo ${c.mio}%"></i>`:''}${c.cg.map((x,k)=>x.pct>0?`<i style="flex:${x.pct};background:${COLS[k%COLS.length]}" title="${esc(x.g.nombre)} ${x.pct}%"></i>`:'').join('')}</div>
-    <div class="pry-repl"><span><i style="background:var(--ink)"></i>Yo ${c.mio}% · ${plata(c.miParte,m)} <span class="sub">(cobrado ${plata(c.miCobrado,m)})</span></span>${c.cg.map((x,k)=>`<span><i style="background:${COLS[k%COLS.length]}"></i>${esc(x.g.nombre||'Colaborador '+(k+1))} ${x.pct}% · ${plata(x.parte,m)}</span>`).join('')}</div>
-    ${c.exceso?`<p class="pry-warn">Los porcentajes de los colaboradores suman ${c.colPct}%: más del 100%. Revisalos.</p>`:''}`;
-  return rep+G.map((g,k)=>{const x=c.cg[k];const nm=g.nombre||'Colaborador '+(k+1);
-    return `<div class="pry-cg" style="--cg:${COLS[k%COLS.length]}"><div class="pry-cgh"><span class="pry-cgn">${k+1}</span>
-      <div class="form" style="padding:0;flex:1"><label>Nombre<input type="text" data-pg="${k}" data-f="nombre" value="${esc(g.nombre||'')}" placeholder="Ej.: Arq. María López"></label>
-        <label>Su participación %<input type="number" min="0" max="100" data-pg="${k}" data-f="pct" data-re="1" value="${esc(g.pct??'')}"></label>
-        <label class="wide">Qué hace<input type="text" data-pg="${k}" data-f="nota" value="${esc(g.nota||'')}" placeholder="Ej.: cálculo estructural, dirección de obra"></label></div></div>
-      <div class="pry-res pry-res4"><div><span class="sub">Su parte (${x.pct}%)</span><b>${plata(x.parte,m)}</b></div><div><span class="sub">Le corresponde de lo cobrado</span><b>${plata(x.cobrado,m)}</b></div>
-        <div><span class="sub">Ya le transferiste</span><b class="ok">${plata(x.transferido,m)}</b></div><div><span class="sub">${x.demas?'Le adelantaste de más':'Pendiente de transferir'}</span><b class="${x.debo?'warn':''}">${plata(x.demas||x.debo,m)}</b></div></div>
-      <p class="sub" style="margin:0">Falta que el cliente pague de su parte: <b>${plata(x.falta,m)}</b></p>
-      ${(g.transf||[]).length?`<div class="tw"><table class="pry-pg"><thead><tr><th>Fecha</th><th>Detalle</th><th class="num">Transferido</th><th></th></tr></thead><tbody>${(g.transf||[]).slice().sort((a,b)=>a.fecha>b.fecha?1:-1).map(t=>`<tr><td>${fch(t.fecha)}</td><td>${esc(t.nota||'')}</td><td class="num">${plata(num(t.monto),m)}</td><td><button type="button" class="pry-q" data-pa="quitartr" data-k="${k}" data-id="${esc(t.id)}" aria-label="Quitar transferencia">✕</button></td></tr>`).join('')}</tbody></table></div>`:''}
-      <div class="pry-np pry-nt3"><input type="date" id="pry-tf-${k}" value="${hoyP()}" aria-label="Fecha de la transferencia"><input type="text" id="pry-tn-${k}" placeholder="Detalle (ej.: su parte del anticipo)" aria-label="Detalle"><input type="text" id="pry-tv-${k}" inputmode="decimal" class="num" placeholder="Monto" value="${x.debo?(m==='USD'?usd(x.debo):gs(x.debo)):''}" aria-label="Monto"><button type="button" class="btn primary sm" data-pa="transf" data-k="${k}">Transferir a ${esc(nm.split(' ').slice(0,2).join(' '))}</button></div>
-      <div class="pry-cgq">${P.quitarCol===k?`<span>¿Quitar a ${esc(nm)}${(g.transf||[]).length?' y sus transferencias':''}?</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="colquitarsi" data-k="${k}">Sí, quitar</button><button type="button" class="btn sm ghost" data-pa="colquitarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="colquitar" data-k="${k}">Quitar colaborador</button>`}</div></div>`}).join('')+
-    `<button type="button" class="btn sm ghost pry-cgadd" data-pa="colagregar">+ Agregar otro colaborador</button>`}
 
 /* ---------- PDFs ---------- */
 function conMembrete(p,f){const E=window.EMPRESAS?window.EMPRESAS():[];const e=E.find(x=>x.id===p.empresa_id)||E[0];
@@ -5055,31 +5070,37 @@ function mount(){const root=document.getElementById('pry-root');if(!root)return;
 const dentro=e=>{const r=document.getElementById('pry-root');return r&&r.contains(e.target)};
 function nota(p,t){p.notas=p.notas||[];p.notas.push({id:nid(),fecha:hoyP(),t})}
 document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.target.closest('[data-pa]');if(!t)return;const a=t.dataset.pa;const p=P.edit;
-  if(a==='vista'){P.vista=t.dataset.v;LS('pry_vista',P.vista);if(P.vista==='tablero'&&P.filtro!=='todos'&&!['presupuestar','aprobado','pausa'].includes(P.filtro))P.filtro='todos';return mount()}
-  if(a==='filtro'){P.filtro=t.dataset.f;if(P.filtro!=='todos'&&P.vista!=='lista'){P.vista='lista'}return mount()}
+  if(a==='vista'){P.vista=t.dataset.v;LS('pry_vista',P.vista);if(P.vista!=='cartera')P.filtro='todos';return mount()}
+  if(a==='filtro'){P.filtro=t.dataset.f;if(P.filtro!=='todos')P.vista='cartera';return mount()}
   if(a==='colab'){P.colab=!P.colab;return mount()}
   if(a==='nuevo'){P.nuevo={};return mount()}
-  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=normColab(JSON.parse(JSON.stringify(x)));P.quitarCol=null;P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
+  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=normColab(JSON.parse(JSON.stringify(x)));P.paso=t.dataset.paso||(ACTIVOS.includes(x.estado)?'cobros':'presupuesto');P.pctOpen=-1;P.otro=null;P.quitarCol=null;P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
   if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;if(P.edit&&P.t){clearTimeout(P.t);P.t=null;await guardar(P.edit,true)}P.edit=null;P.nuevo=null;return mount()}
   if(!p)return;
   if(a==='estado'){const ne=t.dataset.e;if(ne===p.estado)return;nota(p,`Estado: ${ES(p.estado)[1]} → ${ES(ne)[1]}`);p.estado=ne;if(ne==='aprobado'&&!p.aprobado)p.aprobado=hoyP();
     await guardar(p,true);toast('Estado: '+ES(ne)[1]);return mount()}
-  if(a==='item'){p.items=p.items||[];p.items.push({id:nid(),concepto:'',monto:0});mount();const L=document.querySelectorAll('[data-f="concepto"]');if(L.length)L[L.length-1].focus();return}
+  if(a==='paso'){P.paso=t.dataset.p;P.pctOpen=-1;P.otro=null;P.quitarCol=null;mount();const w=document.getElementById('pry-wc');if(w)w.scrollTop=0;return}
+  if(a==='item'){p.items=p.items||[];p.items.push({id:nid(),concepto:'',monto:0,rep:{yo:100}});mount();const L=document.querySelectorAll('[data-f="concepto"]');if(L.length)L[L.length-1].focus();return}
   if(a==='quitarit'){p.items.splice(+t.dataset.i,1);autoguardar();return mount()}
   if(a==='pago'){const v=num(document.getElementById('pry-pv').value);if(!v)return toast('Escribí el monto cobrado');
     const x={id:nid(),fecha:document.getElementById('pry-pf').value||hoyP(),concepto:document.getElementById('pry-pc').value.trim()||'Pago',medio:document.getElementById('pry-pm').value,monto:v};
     p.pagos=p.pagos||[];p.pagos.push(x);nota(p,`Cobro registrado: ${plata(v,p.moneda)}${x.concepto?' · '+x.concepto:''}`);await guardar(p,true);toast('Cobro registrado');return mount()}
-  if(a==='transf'){const k=+t.dataset.k;const g=p.colab.colegas[k];if(!g)return;const v=num(document.getElementById('pry-tv-'+k).value);if(!v)return toast('Escribí el monto transferido');g.transf=g.transf||[];
-    const x={id:nid(),fecha:document.getElementById('pry-tf-'+k).value||hoyP(),nota:document.getElementById('pry-tn-'+k).value.trim(),monto:v};g.transf.push(x);
-    nota(p,`Transferencia a ${g.nombre||'colaborador'}: ${plata(v,p.moneda)}${x.nota?' · '+x.nota:''}`);await guardar(p,true);toast('Transferencia registrada');return mount()}
-  if(a==='quitartr'){const g=p.colab.colegas[+t.dataset.k];if(g)g.transf=(g.transf||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
-  if(a==='colagregar'){normColab(p);p.colab.si=true;const c=cuentas(p);p.colab.colegas.push({id:nid(),nombre:'',pct:c.col?Math.max(0,Math.floor(c.mio/2)):50,nota:'',transf:[]});P.quitarCol=null;autoguardar();mount();
-    const L=document.querySelectorAll('[data-pg][data-f="nombre"]');if(L.length){L[L.length-1].focus();L[L.length-1].scrollIntoView({block:'center'})}return}
+  if(a==='colnuevo'){const inp=document.getElementById('pry-ncol');const v=(inp&&inp.value||'').trim();if(!v){if(inp)inp.focus();return toast('Escribí el nombre del colega')}
+    p.colab.colegas.push({id:nid(),nombre:v,transf:[]});p.colab.si=true;nota(p,'Colega agregado: '+v);await guardar(p,true);toast(v+' agregado · marcá qué ítems hace');return mount()}
+  if(a==='rep'){const it=p.items[+t.dataset.i];if(!it)return;const ids=new Set(colegas(p).map(g=>g.id));let on=Object.keys(repDe(it,ids));const k=t.dataset.p;
+    on=on.includes(k)?on.filter(x=>x!==k):[...on,k];if(!on.length)on=[k];it.rep={};on.forEach(x=>it.rep[x]=Math.round(10000/on.length)/100);autoguardar();return mount()}
+  if(a==='reppct'){P.pctOpen=P.pctOpen===+t.dataset.i?-1:+t.dataset.i;return mount()}
+  if(a==='pagarya'){const k=+t.dataset.k;const x=cuentas(p).cg[k];if(!x||x.debo<=0)return;x.g.transf=x.g.transf||[];const v=p.moneda==='USD'?Math.round(x.debo*100)/100:Math.round(x.debo);
+    x.g.transf.push({id:nid(),fecha:hoyP(),nota:'Su parte de lo cobrado',monto:v});nota(p,`Le pasaste a ${x.g.nombre||'colega'} ${plata(v,p.moneda)}`);await guardar(p,true);toast('Pago a '+(x.g.nombre||'colega')+' registrado');return mount()}
+  if(a==='otromonto'){P.otro=P.otro===+t.dataset.k?null:+t.dataset.k;mount();const el=document.getElementById('pry-tv-'+t.dataset.k);if(el)el.focus();return}
+  if(a==='transf'){const k=+t.dataset.k;const g=colegas(p)[k];if(!g)return;const v=num(document.getElementById('pry-tv-'+k).value);if(!v)return toast('Escribí el monto que le pasaste');g.transf=g.transf||[];
+    const x={id:nid(),fecha:document.getElementById('pry-tf-'+k).value||hoyP(),nota:document.getElementById('pry-tn-'+k).value.trim(),monto:v};g.transf.push(x);P.otro=null;
+    nota(p,`Le pasaste a ${g.nombre||'colega'} ${plata(v,p.moneda)}${x.nota?' · '+x.nota:''}`);await guardar(p,true);toast('Pago registrado');return mount()}
+  if(a==='quitartr'){const g=colegas(p)[+t.dataset.k];if(g)g.transf=(g.transf||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
   if(a==='colquitar'){P.quitarCol=+t.dataset.k;return mount()}
   if(a==='colquitarno'){P.quitarCol=null;return mount()}
-  if(a==='colquitarsi'){const g=p.colab.colegas.splice(+t.dataset.k,1)[0];P.quitarCol=null;if(g)nota(p,`Colaborador quitado: ${g.nombre||'sin nombre'}`);if(!p.colab.colegas.length)p.colab.si=false;await guardar(p,true);return mount()}
+  if(a==='colquitarsi'){const g=p.colab.colegas.splice(+t.dataset.k,1)[0];P.quitarCol=null;if(g){p.items.forEach(it=>{if(it.rep){delete it.rep[g.id];if(!Object.values(it.rep).some(v=>num(v)>0))it.rep={yo:100}}});nota(p,`Colega quitado: ${g.nombre||'sin nombre'}`)}p.colab.si=p.colab.colegas.length>0;await guardar(p,true);return mount()}
   if(a==='quitarpago'){p.pagos=(p.pagos||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
-  if(a==='colabsi'){normColab(p);p.colab.si=t.checked;if(t.checked&&!p.colab.colegas.length)p.colab.colegas.push({id:nid(),nombre:'',pct:50,nota:'',transf:[]});autoguardar();return mount()}
   if(a==='nota'){const i=document.getElementById('pry-nt');const v=i.value.trim();if(!v)return;nota(p,v);await guardar(p,true);return mount()}
   if(a==='veritems'){P.verItems=!P.verItems;return mount()}
   if(a==='impno'){P.imp=null;return mount()}
@@ -5103,23 +5124,25 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.pf){p[t.dataset.pf]=t.value;autoguardar();if(t.dataset.re)mount();return}
   if(t.dataset.pi!=null){const it=p.items[+t.dataset.pi];if(!it)return;it[t.dataset.f]=t.dataset.f==='monto'?num(t.value):t.value;
     if(t.dataset.f==='monto'){const el=document.getElementById('pry-total');if(el)el.textContent=plata(cuentas(p).total,p.moneda)}autoguardar();return}
-  if(t.dataset.pg!=null){const g=normColab(p).colab.colegas[+t.dataset.pg];if(!g)return;g[t.dataset.f]=t.dataset.f==='pct'?num(t.value):t.value;autoguardar();return}
+  if(t.dataset.pg!=null){const g=colegas(p)[+t.dataset.pg];if(!g)return;g[t.dataset.f]=t.value;autoguardar();return}
 });
 document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;const p=P.edit;if(!p)return;
   if(t.id==='pry-arch'){const f=t.files&&t.files[0];t.value='';if(f)leerArchivo(p,f,true);return}
+  if(t.dataset.rp!=null){const it=p.items[+t.dataset.rp];if(!it)return;it.rep=it.rep||{};const v=Math.max(0,Math.min(100,num(t.value)));if(v)it.rep[t.dataset.p]=v;else delete it.rep[t.dataset.p];if(!Object.keys(it.rep).length)it.rep={yo:100};autoguardar();return mount()}
   if(t.dataset.re){mount()}
   if(t.dataset.pi!=null&&t.dataset.f==='monto'){t.value=num(t.value)?(p.moneda==='USD'?usd(num(t.value)):gs(num(t.value))):''}
 });
 document.addEventListener('keydown',e=>{if(!dentro(e))return;
   if(e.key==='Escape'&&(P.edit||P.nuevo)){const x=document.querySelector('#pry-root .rs-x');if(x)x.click()}
+  if(e.key==='Enter'&&e.target.id==='pry-ncol'){e.preventDefault();const b=document.querySelector('[data-pa="colnuevo"]');if(b)b.click()}
   if(e.key==='Enter'&&e.target.id==='pry-nt'){e.preventDefault();const b=document.querySelector('[data-pa="nota"]');if(b)b.click()}
   if(e.key==='Enter'&&/^pry-tv-\d+$/.test(e.target.id)){e.preventDefault();const b=document.querySelector(`[data-pa="transf"][data-k="${e.target.id.slice(7)}"]`);if(b)b.click()}
   if(e.key==='Enter'&&e.target.id==='pry-pv'){e.preventDefault();const b=document.querySelector('[data-pa="pago"]');if(b)b.click()}});
 document.addEventListener('submit',async e=>{if(e.target.id!=='pry-nf')return;e.preventDefault();e.stopImmediatePropagation();const fd=Object.fromEntries(new FormData(e.target));
   if(!fd.cliente.trim()||!fd.nombre.trim())return toast('Completá cliente y nombre');
   const p={id:nid(),nombre:fd.nombre.trim(),cliente:fd.cliente.trim(),tipo:fd.tipo,fecha:fd.fecha||hoyP(),pedido:fd.pedido.trim(),estado:'presupuestar',moneda:'Gs',items:[],pagos:[],
-    colab:{si:!!fd.colab,colegas:fd.colab?[{id:nid(),nombre:'',pct:50,nota:'',transf:[]}]:[]},notas:[{id:nid(),fecha:hoyP(),t:'Pedido recibido'}],creado:new Date().toISOString()};
-  await guardar(p,true);P.nuevo=null;P.edit=JSON.parse(JSON.stringify(p));P.estadoG='Guardado';mount();toast('Proyecto creado · ahora cargá el presupuesto')},true);
+    colab:{si:false,colegas:String(fd.colegas||'').split(',').map(x=>x.trim()).filter(Boolean).map(n=>({id:nid(),nombre:n,transf:[]}))},repV:2,notas:[{id:nid(),fecha:hoyP(),t:'Pedido recibido'}],creado:new Date().toISOString()};
+  normColab(p);await guardar(p,true);P.nuevo=null;P.edit=JSON.parse(JSON.stringify(p));P.paso='presupuesto';P.pctOpen=-1;P.estadoG='Guardado';mount();toast('Proyecto creado · ahora cargá el presupuesto')},true);
 
 window.PROY={mount,recargar:()=>{P.lista=null}};
 
@@ -5208,6 +5231,52 @@ const css=document.createElement('style');css.textContent=`
 .pry-cg{border:1px solid var(--line);border-left:4px solid var(--cg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
 .pry-cgh{display:flex;gap:10px;align-items:flex-start}.pry-cgn{flex:none;width:26px;height:26px;border-radius:99px;background:var(--cg);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;margin-top:22px}
 .pry-cgq{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.pry-cgadd{align-self:flex-start}
+.pry-r3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pry-r3>div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.pry-r3 b{font-family:var(--f-display);font-size:30px;line-height:1.05}.pry-r3 small{color:var(--muted);font-size:12.5px}.pry-r3 .w b{color:var(--warn)}.pry-r3 .o b{color:var(--ok)}
+.pry-rows{display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pry-row{display:grid;grid-template-columns:1fr 220px;gap:16px;align-items:center;padding:13px 16px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer;width:100%}
+.pry-row:last-child{border-bottom:0}.pry-row:hover{background:var(--chip)}
+.pry-rt{min-width:0}.pry-rt>b{font-size:16px;margin-right:6px}.pry-rt .pry-es{vertical-align:2px}
+.pry-say{margin:3px 0 1px;font-weight:600;font-size:14.5px}.pry-say .w,.w{color:var(--warn)}.o{color:var(--ok)}
+.pry-rm{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted)}
+.pry-top,.pry-pasos{flex:none}
+.pry-top{padding:10px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.pry-pasos{display:flex;overflow-x:auto;border-bottom:1px solid var(--line);padding:0 10px;scrollbar-width:thin}
+.pry-pasos button{border:0;background:none;color:var(--muted);font:600 14px var(--f-body,inherit);padding:10px 10px;white-space:nowrap;cursor:pointer;border-bottom:3px solid transparent;display:inline-flex;align-items:center;gap:6px}
+.pry-pasos button i{font-style:normal;display:inline-grid;place-items:center;width:20px;height:20px;border-radius:99px;background:var(--chip);font-size:12px}
+.pry-pasos button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}.pry-pasos button[aria-selected="true"] i{background:var(--accent);color:var(--accent-ink)}
+.pry-pasos small{background:var(--chip);border-radius:99px;padding:0 7px;font-size:11.5px;color:var(--ink)}.pry-pasos small.w{background:var(--warn-bg);color:var(--warn)}
+.pry-team{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pry-pc{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border-radius:99px;padding:3px 11px 3px 4px;font-weight:600;font-size:13.5px}
+.pry-dot{flex:none;width:20px;height:20px;border-radius:99px;display:inline-grid;place-items:center;color:var(--panel);font-size:10px;font-weight:800;letter-spacing:0}
+.pry-addc{display:inline-flex;gap:6px;flex:1 1 280px;min-width:0}.pry-addc input{flex:1;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.pry-fb{display:flex;flex-direction:column;gap:10px}.pry-fb.con{display:grid;grid-template-columns:1fr 270px;gap:14px;align-items:start}
+.pry-it2{border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;flex-direction:column;gap:7px}
+.pry-fb:not(.con) .pry-it2{border:0;padding:0}
+.pry-chp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pry-chp button{border:1.5px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:3px 10px 3px 3px;font:600 13px var(--f-body,inherit);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pry-chp button[aria-pressed="true"]{border-color:var(--ink);background:var(--chip)}.pry-chp button[aria-pressed="false"] .pry-dot{opacity:.35}
+.pry-chp .pry-pbtn{padding:3px 11px}.pry-pct{font-size:12px;color:var(--muted)}
+.pry-pin{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:4px;font-size:13px;text-transform:none!important;letter-spacing:0!important}.pry-pin input{width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+.pry-wtxt{color:var(--warn);font-size:12.5px}
+.pry-split{height:5px;border-radius:99px;overflow:hidden;display:flex;background:var(--chip)}.pry-split i,.pry-repb i{display:block}
+.pry-side{position:sticky;top:0;background:color-mix(in srgb,var(--chip) 50%,var(--panel));border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:9px}
+.pry-side h4{margin:0;font-size:15px}.pry-tr{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:14px}.pry-tr .sub{font-size:12px}
+.pry-acc{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.pry-accc{display:flex;flex-direction:column;gap:10px;padding:14px 16px;min-width:0}
+.pry-who{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.pry-who b{font-size:15.5px}
+.pry-nm{flex:1 1 160px;min-width:0;border:1px solid transparent;border-radius:8px;padding:4px 6px;font:700 15.5px var(--f-body,inherit);background:transparent;color:var(--ink)}.pry-nm:hover,.pry-nm:focus{border-color:var(--line);background:var(--panel)}
+.pry-bignum{font-family:var(--f-display);font-size:32px;line-height:1;font-variant-numeric:tabular-nums}.pry-bignum.w{color:var(--warn)}.pry-bignum.o{color:var(--ok)}
+.pry-flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:6px;align-items:center;text-align:center}
+.pry-flow>div{background:var(--chip);border-radius:10px;padding:7px 6px;display:flex;flex-direction:column;min-width:0}.pry-flow>div .sub{font-size:12px;line-height:1.25}.pry-flow b{font-size:15px;font-variant-numeric:tabular-nums}.pry-flow>span{color:var(--muted)}
+.pry-pay{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pry-log,.pry-pl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:13.5px}
+.pry-log li{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px dashed var(--line);padding-bottom:4px}
+.pry-pl button{width:100%;display:flex;justify-content:space-between;gap:10px;border:0;background:var(--chip);border-radius:8px;padding:7px 10px;cursor:pointer;color:var(--ink);font:inherit;text-align:left}.pry-pl button:hover{outline:1px solid var(--line)}
+@media (max-width:899px){.pry-fb.con{grid-template-columns:1fr}.pry-side{position:static}.pry-row{grid-template-columns:1fr}}
+@media (max-width:560px){.pry-top .pry-steps button{padding:5px 10px;font-size:12.5px}.pry-top .pry-say{font-size:13.5px}.pry-r3{grid-template-columns:1fr;gap:6px}.pry-r3>div{flex-direction:row;flex-wrap:wrap;align-items:baseline;column-gap:8px}.pry-r3 b{font-size:24px}.pry-r3 small{width:100%}
+  .pry-flow{grid-template-columns:1fr;}.pry-flow>span{transform:rotate(90deg)}.pry-top{padding:8px 14px}}
 .pry-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:899px){.pry-k{grid-template-columns:1fr 1fr}.pry-np{grid-template-columns:1fr 1fr}.pry-np .btn{grid-column:1/-1}}
 @media (max-width:560px){.pry-it{grid-template-columns:1fr 120px 30px}.pry-res{grid-template-columns:1fr}.pry-head h2{font-size:28px}.pry-tab{grid-template-columns:1fr}}
