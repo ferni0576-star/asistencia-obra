@@ -420,6 +420,9 @@ function backendLocal(){
     async proyectos(){if(!d.proyectos){d.proyectos=JSON.parse(JSON.stringify(SEMILLA_PRY));save()}return JSON.parse(JSON.stringify(d.proyectos))},
     async saveProyecto(p){d.proyectos=d.proyectos||[];const i=d.proyectos.findIndex(x=>x.id===p.id);if(i>=0)d.proyectos[i]=p;else d.proyectos.unshift(p);save()},
     async delProyecto(id){d.proyectos=(d.proyectos||[]).filter(x=>x.id!==id);save()},
+    async saveArchPry(a){try{localStorage.setItem('pry_arch_'+a.id,a.data)}catch(e){throw new Error('En la prueba no entra un archivo tan grande')}},
+    async archPry(id){try{return localStorage.getItem('pry_arch_'+id)}catch(e){return null}},
+    async delArchPry(id){try{localStorage.removeItem('pry_arch_'+id)}catch(e){}},
     async saveContratista(c){const v=JSON.parse(JSON.stringify(c));const i=d.contratistas.findIndex(x=>x.id===c.id);if(i>=0)d.contratistas[i]=v;else d.contratistas.push(v);save()},
     async presupuesto(oid){if(!d.presupuestos){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.presupuestos=[];
         if(SEMILLA_PRES&&o)d.presupuestos.push({...JSON.parse(JSON.stringify(SEMILLA_PRES)),obra_id:o.id});save()}
@@ -489,6 +492,9 @@ function backendNube(sb){
     async proyectos(){return ok(await sb.from('proyectos').select('id,datos,actualizado').order('actualizado',{ascending:false})).map(r=>({...r.datos,id:r.id}))},
     async saveProyecto(p){const{id,...datos}=p;ok(await sb.from('proyectos').upsert({id,datos,actualizado:new Date().toISOString()}))},
     async delProyecto(id){ok(await sb.from('proyectos').delete().eq('id',id))},
+    async saveArchPry(a){ok(await sb.from('proyecto_archivos').insert({id:a.id,proyecto_id:a.proyecto_id,nombre:a.nombre,tipo:a.tipo,tam:a.tam,data:a.data}))},
+    async archPry(id){const r=ok(await sb.from('proyecto_archivos').select('data').eq('id',id));return r[0]?r[0].data:null},
+    async delArchPry(id){ok(await sb.from('proyecto_archivos').delete().eq('id',id))},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
     async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
       return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
@@ -1199,7 +1205,7 @@ function exportarExcel(){
 
 /* ---------- puentes con el módulo de contratistas ---------- */
 window.ASIS_OBRA=()=>obraAct();
-window.PRYB={list:()=>DB.proyectos(),save:p=>DB.saveProyecto(p),del:id=>DB.delProyecto(id)};
+window.PRYB={list:()=>DB.proyectos(),save:p=>DB.saveProyecto(p),del:id=>DB.delProyecto(id),arch:{save:a=>DB.saveArchPry(a),get:id=>DB.archPry(id),del:id=>DB.delArchPry(id)}};
 const SEMILLA_PRY=[];
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
@@ -2619,6 +2625,7 @@ function pdfjs(){
     s.onerror=()=>{pdfjsListo=null;no(new Error('pdfjs'))};document.head.appendChild(s)});
   return pdfjsListo;
 }
+window.PDFJS=pdfjs;
 async function abrir(p){
   PL.ver=p;PL.doc=null;PL.pag=1;PL.zoom=1;render();
   try{const lib=await pdfjs();const src=await window.PLB.fuente(p);
@@ -4693,6 +4700,117 @@ const css=document.createElement('style');css.textContent=`
 })();
 
 (function(){
+/* ============ Lector de presupuestos (PDF o Excel): detecta ítems, montos, total, moneda y datos del cliente ============ */
+const RX_DESC=/descrip|concepto|detalle|rubro|trabajo|servicio|designaci|actividad/i;
+const RX_AMT=/total|importe|monto|subtotal|parcial|precio\s*final|valor/i;
+const RX_PU=/unit|p\.?\s*u\.?$|precio\s*unit/i;
+const RX_CANT=/^cant|cantidad/i;
+const RX_N=/^(it(e|é)m|n[°º.o]?|nro\.?|#)$/i;
+const RX_TOT=/^\s*(monto\s+)?total(es)?\b|total\s+(general|gs|presupuesto|del\s+presupuesto|a\s+pagar|honorarios|obra)|^importe\s+total/i;
+const RX_SUB=/sub\s*-?\s*total/i;
+const RX_IVA=/^\s*i\.?v\.?a\.?\b/i;
+const limpia=s=>String(s??'').replace(/\s+/g,' ').trim();
+
+/* número en formato paraguayo/latino o inglés: 8.000.000 · 4.500,50 · US$ 4,500.00 · Gs. 1.200.000 */
+function aNum(v){if(typeof v==='number')return isFinite(v)?v:null;let s=limpia(v);if(!s||/%/.test(s)||/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(s))return null;
+  s=s.replace(/(gs|g|us\$|u\$s|usd|\$|₲|guaran\w*|d[oó]lares?)\.?/ig,'').replace(/\s/g,'');const neg=/^\(.*\)$|^-/.test(s);s=s.replace(/[()\-+]/g,'');
+  if(!/^\d[\d.,]*$/.test(s))return null;let n;
+  if(s.includes('.')&&s.includes(',')){n=s.lastIndexOf(',')>s.lastIndexOf('.')?Number(s.replace(/\./g,'').replace(',','.')):Number(s.replace(/,/g,''))}
+  else if(s.includes('.')){n=/^\d{1,3}(\.\d{3})+$/.test(s)?Number(s.replace(/\./g,'')):Number(s)}
+  else if(s.includes(',')){n=/^\d{1,3}(,\d{3})+$/.test(s)?Number(s.replace(/,/g,'')):Number(s.replace(',','.'))}
+  else n=Number(s);return isFinite(n)?(neg?-n:n):null}
+const esN=t=>/^\d{1,3}(\.\d{1,3}){0,3}\.?$/.test(limpia(t))&&!/^\d{1,3}\.\d{3}$/.test(limpia(t));
+const esTexto=t=>{const s=limpia(t);return s.length>1&&aNum(s)==null&&/[a-záéíóúñ]/i.test(s)};
+
+/* ---------- lectura de cada formato a "filas de celdas con posición" ---------- */
+async function filasExcel(buf){const wb=XLSX.read(buf,{type:'array'});let mejor=null;
+  for(const nom of wb.SheetNames){const A=XLSX.utils.sheet_to_json(wb.Sheets[nom],{header:1,raw:true,defval:''});
+    const F=A.map(r=>r.map((v,i)=>({t:v instanceof Date?'':(typeof v==='number'?v:limpia(v)),x:i*100})).filter(c=>c.t!==''&&c.t!=null)).filter(r=>r.length);
+    const score=F.filter(r=>r.some(c=>typeof c.t==='number'&&c.t>=1000)&&r.some(c=>esTexto(c.t))).length;
+    if(!mejor||score>mejor.score)mejor={score,F,hoja:nom}}
+  return{filas:mejor?mejor.F:[],hoja:mejor&&mejor.hoja,hojas:wb.SheetNames.length}}
+async function filasPdf(buf){const lib=await window.PDFJS();const pdf=await lib.getDocument({data:buf}).promise;const F=[];let txt=0;
+  for(let pg=1;pg<=Math.min(pdf.numPages,30);pg++){const page=await pdf.getPage(pg);const tc=await page.getTextContent();
+    const its=tc.items.filter(i=>limpia(i.str)).map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width||0,h:Math.abs(i.transform[3])||8}));txt+=its.length;
+    its.sort((a,b)=>b.y-a.y||a.x-b.x);const L=[];
+    for(const it of its){const l=L.find(l=>Math.abs(l.y-it.y)<=Math.max(2,it.h*0.4));if(l)l.its.push(it);else L.push({y:it.y,its:[it]})}
+    L.sort((a,b)=>b.y-a.y);
+    for(const l of L){l.its.sort((a,b)=>a.x-b.x);const C=[];
+      for(const it of l.its){const c=C[C.length-1];const gap=c?it.x-(c.x2):1e9;if(c&&gap<Math.max(3.2,it.h*0.55))
+        {c.t+=(gap>0.8?' ':'')+it.s;c.x2=it.x+it.w}else C.push({t:it.s,x:it.x,x2:it.x+it.w})}
+      F.push(C.map(c=>({t:limpia(c.t),x:(c.x+c.x2)/2,xd:c.x2})).filter(c=>c.t))}}
+  return{filas:F,paginas:pdf.numPages,sinTexto:txt<5}}
+
+/* ---------- interpretación ---------- */
+function interpretar(F,todoTexto){
+  const R={items:[],rubros:[],total:null,moneda:'Gs',meta:{},avisos:[]};
+  const usd=(todoTexto.match(/us\$|u\$s|usd|d[oó]lar/ig)||[]).length,gsn=(todoTexto.match(/\bgs\.?|guaran/ig)||[]).length;R.moneda=usd>gsn?'USD':'Gs';
+  /* datos sueltos: cliente, fecha, forma de pago, obra */
+  const valorDe=(r,i)=>{const c=r[i];const m=String(c.t).split(/:\s*/);if(m.length>1&&limpia(m.slice(1).join(':')))return limpia(m.slice(1).join(':'));const n=r[i+1];return n?limpia(n.t):''};
+  F.forEach(r=>r.forEach((c,i)=>{const t=String(c.t);
+    if(!R.meta.cliente&&/^(cliente|propietario|comitente|señor(a)?|sr\.?|sra\.?)\s*:?/i.test(t)){const v=valorDe(r,i);if(v&&v.length<80)R.meta.cliente=v}
+    if(!R.meta.obra&&/^(obra|proyecto)\s*:/i.test(t)){const v=valorDe(r,i);if(v&&v.length<100)R.meta.obra=v}
+    if(!R.meta.forma&&/forma\s+de\s+pago|condiciones\s+de\s+pago/i.test(t)){const v=valorDe(r,i);if(v&&v.length>3)R.meta.forma=v.slice(0,200)}
+    if(!R.meta.fecha){const m=t.match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/);if(m&&/fecha|encarnaci|asunci|,/i.test(r.map(x=>x.t).join(' '))){const a=m[3].length===2?'20'+m[3]:m[3];if(+m[2]<=12&&+m[1]<=31)R.meta.fecha=`${a}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`}}}));
+  /* encabezado de la tabla */
+  let H=null;
+  for(let k=0;k<F.length&&!H;k++){const r=F[k];const d=r.find(c=>typeof c.t==='string'&&RX_DESC.test(c.t)&&c.t.length<40);
+    const am=r.filter(c=>typeof c.t==='string'&&RX_AMT.test(c.t)&&!RX_PU.test(c.t)&&c.t.length<40);
+    if(d&&am.length){const a=am.find(c=>/total/i.test(c.t))||am[am.length-1];H={fila:k,desc:d.x,amt:a.x,
+      n:(r.find(c=>typeof c.t==='string'&&RX_N.test(c.t))||{}).x,pu:(r.find(c=>typeof c.t==='string'&&RX_PU.test(c.t))||{}).x,cant:(r.find(c=>typeof c.t==='string'&&RX_CANT.test(c.t))||{}).x}}}
+  const desde=H?H.fila+1:0;
+  const cerca=(r,x,tol)=>{let b=null,bd=1e9;for(const c of r){const d=Math.abs(c.x-x);if(d<bd){bd=d;b=c}}return b&&bd<=tol?b:null};
+  const tol=F.some(r=>r.some(c=>c.x%100))?60:49;
+  let rubro=null;const crudo=[];
+  for(let k=desde;k<F.length;k++){const r=F[k];if(!r.length)continue;
+    const linea=r.map(c=>c.t).join(' ');
+    /* monto de la fila */
+    let amt=null;
+    if(H){const c=cerca(r,H.amt,tol);amt=c?aNum(c.t):null;if(amt==null){const nums=r.filter(c=>aNum(c.t)!=null&&c.x>H.desc);const ult=nums[nums.length-1];if(ult&&Math.abs(ult.x-H.amt)<tol*2.5)amt=aNum(ult.t)}}
+    else{const nums=r.filter(c=>aNum(c.t)!=null&&!esN(c.t));if(nums.length)amt=aNum(nums[nums.length-1].t)}
+    /* número de ítem y descripción */
+    let n='';const c0=r[0];if(c0&&esN(c0.t)&&(!H||H.n==null||Math.abs(c0.x-H.n)<tol*1.5||c0.x<H.desc))n=limpia(c0.t).replace(/\.$/,'');
+    let desc='';if(H){const c=cerca(r,H.desc,tol*3);if(c&&esTexto(c.t))desc=c.t}
+    if(!desc){const T=r.filter(c=>esTexto(c.t));T.sort((a,b)=>String(b.t).length-String(a.t).length);desc=T[0]?T[0].t:''}
+    desc=limpia(String(desc).replace(/^\d+(\.\d+)*\.?\s+/,''));
+    if(!n){const m=limpia(linea).match(/^(\d{1,3}(\.\d{1,3}){0,3})\.?\s+[a-záéíóúñ]/i);if(m)n=m[1]}
+    if(RX_SUB.test(linea)){if(amt)crudo.push({tipo:'sub',amt,rubro});continue}
+    if(RX_IVA.test(desc)||RX_IVA.test(linea)&&!desc){if(amt)crudo.push({tipo:'iva',desc:desc||'IVA',amt});continue}
+    if(RX_TOT.test(desc)||RX_TOT.test(linea)&&(!desc||RX_TOT.test(desc))){if(amt)R.total=Math.max(R.total||0,amt);continue}
+    if(!desc||desc.length<2)continue;
+    if(/^(cliente|obra|proyecto|fecha|forma de pago|condiciones de pago|validez|ruc|tel[eé]fono|direcci[oó]n|correo|e-?mail)\s*:/i.test(desc)||/^(atentamente|firma|sin otro particular)/i.test(desc))continue;
+    const entero=n&&!n.includes('.');
+    if((amt==null||amt===0)&&(entero||(!n&&desc===desc.toUpperCase()&&desc.length>3&&/[A-Z]/.test(desc)))){rubro={n,desc};continue}
+    if(amt==null||amt<=0)continue;
+    crudo.push({tipo:'item',n,desc,amt,rubro:rubro?rubro.desc:'',entero})}
+  /* ítems con número entero que además tienen hijos (1 → 1.1, 1.2): son subtotales de rubro */
+  const its=crudo.filter(x=>x.tipo==='item');
+  its.forEach(x=>{if(x.entero&&its.some(y=>y.n&&y.n.startsWith(x.n+'.')))x.esRubro=true});
+  its.forEach(x=>{if(!x.esRubro&&x.n&&x.n.includes('.')){const pr=x.n.split('.')[0];const rb=its.find(y=>y.esRubro&&y.n===pr);if(rb)x.rubro=rb.desc}});
+  let det=its.filter(x=>!x.esRubro);
+  const ivas=crudo.filter(x=>x.tipo==='iva');
+  const suma=A=>A.reduce((s,x)=>s+x.amt,0);
+  /* si sigue sumando de más contra el TOTAL del archivo, sacar filas que repiten la suma de las anteriores (subtotales sin rótulo) */
+  if(R.total&&suma(det)>R.total*1.02){const D=[];let acc=0;for(const x of det){if(acc>0&&Math.abs(x.amt-acc)<=Math.max(1,acc*0.001)&&!x.n.includes('.')){acc=0;continue}D.push(x);acc+=x.amt}if(Math.abs(suma(D)-R.total)<Math.abs(suma(det)-R.total))det=D}
+  R.items=det.map(x=>({concepto:(x.n&&x.n.includes('.')?x.n+' ':'')+x.desc,monto:x.amt,rubro:x.rubro}));
+  if(ivas.length&&R.total&&Math.abs(suma(det)+suma(ivas)-R.total)<Math.abs(suma(det)-R.total))ivas.forEach(v=>R.items.push({concepto:v.desc.length<20?'IVA':v.desc,monto:v.amt,rubro:''}));
+  /* agrupado por rubro */
+  const G=new Map();R.items.forEach(i=>{const k=i.rubro||'Otros';G.set(k,(G.get(k)||0)+i.monto)});
+  R.rubros=[...G].map(([concepto,monto])=>({concepto,monto}));
+  R.suma=R.items.reduce((s,i)=>s+i.monto,0);
+  if(!R.items.length)R.avisos.push('No encontré una tabla de ítems con montos.');
+  else if(R.total&&Math.abs(R.suma-R.total)>Math.max(1,R.total*0.005))R.avisos.push(`La suma de los ítems da ${R.suma.toLocaleString('es-PY')} y el total del archivo dice ${R.total.toLocaleString('es-PY')}. Revisá los ítems marcados.`);
+  return R}
+
+async function leer(file){const buf=await file.arrayBuffer();const nom=file.name||'';const pdf=/\.pdf$/i.test(nom)||file.type==='application/pdf';
+  if(!pdf&&!window.XLSX)throw new Error('No se pudo cargar el lector de Excel');
+  const L=pdf?await filasPdf(buf.slice(0)):await filasExcel(buf);
+  if(pdf&&L.sinTexto)return{items:[],rubros:[],avisos:['El PDF parece escaneado (es una imagen): no tiene texto para leer. Quedó guardado y podés cargar los ítems a mano.'],meta:{},moneda:'Gs',total:null,suma:0,escaneado:true};
+  const R=interpretar(L.filas,L.filas.map(r=>r.map(c=>c.t).join(' ')).join('\n'));R.origen=pdf?`PDF · ${L.paginas} pág.`:`Excel · hoja ${L.hoja}`;return R}
+window.LEERPRES={leer,aNum,interpretar};
+})();
+
+(function(){
 /* ============ Proyectos: cartera de pedidos de clientes, presupuestos, cobros y colaboraciones ============ */
 const LS=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}};
 const P={lista:null,cargando:false,vista:LS('pry_vista')||'tablero',filtro:'todos',q:'',colab:false,abierto:null,edit:null,nuevo:null,t:null,estadoG:'',borrar:false,err:null};
@@ -4801,8 +4919,11 @@ function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';con
      <label class="wide">¿Qué te pidió?<textarea data-pf="pedido" rows="3">${esc(p.pedido||'')}</textarea></label></div></section>
 
    <section class="pry-sec"><div class="pry-sh"><h3>Presupuesto que le pasaste</h3><div class="pry-sha"><label class="pry-mini">Moneda<select data-pf="moneda" data-re="1"><option ${m==='Gs'?'selected':''}>Gs</option><option ${m==='USD'?'selected':''} value="USD">US$</option></select></label>
+       <label class="btn sm primary pry-up">Subir PDF o Excel<input type="file" id="pry-arch" accept=".pdf,.xlsx,.xls,.xlsm,.csv,application/pdf" hidden></label>
        <button type="button" class="btn sm" data-pa="pdfpres" ${c.total?'':'disabled'}>PDF presupuesto</button></div></div>
-     <div class="pry-items">${(p.items||[]).map((it,i)=>`<div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>`).join('')}
+     ${vArchivos(p)}${vImp(p)}
+     <div class="pry-items">${(p.items||[]).filter((it,i)=>P.verItems||(p.items.length<=14)||i<10).map((it,i)=>`<div class="pry-it"><input type="text" data-pi="${i}" data-f="concepto" value="${esc(it.concepto||'')}" placeholder="Concepto (ej.: Anteproyecto, Proyecto ejecutivo, Dirección de obra)" aria-label="Concepto"><input type="text" data-pi="${i}" data-f="monto" inputmode="decimal" class="num" value="${it.monto?(m==='USD'?usd(num(it.monto)):gs(num(it.monto))):''}" placeholder="Monto" aria-label="Monto"><button type="button" class="pry-q" data-pa="quitarit" data-i="${i}" aria-label="Quitar ítem">✕</button></div>`).join('')}
+       ${(p.items||[]).length>14?`<button type="button" class="btn sm ghost" data-pa="veritems">${P.verItems?'Mostrar menos':'Ver los '+p.items.length+' ítems'}</button>`:''}
        <button type="button" class="btn sm ghost" data-pa="item">+ Agregar ítem</button></div>
      <div class="pry-tot"><span>Total del presupuesto</span><b id="pry-total">${plata(c.total,m)}</b></div>
      <div class="form" style="padding:0">
@@ -4831,6 +4952,42 @@ function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';con
 
    <div class="pry-del">${P.borrar?`<span>¿Eliminar este proyecto y sus cobros? No se puede deshacer.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="borrarsi">Sí, eliminar</button><button type="button" class="btn sm ghost" data-pa="borrarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="borrar">Eliminar proyecto</button>`}</div>
   </div></div>`}
+
+/* ---------- archivo del presupuesto: guardar, ver y leer ---------- */
+const kb=n=>n>1048576?(n/1048576).toFixed(1).replace('.',',')+' MB':Math.max(1,Math.round(n/1024))+' KB';
+function vArchivos(p){const A=p.archivos||[];if(!A.length)return '';
+  return `<div class="pry-archs">${A.map(a=>`<div class="pry-arch"><span class="pry-ai">${/pdf/i.test(a.tipo||a.nombre)?'PDF':'XLS'}</span><div><b>${esc(a.nombre)}</b><span class="sub">${kb(a.tam||0)} · subido ${fch(a.fecha)}</span></div>
+    <button type="button" class="btn sm ghost" data-pa="archver" data-id="${esc(a.id)}">${/pdf/i.test(a.tipo||a.nombre)?'Ver':'Descargar'}</button><button type="button" class="btn sm ghost" data-pa="archleer" data-id="${esc(a.id)}">Leer de nuevo</button><button type="button" class="pry-q" data-pa="archquitar" data-id="${esc(a.id)}" aria-label="Quitar archivo">✕</button></div>`).join('')}</div>`}
+function listaImp(){const I=P.imp;if(!I||!I.R)return[];return I.modo==='rubro'?I.R.rubros:I.R.items}
+function vImp(p){const I=P.imp;if(!I)return '';
+  if(I.leyendo)return `<div class="pry-imp"><b>Leyendo “${esc(I.nombre)}”…</b><span class="sub">Buscando ítems, montos y el total</span></div>`;
+  const R=I.R;const m=R.moneda;const L=listaImp();const sel=I.sel;const tot=L.reduce((s,x,i)=>s+(sel[i]?x.monto:0),0);
+  const ok=R.total&&Math.abs(R.suma-R.total)<=Math.max(1,R.total*0.005);const hayRub=R.rubros.length>1&&R.items.length>R.rubros.length;
+  const n=(p.items||[]).filter(x=>x.concepto||num(x.monto)).length;
+  return `<div class="pry-imp"><div class="pry-imph"><div><b>Leí “${esc(I.nombre)}”</b><span class="sub">${esc(R.origen||'')} · ${R.items.length} ítem${R.items.length===1?'':'s'}${hayRub?` en ${R.rubros.length} rubros`:''}</span></div><button type="button" class="rs-x" data-pa="impno" aria-label="Descartar">✕</button></div>
+    ${R.items.length?`<div class="pry-ich">${ok?`<span class="pry-ok">✓ La suma coincide con el total del archivo: ${plata(R.total,m)}</span>`:R.total?'':`<span class="sub">El archivo no tiene una fila de TOTAL para comparar · suma ${plata(R.suma,m)}</span>`}
+      ${R.avisos.map(a=>`<span class="pry-warn">${esc(a)}</span>`).join('')}
+      <span class="pry-tag">Moneda: ${m==='USD'?'US$':'Gs'}</span>${R.meta.cliente?`<span class="pry-tag">Cliente: ${esc(R.meta.cliente)}</span>`:''}${R.meta.fecha?`<span class="pry-tag">Fecha: ${fch(R.meta.fecha)}</span>`:''}${R.meta.forma?`<span class="pry-tag">Forma de pago: ${esc(R.meta.forma)}</span>`:''}</div>
+    ${hayRub?`<div class="pry-seg" role="group" aria-label="Cómo cargar"><button type="button" data-pa="impmodo" data-m="rubro" aria-pressed="${I.modo==='rubro'}">Un ítem por rubro (${R.rubros.length})</button><button type="button" data-pa="impmodo" data-m="detalle" aria-pressed="${I.modo==='detalle'}">Todo el detalle (${R.items.length})</button></div>`:''}
+    <div class="pry-il">${L.map((x,i)=>`<label class="pry-ir ${sel[i]?'':'off'}"><input type="checkbox" data-pa="impsel" data-i="${i}" ${sel[i]?'checked':''}><span>${esc(x.concepto)}</span><b>${plata(x.monto,m)}</b></label>`).join('')}</div>
+    <div class="pry-if"><span>Seleccionado: <b>${plata(tot,m)}</b></span><div class="bar"><button type="button" class="btn primary sm" data-pa="impsi" data-m="reemplazar">${n?(n===1?'Reemplazar el ítem actual':`Reemplazar los ${n} ítems actuales`):'Cargar estos ítems'}</button>${n?`<button type="button" class="btn sm" data-pa="impsi" data-m="sumar">Sumar a los actuales</button>`:''}<button type="button" class="btn sm ghost" data-pa="impno">Descartar</button></div></div>`
+    :`<p class="sub" style="margin:0">${esc(R.avisos[0]||'No encontré ítems con montos.')} El archivo quedó guardado en el proyecto.</p><div class="bar"><button type="button" class="btn sm ghost" data-pa="impno">Cerrar</button></div>`}</div>`}
+async function leerArchivo(p,file,guardarlo){if(!window.LEERPRES)return toast('No se pudo cargar el lector');
+  if(file.size>8*1048576)return toast('El archivo pesa más de 8 MB. Probá exportarlo de nuevo o comprimirlo.');
+  P.imp={leyendo:true,nombre:file.name};mount();
+  if(guardarlo){try{const data=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(file)});
+      const a={id:nid(),nombre:file.name,tipo:file.type||(/\.pdf$/i.test(file.name)?'application/pdf':'application/vnd.ms-excel'),tam:file.size,fecha:hoyP()};
+      await window.PRYB.arch.save({...a,proyecto_id:p.id,data});p.archivos=p.archivos||[];p.archivos.push(a);nota(p,'Archivo del presupuesto subido: '+file.name);await guardar(p,true)}
+    catch(e){toast(/proyecto_archivos/i.test(e&&e.message||'')?'Para guardar el archivo falta pegar el SQL 23 en Supabase':'No se pudo guardar el archivo, pero igual lo leo')}}
+  try{const R=await window.LEERPRES.leer(file);const modo=R.rubros.length>1&&R.items.length>14?'rubro':'detalle';P.imp={nombre:file.name,R,modo,sel:(modo==='rubro'?R.rubros:R.items).map(()=>true)}}
+  catch(e){P.imp={nombre:file.name,R:{items:[],rubros:[],avisos:['No pude leer el archivo ('+(e&&e.message||'formato no reconocido')+').'],meta:{},moneda:'Gs',suma:0}}}
+  mount();const el=document.querySelector('.pry-imp');if(el)el.scrollIntoView({block:'nearest',behavior:'smooth'})}
+function aplicarImp(p,modo){const I=P.imp;const L=listaImp().filter((x,i)=>I.sel[i]);if(!L.length)return toast('No hay ítems seleccionados');
+  const nuevos=L.map(x=>({id:nid(),concepto:x.concepto,monto:Math.round(x.monto*100)/100}));
+  p.items=modo==='sumar'?[...(p.items||[]).filter(x=>x.concepto||num(x.monto)),...nuevos]:nuevos;
+  p.moneda=I.R.moneda||p.moneda;const M=I.R.meta||{};if(!p.envio&&M.fecha)p.envio=M.fecha;if(!p.forma_pago&&M.forma)p.forma_pago=M.forma;
+  nota(p,`Presupuesto cargado desde “${I.nombre}”: ${nuevos.length} ítem${nuevos.length===1?'':'s'} · ${plata(nuevos.reduce((s,x)=>s+x.monto,0),p.moneda)}`);P.imp=null;P.verItems=false}
+function dataAFile(a,data){const [h,b]=data.split(',');const bin=atob(b);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new File([u],a.nombre,{type:(h.match(/data:([^;]+)/)||[])[1]||a.tipo||''})}
 
 /* ---------- PDFs ---------- */
 function conMembrete(p,f){const E=window.EMPRESAS?window.EMPRESAS():[];const e=E.find(x=>x.id===p.empresa_id)||E[0];
@@ -4864,7 +5021,7 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='filtro'){P.filtro=t.dataset.f;if(!['todos','cobrar'].includes(P.filtro)&&P.vista==='tablero'){P.vista='lista'}return mount()}
   if(a==='colab'){P.colab=!P.colab;return mount()}
   if(a==='nuevo'){P.nuevo={};return mount()}
-  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=JSON.parse(JSON.stringify(x));P.estadoG='';P.borrar=false}return mount()}
+  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=JSON.parse(JSON.stringify(x));P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
   if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;if(P.edit&&P.t){clearTimeout(P.t);P.t=null;await guardar(P.edit,true)}P.edit=null;P.nuevo=null;return mount()}
   if(!p)return;
   if(a==='estado'){const ne=t.dataset.e;if(ne===p.estado)return;nota(p,`Estado: ${ES(p.estado)[1]} → ${ES(ne)[1]}`);p.estado=ne;if(ne==='enviado'&&!p.envio)p.envio=hoyP();if(ne==='aprobado'&&!p.aprobado)p.aprobado=hoyP();
@@ -4877,11 +5034,21 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='quitarpago'){p.pagos=(p.pagos||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
   if(a==='colabsi'){p.colab={...(p.colab||{mio:50}),si:t.checked};if(p.colab.mio==null)p.colab.mio=50;autoguardar();return mount()}
   if(a==='nota'){const i=document.getElementById('pry-nt');const v=i.value.trim();if(!v)return;nota(p,v);await guardar(p,true);return mount()}
+  if(a==='veritems'){P.verItems=!P.verItems;return mount()}
+  if(a==='impno'){P.imp=null;return mount()}
+  if(a==='impmodo'){P.imp.modo=t.dataset.m;P.imp.sel=listaImp().map(()=>true);return mount()}
+  if(a==='impsel'){P.imp.sel[+t.dataset.i]=t.checked;return mount()}
+  if(a==='impsi'){aplicarImp(p,t.dataset.m);await guardar(p,true);toast('Ítems del presupuesto cargados');return mount()}
+  if(a==='archver'||a==='archleer'){const A=(p.archivos||[]).find(x=>x.id===t.dataset.id);if(!A)return;const w=a==='archver'&&/pdf/i.test(A.tipo||A.nombre)?window.open('','_blank'):null;
+    let data;try{data=await window.PRYB.arch.get(A.id)}catch(err){data=null}if(!data){if(w)w.close();return toast('No encontré el archivo guardado')}
+    const f=dataAFile(A,data);if(a==='archleer')return leerArchivo(p,f,false);
+    const url=URL.createObjectURL(f);if(w){w.location=url}else{const l=document.createElement('a');l.href=url;l.download=A.nombre;document.body.appendChild(l);l.click();l.remove()}setTimeout(()=>URL.revokeObjectURL(url),60000);return}
+  if(a==='archquitar'){const A=(p.archivos||[]).find(x=>x.id===t.dataset.id);if(!A)return;try{await window.PRYB.arch.del(A.id)}catch(err){}p.archivos=p.archivos.filter(x=>x.id!==A.id);await guardar(p,true);toast('Archivo quitado');return mount()}
   if(a==='pdfpres')return pdfPres(p);
   if(a==='pdfcta')return pdfCta(p);
   if(a==='borrar'){P.borrar=true;return mount()}
   if(a==='borrarno'){P.borrar=false;return mount()}
-  if(a==='borrarsi'){try{await window.PRYB.del(p.id);P.lista=P.lista.filter(x=>x.id!==p.id);P.edit=null;P.borrar=false;toast('Proyecto eliminado')}catch(err){toast('No se pudo eliminar')}return mount()}
+  if(a==='borrarsi'){try{for(const A of p.archivos||[]){try{await window.PRYB.arch.del(A.id)}catch(err){}}await window.PRYB.del(p.id);P.lista=P.lista.filter(x=>x.id!==p.id);P.edit=null;P.borrar=false;toast('Proyecto eliminado')}catch(err){toast('No se pudo eliminar')}return mount()}
 });
 document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.id==='pry-q'){P.q=t.value;return mount()}
@@ -4892,6 +5059,7 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.pc){p.colab=p.colab||{si:true};p.colab[t.dataset.pc]=t.dataset.pc==='mio'?num(t.value):t.value;autoguardar();return}
 });
 document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;const p=P.edit;if(!p)return;
+  if(t.id==='pry-arch'){const f=t.files&&t.files[0];t.value='';if(f)leerArchivo(p,f,true);return}
   if(t.dataset.re){mount()}
   if(t.dataset.pi!=null&&t.dataset.f==='monto'){t.value=num(t.value)?(p.moneda==='USD'?usd(num(t.value)):gs(num(t.value))):''}
   if(t.dataset.pc==='mio')mount()});
@@ -4959,6 +5127,21 @@ const css=document.createElement('style');css.textContent=`
 .pry-nn{display:flex;gap:6px}.pry-nn input{flex:1}
 .pry-hist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;max-height:220px;overflow:auto}.pry-hist li{font-size:14px;border-bottom:1px dashed var(--line);padding-bottom:4px}
 .pry-chk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;font-weight:600;text-transform:none!important;letter-spacing:0!important}
+.pry-up{cursor:pointer}
+.pry-archs{display:flex;flex-direction:column;gap:6px}
+.pry-arch{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:8px;align-items:center;background:var(--chip);border-radius:10px;padding:7px 10px}
+.pry-arch>div{display:flex;flex-direction:column;min-width:0}.pry-arch b{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pry-arch .sub{font-size:12px}
+.pry-ai{background:var(--bad);color:#fff;border-radius:6px;font-size:10.5px;font-weight:800;padding:5px 6px;letter-spacing:.04em}
+.pry-imp{border:2px solid var(--accent);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--accent) 6%,var(--panel))}
+.pry-imph{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.pry-imph>div{display:flex;flex-direction:column}
+.pry-ich{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pry-ok{color:var(--ok);font-weight:700;font-size:13.5px;width:100%}.pry-warn{color:var(--warn);background:var(--warn-bg);border-radius:8px;padding:6px 9px;font-size:13.5px;width:100%}
+.pry-tag{background:var(--chip);border-radius:99px;padding:3px 10px;font-size:12.5px}
+.pry-il{display:flex;flex-direction:column;max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.pry-ir{display:grid!important;grid-template-columns:22px 1fr auto;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--line);font-size:14px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-weight:400!important}
+.pry-ir:last-child{border-bottom:0}.pry-ir b{white-space:nowrap;font-variant-numeric:tabular-nums}.pry-ir.off{opacity:.45}
+.pry-if{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.pry-if .bar{margin:0}
+@media (max-width:560px){.pry-arch{grid-template-columns:auto 1fr auto auto}.pry-arch .btn:nth-of-type(2){display:none}.pry-sha{flex-wrap:wrap;justify-content:flex-end}}
 .pry-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:899px){.pry-k{grid-template-columns:1fr 1fr}.pry-np{grid-template-columns:1fr 1fr}.pry-np .btn{grid-column:1/-1}}
 @media (max-width:560px){.pry-it{grid-template-columns:1fr 120px 30px}.pry-res{grid-template-columns:1fr}.pry-head h2{font-size:28px}.pry-tab{grid-template-columns:1fr}}
