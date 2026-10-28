@@ -4917,7 +4917,8 @@ function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el pre
      <div><span class="sub">Certificado al cliente</span><b>${pct(ce/tot)}</b><small>Gs ${M(ce)}</small></div>
      <div class="cr-est"><span class="sub">Situación</span><b>${est==='ok'?'En tiempo':est==='mal'?`${atr} días de atraso`:`${-atr} días adelantado`}</b><small>${est==='ok'?'dentro de una semana del plan':est==='mal'?`faltan Gs ${M(plan-ej)} para estar al día`:`Gs ${M(ej-plan)} por encima del plan`}</small></div></div>
    <section class="panel cr-box"><div class="cr-bh"><h3>Curva de avance</h3><span class="cr-ley"><i class="lp"></i>Cronograma estimado <i class="le"></i>Ejecutado <i class="lc"></i>Certificado al cliente</span></div>${curvaSVG(A,C)}</section>
-   <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3><span class="cr-ley"><i class="lp"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
+   <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3>${C.semanas?`<span class="pry-seg cr-seg"><button data-cr="mes" data-v="obra" aria-pressed="${CR.mes!=='cal'}">Mes de obra (4 sem.)</button><button data-cr="mes" data-v="cal" aria-pressed="${CR.mes==='cal'}">Mes calendario</button></span>`:''}<span class="cr-ley"><i class="lp"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
+   ${C.semanas?semanas(A,C):''}
    <section class="panel cr-box"><div class="cr-bh"><h3>Rubros</h3><span class="sub">Barra = fechas del cronograma · relleno = avance ejecutado · línea = hoy</span></div>${gantt(A,C)}</section>
   </div>`}
 
@@ -4935,16 +4936,25 @@ function curvaSVG(A,C){const R=rango(A,C);const W=760,H=260,pl=58,pr=14,pt=14,pb
     <path d="${lp}" class="cr-lp"/><path d="${pts('ce')}" class="cr-lc"/><path d="${pts('ej')}" class="cr-le"/>
     ${A.curva.filter(p=>dn(p.f)<=H0).map(p=>`<circle cx="${xs(dn(p.f))}" cy="${ys(p.ej)}" r="3" class="cr-pe"><title>${fdm(p.f)}: ejecutado ${pct(p.ej/tot)} · estimado ${pct(planAl(A,C,dn(p.f))/tot)}</title></circle>`).join('')}</svg></div>`}
 
-function meses(A,C){const R=rango(A,C);const H0=hoyN();const L=[];const d=new Date(R.a*864e5);d.setUTCDate(1);
-  while(d.getTime()/864e5<=R.b){const a=d.getTime()/864e5;const e=new Date(d);e.setUTCMonth(e.getUTCMonth()+1);const b=e.getTime()/864e5-1;
+function meses(A,C){const R=rango(A,C);const H0=hoyN();const L=[];const d=new Date(R.a*864e5);d.setUTCDate(1);const obra=C.semanas&&CR.mes!=='cal';
+  const B=[];if(obra){const d0=dn(C.inicio);for(let i=0;d0+28*i<=R.b;i++)B.push([d0+28*i,d0+28*(i+1)-1,'Mes '+(i+1)])}else{while(d.getTime()/864e5<=R.b){const a=d.getTime()/864e5;const e=new Date(d);e.setUTCMonth(e.getUTCMonth()+1);B.push([a,e.getTime()/864e5-1,null]);d.setUTCMonth(d.getUTCMonth()+1)}}
+  for(const [a,b,nomb] of B){
     const pA=planAl(A,C,a-1),pB=planAl(A,C,b),eA=realAl(A,a-1,'ej'),eB=realAl(A,Math.min(b,H0),'ej'),cA=realAl(A,a-1,'ce'),cB=realAl(A,Math.min(b,H0),'ce');
-    L.push({k:nd(a).slice(0,7),plan:pB-pA,ej:a>H0?null:eB-eA,ce:a>H0?null:cB-cA,pAc:pB,eAc:a>H0?null:eB,fut:a>H0,act:a<=H0&&H0<=b});d.setUTCMonth(d.getUTCMonth()+1)}
+    L.push({k:nd(a).slice(0,7),nom:nomb,sub:nomb?`${fdm(nd(a)).slice(0,5)}–${fdm(nd(b)).slice(0,5)}`:'',plan:pB-pA,ej:a>H0?null:eB-eA,ce:a>H0?null:cB-cA,pAc:pB,eAc:a>H0?null:eB,fut:a>H0,act:a<=H0&&H0<=b})}
   const mx=Math.max(1,...L.map(x=>Math.max(x.plan,x.ej||0)));
-  return `<div class="cr-bars" role="img" aria-label="Desembolso estimado y ejecutado por mes">${L.map(x=>`<div class="cr-bm ${x.act?'act':''}"><div class="cr-bb"><i class="bp" style="height:${x.plan/mx*100}%" title="Estimado Gs ${gs(x.plan)}"></i><i class="be" style="height:${(x.ej||0)/mx*100}%" title="Ejecutado Gs ${gs(x.ej||0)}"></i></div><span>${mesTxt(x.k)}</span></div>`).join('')}</div>
+  return `<div class="cr-bars" role="img" aria-label="Desembolso estimado y ejecutado por mes">${L.map(x=>`<div class="cr-bm ${x.act?'act':''}"><div class="cr-bb"><i class="bp" style="height:${x.plan/mx*100}%" title="Estimado Gs ${gs(x.plan)}"></i><i class="be" style="height:${(x.ej||0)/mx*100}%" title="Ejecutado Gs ${gs(x.ej||0)}"></i></div><span>${x.nom||mesTxt(x.k)}</span></div>`).join('')}</div>
    <div class="tw"><table class="cr-tm"><thead><tr><th>Mes</th><th class="n">Estimado</th><th class="n">Ejecutado</th><th class="n">Diferencia</th><th class="n">Certificado al cliente</th><th class="n">Acumulado estimado</th><th class="n">Acumulado ejecutado</th></tr></thead><tbody>
-   ${L.map(x=>{const df=x.ej==null?null:x.ej-x.plan;return `<tr class="${x.fut?'fut':''}"><td>${mesTxt(x.k)}${x.act?' <span class="cr-chip">en curso</span>':''}</td><td class="n">${gs(x.plan)}</td><td class="n">${x.ej==null?'—':gs(x.ej)}</td><td class="n ${df==null?'':df<-1?'neg':'pos'}">${df==null?'—':(df>0?'+':'')+gs(df)}</td><td class="n">${x.ce==null?'—':gs(x.ce)}</td><td class="n">${gs(x.pAc)}</td><td class="n">${x.eAc==null?'—':gs(x.eAc)}</td></tr>`}).join('')}
+   ${L.map(x=>{const df=x.ej==null?null:x.ej-x.plan;return `<tr class="${x.fut?'fut':''}"><td>${x.nom?`${x.nom} <span class="sub">${x.sub}</span>`:mesTxt(x.k)}${x.act?' <span class="cr-chip">en curso</span>':''}</td><td class="n">${gs(x.plan)}</td><td class="n">${x.ej==null?'—':gs(x.ej)}</td><td class="n ${df==null?'':df<-1?'neg':'pos'}">${df==null?'—':(df>0?'+':'')+gs(df)}</td><td class="n">${x.ce==null?'—':gs(x.ce)}</td><td class="n">${gs(x.pAc)}</td><td class="n">${x.eAc==null?'—':gs(x.eAc)}</td></tr>`}).join('')}
    </tbody></table></div>`}
 
+function semanas(A,C){const d0=dn(C.inicio);const H0=hoyN();const n=Math.max(C.sem||0,Math.ceil((rango(A,C).b-d0+1)/7));const tot=A.tot||1;const L=[];
+  for(let w=1;w<=n;w++){const a=d0+7*(w-1),b=a+6;const pA=planAl(A,C,a-1),pB=planAl(A,C,b);const fut=a>H0;const eB=fut?null:realAl(A,Math.min(b,H0),'ej'),eA=realAl(A,a-1,'ej');
+    const dv=eB==null?null:(eB-pB)/tot;L.push({w,a,ps:pB-pA,pa:pB,es:eB==null?null:eB-eA,ea:eB,dv,fut,act:a<=H0&&H0<=b,mes:Math.floor((w-1)/4)+1})}
+  const act=L.find(x=>x.act)||L.filter(x=>!x.fut).pop();const ab=CR.semAb;const vis=ab?L:L.filter(x=>act&&x.w>=act.w-3&&x.w<=act.w+2);
+  return `<section class="panel cr-box"><div class="cr-bh"><h3>Semana a semana</h3><span class="sub">${act?`Semana ${act.w} de ${n} · desvío acumulado <b class="${act.dv<-0.005?'neg':'pos'}">${act.dv==null?'—':(act.dv>0?'+':'')+pct(act.dv)}</b>`:''}</span></div>
+   <div class="tw"><table class="cr-tm"><thead><tr><th>Sem.</th><th>Desde</th><th class="n">Previsto semanal</th><th class="n">Previsto acum.</th><th class="n">Ejecutado semanal</th><th class="n">Ejecutado acum.</th><th class="n">Desvío acum.</th><th>Estado</th></tr></thead><tbody>
+   ${vis.map(x=>`<tr class="${x.fut?'fut':''}"><td>${x.w} <span class="sub">M${x.mes}</span>${x.act?' <span class="cr-chip">esta semana</span>':''}</td><td>${fdm(nd(x.a))}</td><td class="n">${gs(x.ps)}</td><td class="n">${gs(x.pa)} <span class="sub">${pct(x.pa/tot)}</span></td><td class="n">${x.es==null?'—':gs(x.es)}</td><td class="n">${x.ea==null?'—':gs(x.ea)+' <span class="sub">'+pct(x.ea/tot)+'</span>'}</td><td class="n ${x.dv==null?'':x.dv<-0.005?'neg':'pos'}">${x.dv==null?'—':(x.dv>0?'+':'')+pct(x.dv)}</td><td>${x.fut?'<span class="sub">Por venir</span>':x.dv<-0.02?'<span class="cr-st mal">Atrasado</span>':x.dv>0.02?'<span class="cr-st bien">Adelantado</span>':'<span class="cr-st ok">En tiempo</span>'}</td></tr>`).join('')}
+   </tbody></table></div><button class="btn sm ghost" data-cr="semab" style="align-self:flex-start">${ab?'Ver solo las semanas cercanas':`Ver las ${n} semanas`}</button></section>`}
 function gantt(A,C){const R=rango(A,C);const H0=hoyN();const xp=x=>(x-R.a)/((R.b-R.a)||1)*100;
   return `<div class="cr-gt">${A.rubros.map(r=>{const c=C.rubros[r.k];const T=c?c.tramos:[];const real=r.tot?r.ej/r.tot:0;const esp=r.tot?planAl(A,C,H0,r.k)/r.tot:0;
     const d=T.length?Math.min(...T.map(t=>dn(t.d))):null,h=T.length?Math.max(...T.map(t=>dn(t.h))):null;
@@ -4973,7 +4983,26 @@ function borrador(A,ini,sem){const D=sem*7;const n=A.rubros.length;const R={};co
 
 /* ---------- importar el Excel de cronograma ---------- */
 const fechaDe=t=>{const m=String(t||'').match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(!m)return null;const a=m[3].length===2?'20'+m[3]:m[3];return `${a}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`};
-function leerCrono(wb,A){let mejor=null;
+/* formato detallado: cada ítem con Monto, Sem.Ini y Sem.Fin (semanas desde la fecha de inicio) */
+function leerSemanas(wb,A){let H=null;
+  for(const nom of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{header:1,raw:true,defval:null});
+    for(let i=0;i<Math.min(rows.length,30);i++){const r=(rows[i]||[]).map(v=>nrm(v));const ci=r.findIndex(v=>/^sem ?ini/.test(v)),cf=r.findIndex(v=>/^sem ?fin/.test(v)),cm=r.findIndex(v=>/^monto|^parcial|^precio total/.test(v)),cit=r.findIndex(v=>/^item$|^n$/.test(v));
+      if(ci>=0&&cf>=0&&cm>=0){H={nom,rows,fila:i,ci,cf,cm,cit:cit>=0?cit:1};break}}if(H)break}
+  if(!H)return null;
+  /* fecha de inicio: celda "Fecha Inicio de Obra" en cualquier hoja */
+  let ini=null;for(const nom of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{header:1,raw:true,defval:null});
+    for(const r of rows){const k=(r||[]).findIndex(v=>/fecha\s*(de\s*)?inicio/i.test(String(v||'')));if(k<0)continue;for(let j=k+1;j<r.length;j++){const v=r[j];if(typeof v==='number'&&v>40000&&v<60000){ini=nd(v-25569);break}const f=fechaDe(v);if(f){ini=f;break}}if(ini)break}if(ini)break}
+  if(!ini)ini=((window.ASIS_OBRA&&window.ASIS_OBRA()||{}).inicio)||null;if(!ini)return{err:'Encontré las semanas de cada ítem pero no la fecha de inicio de obra. Poné la fecha de inicio en la obra y volvé a importar.'};
+  const sum={};let rub=null;const d0=dn(ini);let semMax=0;
+  for(let i=H.fila+1;i<H.rows.length;i++){const r=H.rows[i]||[];const txt=r.map(v=>String(v??'')).join(' ');if(/total general/i.test(txt))break;
+    const h0=String(r[0]??'').trim();const mh=h0.match(/^(\d+)[.)]\s*\D/);if(mh&&!(typeof r[H.cm]==='number')){rub={n:mh[1],d:h0};continue}
+    const it=String(r[H.cit]??'').trim();const m=Number(r[H.cm]),a=Number(r[H.ci]),b=Number(r[H.cf]);if(!(m>0&&a>0&&b>=a))continue;
+    const n=(it.match(/^(\d+)\./)||[])[1]||(rub&&rub.n);if(!n)continue;const k=n;sum[k]=sum[k]||{n,d:rub&&rub.n===n?rub.d:'',tot:0,its:[]};sum[k].tot+=m;sum[k].its.push({m,a,b});semMax=Math.max(semMax,b)}
+  const out={};let ok=0,no=[];
+  for(const s of Object.values(sum)){const r=A.rubros.find(x=>String(x.k)===s.n)||A.rubros.find(x=>nrm(x.nombre)===nrm(s.d));if(!r){no.push(s.d||('Rubro '+s.n));continue}
+    out[r.k]={tramos:s.its.map(t=>({d:nd(d0+7*(t.a-1)),h:nd(d0+7*t.b-1),p:t.m/s.tot}))};ok++}
+  return{C:{inicio:ini,origen:'excel',archivo:'',semanas:true,sem:semMax,rubros:out},hoja:H.nom,ok,no,per:semMax,unidad:'semanas'}}
+function leerCrono(wb,A){const S=leerSemanas(wb,A);if(S)return S;let mejor=null;
   for(const nom of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{header:1,raw:true,defval:null});
     for(let i=0;i<Math.min(rows.length,40);i++){const r=rows[i]||[];const fc=[];r.forEach((v,k)=>{if(typeof v==='number'&&v>40000&&v<60000){fc.push({k,f:nd(v-25569)})}else{const f=fechaDe(v);if(f)fc.push({k,f})}});
       const cDesc=r.findIndex(v=>/rubro|descrip|detalle/i.test(String(v||'')));const cN=r.findIndex(v=>/^\s*(n[°º.o]*|item)\s*$/i.test(String(v||'')));
@@ -4998,6 +5027,8 @@ function leerCrono(wb,A){let mejor=null;
 function guardar(X,C){X.doc.cronograma=C;X.guardar();}
 function mount(){const el=document.getElementById('crono-root');if(el)el.innerHTML=html()}
 document.addEventListener('click',e=>{const t=e.target.closest('[data-cr]');if(!t||!document.getElementById('crono-root'))return;const X=ctx();if(!X)return;const a=t.dataset.cr;
+  if(a==='mes'){CR.mes=t.dataset.v;return mount()}
+  if(a==='semab'){CR.semAb=!CR.semAb;return mount()}
   if(a==='editar'){CR.edit=true;CR.imp=null;return mount()}
   if(a==='listo'){CR.edit=false;CR.imp=null;return mount()}
   if(a==='borrador'){const ini=document.getElementById('cr-ini').value;const w=Math.max(4,Number(document.getElementById('cr-dur').value)||32);CR.dur=w;if(!ini)return toast('Poné la fecha de inicio');
@@ -5014,14 +5045,14 @@ document.addEventListener('change',async e=>{if(!document.getElementById('crono-
     try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const R=leerCrono(wb,X.A);
       if(R.err){CR.imp={err:true,msg:R.err};return mount()}
       R.C.archivo=f.name;guardar(X,R.C);CR.edit=false;CR.imp=null;mount();
-      toast(`Cronograma importado: ${R.ok} rubros en ${R.per} meses${R.no.length?` · ${R.no.length} sin coincidencia`:''}`);
+      toast(`Cronograma importado: ${R.ok} rubros en ${R.per} ${R.unidad||'meses'}${R.no.length?` · ${R.no.length} sin coincidencia`:''}`);
       if(R.no.length)setTimeout(()=>toast('Sin coincidencia en el presupuesto: '+R.no.slice(0,4).join(', ')),2600)}
     catch(err){CR.imp={err:true,msg:'No se pudo leer el archivo. Guardalo como .xlsx e intentá de nuevo.'};mount()}}});
 /* para el Resumen: valor planificado a una fecha, rango del plan y situación de hoy */
 function situacion(A,C){if(!planificado(C))return null;const H=hoyN();const plan=planAl(A,C,H),ej=realAl(A,H,'ej');let atr=0;
   if(ej<plan){let x=H;while(x>dn('2000-01-01')&&planAl(A,C,x)>ej)x--;atr=H-x}else{let x=H;const R=rango(A,C);while(x<R.b+400&&planAl(A,C,x)<ej)x++;atr=-(x-H)}
-  const T=Object.values(C.rubros).flatMap(r=>r.tramos||[]);const d=new Date(H*864e5);const m0=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)/864e5;
-  return{plan,ej,atr,ini:nd(Math.min(...T.map(t=>dn(t.d)))),fin:nd(Math.max(...T.map(t=>dn(t.h)))),mes:{plan:plan-planAl(A,C,m0-1),ej:ej-realAl(A,m0-1,'ej'),nombre:MES[d.getUTCMonth()]}}}
+  const T=Object.values(C.rubros).flatMap(r=>r.tramos||[]);const d=new Date(H*864e5);let m0=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)/864e5,mn=MES[d.getUTCMonth()];if(C.semanas&&C.inicio){const d0=dn(C.inicio);const k=Math.max(0,Math.floor((H-d0)/28));m0=d0+28*k;mn='el mes '+(k+1)+' de obra'}
+  return{plan,ej,atr,ini:nd(Math.min(...T.map(t=>dn(t.d)))),fin:nd(Math.max(...T.map(t=>dn(t.h)))),mes:{plan:plan-planAl(A,C,m0-1),ej:ej-realAl(A,m0-1,'ej'),nombre:mn}}}
 window.CRONO={mount,html,leerCrono,planAl,borrador,situacion,planFecha:(A,C,f)=>planAl(A,C,dn(f)),hay:planificado};
 
 const css=document.createElement('style');css.textContent=`
@@ -5047,6 +5078,7 @@ const css=document.createElement('style');css.textContent=`
 .cr-bb{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line)}
 .cr-bb i{display:block;width:40%;max-width:18px;border-radius:4px 4px 0 0;min-height:1px}.cr-bb .bp{background:color-mix(in srgb,var(--muted) 45%,transparent)}.cr-bb .be{background:var(--ok)}
 .cr-tm td.neg{color:var(--bad)}.cr-tm td.pos{color:var(--ok)}.cr-tm tr.fut td{color:var(--muted)}
+.cr-seg{font-size:12px}.cr-seg button{padding:5px 10px;font-size:12.5px}
 .cr-chip{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 7px;font-size:11px;font-weight:700}
 .cr-gt{display:flex;flex-direction:column;gap:2px}
 .cr-gr{display:grid;grid-template-columns:minmax(180px,260px) 1fr 96px;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
