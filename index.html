@@ -515,8 +515,9 @@ function backendNube(sb){
     async delArchPry(id){ok(await sb.from('proyecto_archivos').delete().eq('id',id))},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
     async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
-      return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||''}},
-    async savePresupuesto(p){ok(await sb.from('presupuestos').upsert({obra_id:p.obra_id,items:p.items,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},base_hasta:p.baseHasta||null,m2:p.m2||null,usd:p.usd||null,indice:p.indice||1},{onConflict:'obra_id'}))},
+      return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||'',cronograma:p.cronograma||null}},
+    async savePresupuesto(p){const row={obra_id:p.obra_id,items:p.items,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},base_hasta:p.baseHasta||null,m2:p.m2||null,usd:p.usd||null,indice:p.indice||1};if(p.cronograma!==undefined)row.cronograma=p.cronograma;
+      let r=await sb.from('presupuestos').upsert(row,{onConflict:'obra_id'});if(r.error&&/cronograma/i.test(r.error.message||'')){delete row.cronograma;r=await sb.from('presupuestos').upsert(row,{onConflict:'obra_id'});if(!r.error)toast('Falta pegar el SQL 24 en Supabase para guardar el cronograma')}ok(r)},
     async pedidos(oid){if(!oid)return[];return ok(await sb.from('pedidos').select('*').eq('obra_id',oid).order('numero')).map(p=>({...p,items:p.items||[]}))},
     async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items,sugeridos:p.sugeridos||[]}))},
     async delPedido(id){ok(await sb.from('pedidos').delete().eq('id',id))},
@@ -2585,7 +2586,7 @@ async function guardarImport(){const R=IM.res;if(!R||!R.items.length)return;cons
   ES.doc=doc;ES.importar=false;Object.keys(IM).forEach(k=>delete IM[k]);ES.tab='detalle';render();toast(`Presupuesto cargado: ${doc.items.length} ítems`)}
 
 const OBRA_P=()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();return{obra:o?o.nombre:'',cliente:o?o.cliente||'':'',ubicacion:o?o.ubicacion||'':''}};
-const TABS=[['resumen','Resumen'],['detalle','Presupuesto'],['avance','Avance al cliente']];
+const TABS=[['resumen','Resumen'],['detalle','Presupuesto'],['avance','Avance al cliente'],['crono','Cronograma']];
 function render(){
   const root=document.getElementById('pres-root');if(!root)return;
   const o=window.ASIS_OBRA&&window.ASIS_OBRA();const oid=o?o.id:null;
@@ -2595,15 +2596,16 @@ function render(){
   const sub=`<div class="subnav-p">${TABS.map(([k,t])=>`<button class="chip-p" data-ptab="${k}" aria-pressed="${ES.tab===k}">${t}</button>`).join('')}</div>`;
   if(!ES.doc||ES.importar){if(window.CLI){root.innerHTML='<div class="panel" style="padding:16px">Esta obra todavía no tiene presupuesto cargado.</div>';return}root.innerHTML=(ES.doc?sub:'')+vImportar();return}
   if(window.PRES_IR!=null){ES.tab='avance';ES.cert=window.PRES_IR;window.PRES_IR=null}
-  const V={resumen:vResumen,detalle:vDetalle,avance:vAvance}[ES.tab];
+  const V={resumen:vResumen,detalle:vDetalle,avance:vAvance,crono:()=>'<div id="crono-root"></div>'}[ES.tab]||vResumen;
   const cuerpo=V();const ban=ES.tab==='avance'&&window.APROB&&(ES.doc.certs||[]).some(x=>x.n===ES.cert)?window.APROB.banner('cert_cliente',String(ES.cert),infoCli(ES.cert)):'';
-  root.innerHTML=sub+ban+cuerpo;
+  root.innerHTML=sub+ban+cuerpo;if(ES.tab==='crono'&&window.CRONO)window.CRONO.mount();
   if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'||el.type==='text'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
 }
 function infoCli(n){const c=(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return null;const m=Object.entries(c.pres||{}).reduce((s,[k,v])=>{const i=ES.doc.items.find(x=>x.id===k);return s+(i?v*precio(i):0)},0);
   return{titulo:`Avance al cliente N°${n}`,detalle:c.desde?`Período ${c.desde.split('-').reverse().join('/')} al ${(c.hasta||'').split('-').reverse().join('/')}`:'',monto:m}}
 function apbCli(n){const i=infoCli(n);if(i&&window.APROB)window.APROB.pedir(ES.oid,'cert_cliente',String(n),i.titulo,i.detalle,i.monto)}
 window.PRES={mount:()=>{ES.refrescar=true;render()}};
+window.PRES_DOC=()=>ES.doc?{doc:ES.doc,con:ES.con||[],guardar}:null;
 /* análisis para el resumen de obra (vista del cliente): avance físico, certificado y curva en el tiempo */
 window.PRES.analizar=(doc,con)=>{const sd=ES.doc,sc=ES.con;ES.doc=doc;ES.con=con||[];
   try{const its=doc.items||[];const P=Object.fromEntries(its.map(i=>[i.id,precio(i)]));const tot=its.reduce((s,i)=>s+i.cant*P[i.id],0);
@@ -4229,19 +4231,37 @@ function anillo(f1,f2,tam){const r1=44,r2=33,c1=2*Math.PI*r1,c2=2*Math.PI*r2;con
     <circle cx="55" cy="55" r="${r1}" class="tr"/><circle cx="55" cy="55" r="${r1}" class="a1" stroke-dasharray="${c1*a} ${c1}" transform="rotate(-90 55 55)"/>
     ${f2!=null?`<circle cx="55" cy="55" r="${r2}" class="tr t2"/><circle cx="55" cy="55" r="${r2}" class="a2" stroke-dasharray="${c2*b} ${c2}" transform="rotate(-90 55 55)"/>`:''}
     <text x="55" y="${f2!=null?58:60}" text-anchor="middle" class="rv">${Math.round(a*100)}<tspan class="rp">%</tspan></text></svg>`}
-function curvaSVG(C,tot,big){
+/* cronograma de la obra (si está cargado): línea estimada y situación */
+function planCrono(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!A||!C||!window.CRONO||!window.CRONO.hay(C))return null;const s=window.CRONO.situacion(A,C);return{f:f=>window.CRONO.planFecha(A,C,f),ini:s.ini,fin:s.fin}}
+/* tarjeta de inicio: cómo va la obra según el cronograma (lo primero que ve el cliente) */
+function cronoCard(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!C||!window.CRONO||!window.CRONO.hay(C))return '';const s=window.CRONO.situacion(A,C);const t=A.tot||1;
+  const est=Math.abs(s.atr)<=7?'ok':s.atr>0?'mal':'bien';const pp=Math.min(1,s.plan/t),pr=Math.min(1,s.ej/t);
+  const tit=est==='ok'?'La obra va en tiempo':est==='mal'?`La obra va ${s.atr} días atrasada`:`La obra va ${-s.atr} días adelantada`;
+  const mm=n=>'Gs '+mil(n);
+  return `<button class="panel rs-cron ${est}" data-rver="curva" aria-label="Ver cronograma y curva de avance">
+    <span class="rs-cr1"><span class="rs-crd" aria-hidden="true"></span><span><span class="sub">Según el cronograma de obra</span><b>${tit}</b><small>Fin previsto ${fdma(s.fin)}</small></span></span>
+    <span class="rs-cr2"><span class="rs-crb"><span>Debería ir</span><span class="rs-crt"><i class="p" style="width:${pp*100}%"></i></span><b>${pct(pp)}</b></span>
+      <span class="rs-crb"><span>Va</span><span class="rs-crt"><i class="r" style="width:${pr*100}%"></i></span><b>${pct(pr)}</b></span></span>
+    <span class="rs-cr3"><span class="sub">En ${s.mes.nombre}</span><span>Previsto <b>${mm(s.mes.plan)}</b></span><span>Ejecutado <b>${mm(s.mes.ej)}</b></span></span>
+    <span class="rs-go">Ver curva ›</span></button>`}
+function sitCrono(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!A||!C||!window.CRONO||!window.CRONO.hay(C))return '';const s=window.CRONO.situacion(A,C);const t=A.tot||1;
+  const cl=Math.abs(s.atr)<=7?'ok':s.atr>0?'mal':'ok';return `<p class="rs-sit ${cl}"><b>${Math.abs(s.atr)<=7?'En tiempo según el cronograma':s.atr>0?`${s.atr} días de atraso según el cronograma`:`${-s.atr} días adelantado según el cronograma`}</b> · hoy deberías llevar ${pct(s.plan/t)} y llevás ${pct(s.ej/t)}</p>`}
+function curvaSVG(C,tot,big,pl){
   if(!C||C.length<2||!tot)return `<div class="rs-vacio">Todavía no hay certificados para dibujar la evolución.</div>`;
-  const W=big?720:520,H=big?300:190,L=34,Rr=12,T=12,B=26;const t0=new Date(C[0].f).getTime(),t1=Math.max(new Date(C[C.length-1].f).getTime(),t0+864e5);
+  const W=big?720:520,H=big?300:190,L=34,Rr=12,T=12,B=26;const hoyS=new Date().toISOString().slice(0,10);
+  const t0=Math.min(new Date(C[0].f).getTime(),pl?new Date(pl.ini).getTime():Infinity),t1=Math.max(new Date(C[C.length-1].f).getTime(),t0+864e5,pl?new Date(big?pl.fin:hoyS).getTime():0);
+  const PS=[];if(pl){for(let k=0;k<=60;k++){const f=new Date(t0+(t1-t0)*k/60).toISOString().slice(0,10);PS.push({f,v:pl.f(f)})}}
   const X=f=>L+(new Date(f).getTime()-t0)/(t1-t0)*(W-L-Rr),Y=v=>T+(1-Math.min(1,v/tot))*(H-T-B);
-  const maxP=Math.max(...C.map(p=>Math.max(p.ej,p.ce)))/tot;const paso=[0.01,0.02,0.05,0.1,0.2,0.25].find(x=>x*4>=maxP*1.08)||0.25;const top=Math.min(1,paso*Math.max(1,Math.ceil(maxP*1.08/paso)));const Yp=v=>T+(1-Math.min(top,v/tot)/top)*(H-T-B);
+  const maxP=Math.max(...C.map(p=>Math.max(p.ej,p.ce)),...PS.map(p=>p.v))/tot;const paso=[0.01,0.02,0.05,0.1,0.2,0.25].find(x=>x*4>=maxP*1.08)||0.25;const top=Math.min(1,paso*Math.max(1,Math.ceil(maxP*1.08/paso)));const Yp=v=>T+(1-Math.min(top,v/tot)/top)*(H-T-B);
   const linea=k=>C.map((p,i)=>`${i?'L':'M'}${X(p.f).toFixed(1)},${Yp(p[k]).toFixed(1)}`).join(' ');
   const area=k=>linea(k)+` L${X(C[C.length-1].f).toFixed(1)},${H-B} L${X(C[0].f).toFixed(1)},${H-B} Z`;
   const ticks=[];for(let v=0;v<=top+1e-9;v+=paso)ticks.push(v/top*top);const meses=[];{const d=new Date(C[0].f+'T12:00:00');d.setDate(1);d.setMonth(d.getMonth()+1);while(d.getTime()<=t1){meses.push(d.toISOString().slice(0,10));d.setMonth(d.getMonth()+1)}}
-  const xt=(meses.length>=2?meses:[C[0].f,C[C.length-1].f]);
+  const xt=(meses.length>=2?meses:[new Date(t0).toISOString().slice(0,10),new Date(t1).toISOString().slice(0,10)]);
   return `<svg viewBox="0 0 ${W} ${H}" class="rs-curva" data-curva='${JSON.stringify(C.map(p=>[p.f,p.ej/tot,p.ce/tot]))}' data-geo="${L},${Rr},${T},${B},${t0},${t1},${top},${W},${H}" role="img" aria-label="Evolución del avance de obra">
     ${ticks.map(v=>`<line x1="${L}" x2="${W-Rr}" y1="${Yp(v*tot)}" y2="${Yp(v*tot)}" class="gr"/><text x="${L-6}" y="${Yp(v*tot)+4}" text-anchor="end" class="ax">${Math.round(v*100)}%</text>`).join('')}
     ${xt.map((f,i)=>`<text x="${X(f)}" y="${H-8}" text-anchor="${meses.length>=2?'middle':i?'end':'start'}" class="ax">${meses.length>=2?MESR[+f.slice(5,7)-1]:fdm(f)}</text>`).join('')}
-    <path d="${area('ej')}" class="ar"/><path d="${linea('ce')}" class="l2"/><path d="${linea('ej')}" class="l1"/>
+    <path d="${area('ej')}" class="ar"/>${PS.length?`<path d="${PS.map((p,i)=>`${i?'L':'M'}${X(p.f).toFixed(1)},${Yp(p.v).toFixed(1)}`).join(' ')}" class="l3"/>`:''}<path d="${linea('ce')}" class="l2"/><path d="${linea('ej')}" class="l1"/>
+    ${pl&&!big?'':pl?`<line x1="${X(hoyS)}" x2="${X(hoyS)}" y1="${T}" y2="${H-B}" class="hy"/>`:''}
     ${C.map(p=>`<circle cx="${X(p.f).toFixed(1)}" cy="${Yp(p.ej).toFixed(1)}" r="${big?3.5:2.8}" class="p1"/>`).join('')}
     <line class="gu" x1="0" x2="0" y1="${T}" y2="${H-B}" style="display:none"/><circle class="gp" r="5" style="display:none"/>
   </svg><div class="rs-tt" style="display:none"></div>`}
@@ -4258,7 +4278,7 @@ function ventana(){if(!RS.ver)return '';const D=RS.D,A=D.A;let t='',h='',ancho=f
     <div><span class="rs-sw a4">↗</span><div><b>Evolución</b><p>Cómo fue creciendo el avance semana a semana. Pasá el dedo o el mouse por la curva para ver cada fecha.</p></div></div>
     <p class="sub">Todo lo que ves es de solo lectura y se actualiza cada vez que se carga un certificado.</p></div>`}
   else if(RS.ver==='curva'&&A){t='Evolución de la obra';ancho=true;const C=A.curva;
-    h=`<div class="rs-leg"><span><i class="k1"></i>Avance de obra</span>${ve('presupuesto')?'<span><i class="k2"></i>Certificado al cliente</span>':''}</div><div class="rs-chart big">${curvaSVG(C,A.tot,true)}</div>
+    const pl=planCrono(A);h=`<div class="rs-leg"><span><i class="k1"></i>Avance de obra</span>${ve('presupuesto')?'<span><i class="k2"></i>Certificado al cliente</span>':''}${pl?'<span><i class="k3"></i>Cronograma</span>':''}</div>${sitCrono(A)}<div class="rs-chart big">${curvaSVG(C,A.tot,true,pl)}</div>
     <div class="tw"><table><thead><tr><th>Semana al</th><th class="n">Avance de obra</th><th class="n">En la semana</th>${ve('presupuesto')?'<th class="n">Certificado</th>':''}</tr></thead><tbody>
     ${C.slice().reverse().map((p,i,a)=>{const prev=a[i+1];return `<tr><td>${fdia(p.f)}</td><td class="n">${pct(p.ej/A.tot)}</td><td class="n">${prev?'+'+pct((p.ej-prev.ej)/A.tot):'—'}</td>${ve('presupuesto')?`<td class="n">${pct(p.ce/A.tot)}</td>`:''}</tr>`}).join('')}</tbody></table></div>`}
   else if(RS.ver==='rubros'&&A){t='Avance por rubro';ancho=true;
@@ -4352,12 +4372,13 @@ function render(){
       ${A?`<button class="rs-hr" data-rver="rubros" aria-label="Ver avance por rubro">${anillo(fe,ve('presupuesto')?fc:null,148)}<span class="rs-hl"><b>Avance de obra</b>${ve('presupuesto')?`<span><i class="k2"></i>Certificado ${pct(fc)}</span>`:''}</span></button>`:''}
     </div>
   </section>
+  ${A?cronoCard(A):''}
   ${accesos()}
   ${A&&A.semana&&A.semana.rubros.length?`<button class="panel rs-sem" data-rver="semana"><span class="rs-semt"><b>Último período</b><span class="sub">${fdia(A.semana.desde)} al ${fdia(A.semana.hasta)}</span></span>
     <span class="rs-semc"><span class="rs-up">+${pct(A.semana.total/A.tot)}</span>${A.semana.rubros.slice(0,3).map(x=>`<span class="rs-pill">${esc(cap(x.nombre))} <b>+${pct(x.pct)}</b></span>`).join('')}${A.semana.rubros.length>3?`<span class="sub">y ${A.semana.rubros.length-3} más</span>`:''}</span><span class="rs-go">Ver ›</span></button>`:''}
   ${A?`<div class="rs-grid">
     <div class="panel rs-card"><div class="rs-ch"><b>Evolución de la obra</b><button class="btn sm" data-rver="curva">Ampliar</button></div>
-      <div class="rs-leg"><span><i class="k1"></i>Avance de obra</span>${ve('presupuesto')?'<span><i class="k2"></i>Certificado</span>':''}</div><div class="rs-chart">${curvaSVG(A.curva,A.tot,false)}</div></div>
+      <div class="rs-leg"><span><i class="k1"></i>Avance de obra</span>${ve('presupuesto')?'<span><i class="k2"></i>Certificado</span>':''}${planCrono(A)?'<span><i class="k3"></i>Cronograma</span>':''}</div>${sitCrono(A)}<div class="rs-chart">${curvaSVG(A.curva,A.tot,false,planCrono(A))}</div></div>
     <div class="panel rs-card"><div class="rs-ch"><b>Avance por rubro</b><button class="btn sm" data-rver="rubros">Ver los ${A.rubros.length}</button></div>
       <p class="sub rs-cs">Los ${top.length} rubros de mayor peso en la obra. Tocá uno para ver el detalle.</p><div class="rs-rl">${top.map(r=>barraR(r,A.tot)).join('')}</div></div>
   </div>`:`<div class="panel" style="padding:16px">${window.CLI?'El avance de la obra se va a mostrar acá cuando se cargue el presupuesto.':'Cargá el presupuesto de la obra para ver el avance en este resumen.'}</div>`}
@@ -4416,6 +4437,21 @@ const css=document.createElement('style');css.textContent=`
 .rs-ring .a1{fill:none;stroke:var(--k1);stroke-width:9;stroke-linecap:round;transition:stroke-dasharray .6s}
 .rs-ring .a2{fill:none;stroke:color-mix(in srgb,currentColor 75%,transparent);stroke-width:7;stroke-linecap:round}
 .rs-ring .rv{font-family:var(--f-num,monospace);font-size:26px;font-weight:700;fill:currentColor}.rs-ring .rp{font-size:14px}
+.k3{display:inline-block;width:14px;height:0;border-top:2px dashed var(--muted);vertical-align:middle}
+.rs-curva .l3{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4}.rs-curva .hy{stroke:var(--bad);stroke-width:1.2;stroke-dasharray:3 3}
+.rs-sit{margin:0 0 4px;font-size:13px;color:var(--muted)}.rs-sit.mal b{color:var(--bad)}.rs-sit.ok b{color:var(--ok)}
+.rs-cron{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(220px,1.4fr) auto auto;gap:18px;align-items:center;padding:16px 18px;text-align:left;width:100%;cursor:pointer;color:var(--ink);font:inherit;border-left:6px solid var(--line)}
+.rs-cron.mal{border-left-color:var(--bad)}.rs-cron.ok,.rs-cron.bien{border-left-color:var(--ok)}
+.rs-cr1{display:flex;gap:12px;align-items:center;min-width:0}.rs-cr1>span:last-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rs-cr1 b{font-family:var(--f-display);font-size:26px;line-height:1.05;text-transform:uppercase;letter-spacing:.01em}.rs-cr1 small{color:var(--muted);font-size:13px}
+.rs-cron.mal .rs-cr1 b{color:var(--bad)}.rs-cron.ok .rs-cr1 b,.rs-cron.bien .rs-cr1 b{color:var(--ok)}
+.rs-crd{flex:none;width:16px;height:16px;border-radius:99px;background:var(--muted);box-shadow:0 0 0 5px color-mix(in srgb,currentColor 0%,transparent)}
+.rs-cron.mal .rs-crd{background:var(--bad);box-shadow:0 0 0 5px var(--bad-bg)}.rs-cron.ok .rs-crd,.rs-cron.bien .rs-crd{background:var(--ok);box-shadow:0 0 0 5px var(--ok-bg)}
+.rs-cr2{display:flex;flex-direction:column;gap:8px;min-width:0}
+.rs-crb{display:grid;grid-template-columns:72px 1fr 56px;gap:8px;align-items:center;font-size:13.5px}.rs-crb b{text-align:right;font-variant-numeric:tabular-nums}
+.rs-crt{height:10px;border-radius:99px;background:var(--chip);overflow:hidden}.rs-crt i{display:block;height:100%;border-radius:99px}.rs-crt .p{background:color-mix(in srgb,var(--muted) 55%,transparent)}.rs-crt .r{background:var(--k1,var(--accent))}
+.rs-cr3{display:flex;flex-direction:column;gap:2px;font-size:13.5px;white-space:nowrap}
+@media (max-width:900px){.rs-cron{grid-template-columns:1fr;gap:12px}.rs-cron .rs-go{justify-self:start}.rs-cr3{flex-direction:row;flex-wrap:wrap;gap:4px 14px;white-space:normal}}
 .k1,.k2{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--k1)}.k2{background:currentColor;opacity:.75}
 .rs-hero .k2{background:#fff}
 .rs-sem{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:14px 16px;text-align:left;cursor:pointer;width:100%;border:1px solid var(--line);color:inherit}
@@ -4840,6 +4876,191 @@ const css=document.createElement('style');css.textContent=`
 .md-clasico{display:flex;justify-content:flex-end}.md-clasico button{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer}
 @media (max-width:1050px){.md-cols{grid-template-columns:1fr}}
 @media (max-width:760px){.md-head h2{font-size:26px}.md-sem{grid-template-columns:repeat(3,minmax(0,1fr))}.md-it{grid-template-columns:4px 1fr}.md-act{grid-column:2;justify-self:start}}
+`;document.head.appendChild(css);
+})();
+
+(function(){
+/* ============ Cronograma de obra: plan por rubro vs avance real (pagos semanales) y desembolso mes a mes ============ */
+const CR={edit:false,imp:null,borr:false,dur:32};
+const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const dn=s=>{const[a,b,c]=String(s).slice(0,10).split('-').map(Number);return Date.UTC(a,b-1,c)/864e5};
+const nd=n=>new Date(n*864e5).toISOString().slice(0,10);
+const hoyN=()=>{const d=new Date();return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5};
+const fdm=s=>{if(!s)return '';const[a,b,c]=s.split('-');return `${c}/${b}/${a.slice(2)}`};
+const mesTxt=s=>{const[a,b]=s.split('-');return MES[+b-1]+' '+a.slice(2)};
+const M=n=>{const a=Math.abs(n);return a>=1e9?(n/1e9).toFixed(2).replace('.',',')+' mil M':a>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M':gs(n)};
+const pct=x=>(Math.round(x*1000)/10).toString().replace('.',',')+'%';
+const nrm=t=>String(t??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/^\s*\d+[.)-]?\s*/,'').replace(/\(.*?\)/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const rnum=t=>{const m=String(t||'').match(/^\s*(\d+)/);return m?m[1]:''};
+
+function ctx(){const P=window.PRES_DOC&&window.PRES_DOC();if(!P||!P.doc)return null;const A=window.PRES.analizar(P.doc,P.con);return{...P,A,C:P.doc.cronograma||null}}
+/* fracción del tramo cumplida al día x (lineal por días) */
+const frac=(t,x)=>{const d=dn(t.d),h=dn(t.h);if(x<d)return 0;if(x>=h)return 1;return (x-d+1)/(h-d+1)};
+function planAl(A,C,x,soloK){let s=0;for(const r of A.rubros){if(soloK!=null&&String(r.k)!==String(soloK))continue;const c=C&&C.rubros[r.k];if(!c)continue;for(const t of c.tramos)s+=r.tot*t.p*frac(t,x)}return s}
+function realAl(A,x,campo){let v=0;for(const p of A.curva){if(dn(p.f)<=x)v=p[campo];else break}return v}
+function rango(A,C){const L=[];for(const r of A.rubros){const c=C&&C.rubros[r.k];if(c)for(const t of c.tramos){L.push(dn(t.d),dn(t.h))}}
+  A.curva.forEach(p=>L.push(dn(p.f)));if(C&&C.inicio)L.push(dn(C.inicio));L.push(hoyN());return{a:Math.min(...L),b:Math.max(...L)}}
+const planificado=C=>C&&Object.values(C.rubros||{}).some(r=>r.tramos&&r.tramos.length);
+
+/* ---------- vista ---------- */
+function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el presupuesto de la obra.</p>';const{A,C}=X;
+  if(!planificado(C)&&window.CLI)return '<div class="panel" style="padding:16px">Esta obra todavía no tiene cronograma cargado.</div>';
+  if(!planificado(C)||CR.edit)return vEditor(X);
+  const H=hoyN();const plan=planAl(A,C,H),ej=realAl(A,H,'ej'),ce=realAl(A,H,'ce');const tot=A.tot||1;
+  let atr=0;if(ej<plan){let x=H;while(x>dn('2000-01-01')&&planAl(A,C,x)>ej)x--;atr=H-x}else{let x=H;const R=rango(A,C);while(x<R.b+400&&planAl(A,C,x)<ej)x++;atr=-(x-H)}
+  const est=Math.abs(atr)<=7?'ok':atr>0?'mal':'bien';
+  return `<div class="cr">
+   <div class="cr-head"><div><h2>Cronograma</h2><span class="sub">${C.origen==='excel'?'Importado de '+esc(C.archivo||'Excel'):'Armado en la app'} · ${fdm(nd(rango(A,C).a))} al ${fdm(nd(Math.max(...A.rubros.flatMap(r=>(C.rubros[r.k]?.tramos||[]).map(t=>dn(t.h))))))}</span></div>
+     ${window.CLI?'':`<div class="bar"><button class="btn" data-cr="editar">Editar fechas</button><label class="btn" style="cursor:pointer">Importar Excel<input type="file" id="cr-file" accept=".xlsx,.xls,.xlsm" hidden></label></div>`}</div>
+   <div class="cr-sem ${est}"><div><span class="sub">Hoy deberías llevar</span><b>${pct(plan/tot)}</b><small>Gs ${M(plan)} según cronograma</small></div>
+     <div><span class="sub">Llevás ejecutado</span><b>${pct(ej/tot)}</b><small>Gs ${M(ej)} · pagos semanales a contratistas</small></div>
+     <div><span class="sub">Certificado al cliente</span><b>${pct(ce/tot)}</b><small>Gs ${M(ce)}</small></div>
+     <div class="cr-est"><span class="sub">Situación</span><b>${est==='ok'?'En tiempo':est==='mal'?`${atr} días de atraso`:`${-atr} días adelantado`}</b><small>${est==='ok'?'dentro de una semana del plan':est==='mal'?`faltan Gs ${M(plan-ej)} para estar al día`:`Gs ${M(ej-plan)} por encima del plan`}</small></div></div>
+   <section class="panel cr-box"><div class="cr-bh"><h3>Curva de avance</h3><span class="cr-ley"><i class="lp"></i>Cronograma estimado <i class="le"></i>Ejecutado <i class="lc"></i>Certificado al cliente</span></div>${curvaSVG(A,C)}</section>
+   <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3><span class="cr-ley"><i class="lp"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
+   <section class="panel cr-box"><div class="cr-bh"><h3>Rubros</h3><span class="sub">Barra = fechas del cronograma · relleno = avance ejecutado · línea = hoy</span></div>${gantt(A,C)}</section>
+  </div>`}
+
+function curvaSVG(A,C){const R=rango(A,C);const W=760,H=260,pl=58,pr=14,pt=14,pb=34;const tot=A.tot||1;
+  const xs=x=>pl+(x-R.a)/((R.b-R.a)||1)*(W-pl-pr),ys=v=>pt+(1-v/tot)*(H-pt-pb);
+  const pasos=[];for(let x=R.a;x<=R.b;x+=Math.max(1,Math.round((R.b-R.a)/120)))pasos.push(x);pasos.push(R.b);
+  const lp=pasos.map((x,i)=>`${i?'L':'M'}${xs(x).toFixed(1)},${ys(planAl(A,C,x)).toFixed(1)}`).join('');
+  const H0=hoyN();const pts=k=>{const L=A.curva.filter(p=>dn(p.f)<=H0);if(!L.length)return '';let d='';L.forEach((p,i)=>{d+=`${i?'L':'M'}${xs(dn(p.f)).toFixed(1)},${ys(p[k]).toFixed(1)}`});return d};
+  const ticksY=[0,.25,.5,.75,1].map(f=>`<line x1="${pl}" x2="${W-pr}" y1="${ys(f*tot)}" y2="${ys(f*tot)}" class="cr-g"/><text x="${pl-6}" y="${ys(f*tot)+4}" text-anchor="end" class="cr-t">${Math.round(f*100)}%</text>`).join('');
+  const meses=[];{const d=new Date(R.a*864e5);d.setUTCDate(1);while(d.getTime()/864e5<=R.b){const n=d.getTime()/864e5;if(n>=R.a)meses.push(n);d.setUTCMonth(d.getUTCMonth()+1)}}
+  const ticksX=meses.map(n=>`<line x1="${xs(n)}" x2="${xs(n)}" y1="${pt}" y2="${H-pb}" class="cr-g"/><text x="${xs(n)+3}" y="${H-pb+16}" class="cr-t">${mesTxt(nd(n))}</text>`).join('');
+  const hx=xs(Math.min(Math.max(H0,R.a),R.b));
+  return `<div class="cr-svgw"><svg viewBox="0 0 ${W} ${H}" class="cr-svg" role="img" aria-label="Curva de avance: estimado contra ejecutado">${ticksY}${ticksX}
+    <line x1="${hx}" x2="${hx}" y1="${pt}" y2="${H-pb}" class="cr-hoy"/><text x="${hx+4}" y="${pt+10}" class="cr-t cr-th">hoy</text>
+    <path d="${lp}" class="cr-lp"/><path d="${pts('ce')}" class="cr-lc"/><path d="${pts('ej')}" class="cr-le"/>
+    ${A.curva.filter(p=>dn(p.f)<=H0).map(p=>`<circle cx="${xs(dn(p.f))}" cy="${ys(p.ej)}" r="3" class="cr-pe"><title>${fdm(p.f)}: ejecutado ${pct(p.ej/tot)} · estimado ${pct(planAl(A,C,dn(p.f))/tot)}</title></circle>`).join('')}</svg></div>`}
+
+function meses(A,C){const R=rango(A,C);const H0=hoyN();const L=[];const d=new Date(R.a*864e5);d.setUTCDate(1);
+  while(d.getTime()/864e5<=R.b){const a=d.getTime()/864e5;const e=new Date(d);e.setUTCMonth(e.getUTCMonth()+1);const b=e.getTime()/864e5-1;
+    const pA=planAl(A,C,a-1),pB=planAl(A,C,b),eA=realAl(A,a-1,'ej'),eB=realAl(A,Math.min(b,H0),'ej'),cA=realAl(A,a-1,'ce'),cB=realAl(A,Math.min(b,H0),'ce');
+    L.push({k:nd(a).slice(0,7),plan:pB-pA,ej:a>H0?null:eB-eA,ce:a>H0?null:cB-cA,pAc:pB,eAc:a>H0?null:eB,fut:a>H0,act:a<=H0&&H0<=b});d.setUTCMonth(d.getUTCMonth()+1)}
+  const mx=Math.max(1,...L.map(x=>Math.max(x.plan,x.ej||0)));
+  return `<div class="cr-bars" role="img" aria-label="Desembolso estimado y ejecutado por mes">${L.map(x=>`<div class="cr-bm ${x.act?'act':''}"><div class="cr-bb"><i class="bp" style="height:${x.plan/mx*100}%" title="Estimado Gs ${gs(x.plan)}"></i><i class="be" style="height:${(x.ej||0)/mx*100}%" title="Ejecutado Gs ${gs(x.ej||0)}"></i></div><span>${mesTxt(x.k)}</span></div>`).join('')}</div>
+   <div class="tw"><table class="cr-tm"><thead><tr><th>Mes</th><th class="n">Estimado</th><th class="n">Ejecutado</th><th class="n">Diferencia</th><th class="n">Certificado al cliente</th><th class="n">Acumulado estimado</th><th class="n">Acumulado ejecutado</th></tr></thead><tbody>
+   ${L.map(x=>{const df=x.ej==null?null:x.ej-x.plan;return `<tr class="${x.fut?'fut':''}"><td>${mesTxt(x.k)}${x.act?' <span class="cr-chip">en curso</span>':''}</td><td class="n">${gs(x.plan)}</td><td class="n">${x.ej==null?'—':gs(x.ej)}</td><td class="n ${df==null?'':df<-1?'neg':'pos'}">${df==null?'—':(df>0?'+':'')+gs(df)}</td><td class="n">${x.ce==null?'—':gs(x.ce)}</td><td class="n">${gs(x.pAc)}</td><td class="n">${x.eAc==null?'—':gs(x.eAc)}</td></tr>`}).join('')}
+   </tbody></table></div>`}
+
+function gantt(A,C){const R=rango(A,C);const H0=hoyN();const xp=x=>(x-R.a)/((R.b-R.a)||1)*100;
+  return `<div class="cr-gt">${A.rubros.map(r=>{const c=C.rubros[r.k];const T=c?c.tramos:[];const real=r.tot?r.ej/r.tot:0;const esp=r.tot?planAl(A,C,H0,r.k)/r.tot:0;
+    const d=T.length?Math.min(...T.map(t=>dn(t.d))):null,h=T.length?Math.max(...T.map(t=>dn(t.h))):null;
+    const st=!T.length?['sf','Sin fechas']:real>=0.999?['ok','Terminado']:esp-real>0.1?['mal','Atrasado']:real-esp>0.1?['bien','Adelantado']:esp>0&&real>0?['ok','En tiempo']:esp>0?['mal','Sin empezar']:['nada','Todavía no'];
+    return `<div class="cr-gr"><div class="cr-gn"><b>${esc(String(r.nombre).replace(/^\d+[.)]?\s*/,''))}</b><span class="sub">${d!=null?`${fdm(nd(d))} → ${fdm(nd(h))}`:'sin fechas'} · real ${pct(real)} / plan hoy ${pct(esp)}</span></div>
+      <div class="cr-gl">${T.map(t=>`<i class="cr-gb" style="left:${xp(dn(t.d))}%;width:${Math.max(.6,xp(dn(t.h)+1)-xp(dn(t.d)))}%"></i>`).join('')}${d!=null?`<i class="cr-gf" style="left:${xp(d)}%;width:${Math.max(0,(xp(h+1)-xp(d))*real)}%"></i>`:''}<i class="cr-gh" style="left:${xp(H0)}%"></i></div>
+      <span class="cr-st ${st[0]}">${st[1]}</span></div>`}).join('')}</div>`}
+
+/* ---------- edición manual y borrador ---------- */
+function vEditor(X){const{A,C}=X;const ini=(C&&C.inicio)||((window.ASIS_OBRA&&window.ASIS_OBRA()||{}).inicio)||nd(hoyN());const tiene=planificado(C);
+  return `<div class="cr"><div class="cr-head"><div><h2>${tiene?'Editar fechas del cronograma':'Cargá tu cronograma'}</h2><span class="sub">Con el cronograma comparás lo que deberías llevar con lo que ejecutás cada semana, y el desembolso estimado con el real mes a mes.</span></div>
+    ${tiene?'<div class="bar"><button class="btn primary" data-cr="listo">Listo</button></div>':''}</div>
+   ${tiene?'':`<div class="cr-opc"><label class="panel cr-op" style="cursor:pointer"><b>Importar mi Excel de cronograma</b><span class="sub">Tu planilla con los ítems y el monto de cada mes en columnas con la fecha de cierre (ej.: "Cierre Primer Mes 01/09/2026").</span><span class="btn">Elegir archivo<input type="file" id="cr-file" accept=".xlsx,.xls,.xlsm" hidden></span></label>
+     <div class="panel cr-op"><b>Armar un borrador y ajustarlo</b><span class="sub">Ordena los rubros del presupuesto uno tras otro con superposición. Después corregís las fechas de cada rubro.</span>
+       <div class="cr-bf"><label>Inicio de obra<input type="date" id="cr-ini" value="${ini}"></label><label>Duración (semanas)<input type="number" id="cr-dur" min="4" max="200" value="${CR.dur}"></label><button class="btn primary" data-cr="borrador">Armar borrador</button></div></div></div>`}
+   ${CR.imp?`<div class="hint ${CR.imp.err?'rojo':''}">${esc(CR.imp.msg)}</div>`:''}
+   <section class="panel cr-box"><div class="cr-bh"><h3>Fechas por rubro</h3><span class="sub">Inicio y fin de cada rubro. El monto se reparte parejo entre esas fechas.</span></div>
+   <div class="tw"><table class="cr-te"><thead><tr><th>Rubro</th><th class="n">Monto</th><th>Inicio</th><th>Fin</th><th></th></tr></thead><tbody>
+   ${A.rubros.map(r=>{const c=C&&C.rubros[r.k];const T=c?c.tramos:[];const d=T.length?nd(Math.min(...T.map(t=>dn(t.d)))):'',h=T.length?nd(Math.max(...T.map(t=>dn(t.h)))):'';
+     return `<tr><td>${esc(r.nombre)}${T.length>1?`<div class="sub">${T.length} tramos del Excel · si cambiás las fechas se reparte parejo</div>`:''}</td><td class="n">${gs(r.tot)}</td><td><input type="date" data-crd="${esc(String(r.k))}" value="${d}"></td><td><input type="date" data-crh="${esc(String(r.k))}" value="${h}"></td><td>${T.length?`<button class="pry-q" data-cr="quitar" data-k="${esc(String(r.k))}" aria-label="Quitar fechas">✕</button>`:''}</td></tr>`}).join('')}
+   </tbody></table></div></section>
+   ${tiene?`<div class="bar" style="justify-content:space-between"><label class="btn" style="cursor:pointer">Importar Excel<input type="file" id="cr-file" accept=".xlsx,.xls,.xlsm" hidden></label>${CR.borr?`<span>¿Borrar todo el cronograma?</span><button class="btn" style="background:var(--bad);color:#fff" data-cr="borrarsi">Sí, borrar</button><button class="btn ghost" data-cr="borrarno">Cancelar</button>`:`<button class="btn ghost" data-cr="borrar">Borrar cronograma</button>`}</div>`:''}</div>`}
+function borrador(A,ini,sem){const D=sem*7;const n=A.rubros.length;const R={};const d0=dn(ini);
+  A.rubros.forEach((r,i)=>{const s=Math.round(d0+(i/n)*D*0.78);const len=Math.max(14,Math.round(D*0.28));const h=Math.min(d0+D-1,s+len-1);R[r.k]={tramos:[{d:nd(s),h:nd(Math.max(s,h)),p:1}]}});
+  return{inicio:ini,origen:'manual',rubros:R}}
+
+/* ---------- importar el Excel de cronograma ---------- */
+const fechaDe=t=>{const m=String(t||'').match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/);if(!m)return null;const a=m[3].length===2?'20'+m[3]:m[3];return `${a}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`};
+function leerCrono(wb,A){let mejor=null;
+  for(const nom of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[nom],{header:1,raw:true,defval:null});
+    for(let i=0;i<Math.min(rows.length,40);i++){const r=rows[i]||[];const fc=[];r.forEach((v,k)=>{if(typeof v==='number'&&v>40000&&v<60000){fc.push({k,f:nd(v-25569)})}else{const f=fechaDe(v);if(f)fc.push({k,f})}});
+      const cDesc=r.findIndex(v=>/rubro|descrip|detalle/i.test(String(v||'')));const cN=r.findIndex(v=>/^\s*(n[°º.o]*|item)\s*$/i.test(String(v||'')));
+      if(fc.length>=2&&cDesc>=0){const cand={nom,rows,fila:i,fc,cDesc,cN:cN>=0?cN:cDesc-1};if(!mejor||fc.length>mejor.fc.length)mejor=cand;break}}}
+  if(!mejor)return{err:'No encontré columnas con fechas de cierre (ej.: "Cierre Primer Mes 01/09/2026") en ese Excel.'};
+  const{rows,fila,cDesc,cN}=mejor;const fc=mejor.fc.slice().sort((a,b)=>a.f<b.f?-1:1);
+  let fin=rows.length;for(let i=fila+1;i<rows.length;i++){const d=String((rows[i]||[])[cDesc]??'')+' '+String((rows[i]||[])[cN]??'');if(/total de rubros|total general|total de la obra/i.test(d)){fin=i;break}}
+  const tieneMonto=c=>rows.slice(fila+1,fin).some(r=>typeof (r||[])[c.k]==='number'&&r[c.k]>0);
+  let ini=null;const per=[];fc.forEach((c,i)=>{if(i===0&&!tieneMonto(c))ini=c.f;else per.push(c)});
+  if(!ini)ini=nd(dn(per[0].f)-30);
+  const sum={};let rub=null;
+  for(let i=fila+1;i<fin;i++){const r=rows[i]||[];const n=String(r[cN]??'').trim(),d=String(r[cDesc]??'').trim();if(!d)continue;if(/^(sub ?)?total/i.test(d)||/^(sub ?)?total/i.test(n))continue;
+    if(/^\d+$/.test(n))rub={n,d};if(!rub)continue;const k=rub.n+'|'+nrm(rub.d);
+    per.forEach((c,j)=>{const v=r[c.k];if(typeof v==='number'&&v>0){sum[k]=sum[k]||{n:rub.n,d:rub.d,v:per.map(()=>0)};sum[k].v[j]+=v}})}
+  const out={};let ok=0,no=[];
+  for(const s of Object.values(sum)){const r=A.rubros.find(x=>String(x.k)===s.n&&nrm(x.nombre)===nrm(s.d))||A.rubros.find(x=>nrm(x.nombre)===nrm(s.d))||A.rubros.find(x=>String(x.k)===s.n);
+    if(!r){no.push(s.d);continue}const T=s.v.reduce((a,b)=>a+b,0);if(!T)continue;
+    out[r.k]={tramos:s.v.map((v,j)=>v>0?{d:j===0?ini:nd(dn(per[j-1].f)+1),h:per[j].f,p:v/T}:null).filter(Boolean)};ok++}
+  return{C:{inicio:ini,origen:'excel',archivo:'',rubros:out},hoja:mejor.nom,ok,no,per:per.length}}
+
+/* ---------- eventos ---------- */
+function guardar(X,C){X.doc.cronograma=C;X.guardar();}
+function mount(){const el=document.getElementById('crono-root');if(el)el.innerHTML=html()}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-cr]');if(!t||!document.getElementById('crono-root'))return;const X=ctx();if(!X)return;const a=t.dataset.cr;
+  if(a==='editar'){CR.edit=true;CR.imp=null;return mount()}
+  if(a==='listo'){CR.edit=false;CR.imp=null;return mount()}
+  if(a==='borrador'){const ini=document.getElementById('cr-ini').value;const w=Math.max(4,Number(document.getElementById('cr-dur').value)||32);CR.dur=w;if(!ini)return toast('Poné la fecha de inicio');
+    guardar(X,borrador(X.A,ini,w));CR.edit=true;CR.imp={msg:'Borrador armado: revisá las fechas de cada rubro y tocá "Listo".'};toast('Borrador armado');return mount()}
+  if(a==='quitar'){const C=JSON.parse(JSON.stringify(X.C||{rubros:{}}));delete C.rubros[t.dataset.k];guardar(X,C);return mount()}
+  if(a==='borrar'){CR.borr=true;return mount()}
+  if(a==='borrarno'){CR.borr=false;return mount()}
+  if(a==='borrarsi'){CR.borr=false;CR.edit=false;guardar(X,null);toast('Cronograma borrado');return mount()}});
+document.addEventListener('change',async e=>{if(!document.getElementById('crono-root'))return;const t=e.target;
+  if(t.dataset.crd!=null||t.dataset.crh!=null){const X=ctx();if(!X)return;const k=t.dataset.crd??t.dataset.crh;const C=JSON.parse(JSON.stringify(X.C||{inicio:null,origen:'manual',rubros:{}}));
+    const row=t.closest('tr');const d=row.querySelector('[data-crd]').value,h=row.querySelector('[data-crh]').value;
+    if(d&&h){if(h<d)return toast('El fin tiene que ser después del inicio');C.rubros[k]={tramos:[{d,h,p:1}]};C.origen=C.origen==='excel'?'excel':'manual';guardar(X,C);toast('Fechas guardadas')}return}
+  if(t.id==='cr-file'){const f=t.files&&t.files[0];t.value='';if(!f)return;const X=ctx();if(!X)return;if(!window.XLSX)return toast('No se pudo cargar el lector de Excel');
+    try{const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});const R=leerCrono(wb,X.A);
+      if(R.err){CR.imp={err:true,msg:R.err};return mount()}
+      R.C.archivo=f.name;guardar(X,R.C);CR.edit=false;CR.imp=null;mount();
+      toast(`Cronograma importado: ${R.ok} rubros en ${R.per} meses${R.no.length?` · ${R.no.length} sin coincidencia`:''}`);
+      if(R.no.length)setTimeout(()=>toast('Sin coincidencia en el presupuesto: '+R.no.slice(0,4).join(', ')),2600)}
+    catch(err){CR.imp={err:true,msg:'No se pudo leer el archivo. Guardalo como .xlsx e intentá de nuevo.'};mount()}}});
+/* para el Resumen: valor planificado a una fecha, rango del plan y situación de hoy */
+function situacion(A,C){if(!planificado(C))return null;const H=hoyN();const plan=planAl(A,C,H),ej=realAl(A,H,'ej');let atr=0;
+  if(ej<plan){let x=H;while(x>dn('2000-01-01')&&planAl(A,C,x)>ej)x--;atr=H-x}else{let x=H;const R=rango(A,C);while(x<R.b+400&&planAl(A,C,x)<ej)x++;atr=-(x-H)}
+  const T=Object.values(C.rubros).flatMap(r=>r.tramos||[]);const d=new Date(H*864e5);const m0=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)/864e5;
+  return{plan,ej,atr,ini:nd(Math.min(...T.map(t=>dn(t.d)))),fin:nd(Math.max(...T.map(t=>dn(t.h)))),mes:{plan:plan-planAl(A,C,m0-1),ej:ej-realAl(A,m0-1,'ej'),nombre:MES[d.getUTCMonth()]}}}
+window.CRONO={mount,html,leerCrono,planAl,borrador,situacion,planFecha:(A,C,f)=>planAl(A,C,dn(f)),hay:planificado};
+
+const css=document.createElement('style');css.textContent=`
+.cr{display:flex;flex-direction:column;gap:14px}
+.cr-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}.cr-head h2{margin:0}
+.cr-sem{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cr-sem>div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:1px;min-width:0}
+.cr-sem b{font-family:var(--f-display);font-size:28px;line-height:1.05}.cr-sem small{color:var(--muted);font-size:12.5px}
+.cr-sem.mal .cr-est{background:var(--bad-bg);border-color:transparent}.cr-sem.mal .cr-est b{color:var(--bad)}
+.cr-sem.ok .cr-est{background:var(--ok-bg);border-color:transparent}.cr-sem.ok .cr-est b{color:var(--ok)}
+.cr-sem.bien .cr-est{background:var(--ok-bg);border-color:transparent}.cr-sem.bien .cr-est b{color:var(--ok)}
+.cr-box{padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cr-bh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.cr-bh h3{margin:0}
+.cr-ley{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}.cr-ley i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-left:8px}
+.cr-ley .lp{background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}.cr-ley .le{background:var(--ok)}.cr-ley .lc{background:#2f6fbf}
+.cr-svgw{overflow-x:auto}.cr-svg{width:100%;min-width:520px;height:auto;display:block}
+.cr-g{stroke:var(--line);stroke-width:1}.cr-t{fill:var(--muted);font-size:11px;font-family:inherit}.cr-th{fill:var(--bad)}
+.cr-hoy{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
+.cr-lp{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4}.cr-le{fill:none;stroke:var(--ok);stroke-width:3;stroke-linejoin:round}.cr-lc{fill:none;stroke:#2f6fbf;stroke-width:2;stroke-linejoin:round}
+.cr-pe{fill:var(--panel);stroke:var(--ok);stroke-width:2}
+.cr-bars{display:flex;gap:6px;align-items:flex-end;height:150px;overflow-x:auto;padding-bottom:2px}
+.cr-bm{flex:1 0 42px;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}.cr-bm span{font-size:11px;color:var(--muted);white-space:nowrap}.cr-bm.act span{color:var(--ink);font-weight:700}
+.cr-bb{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line)}
+.cr-bb i{display:block;width:40%;max-width:18px;border-radius:4px 4px 0 0;min-height:1px}.cr-bb .bp{background:color-mix(in srgb,var(--muted) 45%,transparent)}.cr-bb .be{background:var(--ok)}
+.cr-tm td.neg{color:var(--bad)}.cr-tm td.pos{color:var(--ok)}.cr-tm tr.fut td{color:var(--muted)}
+.cr-chip{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 7px;font-size:11px;font-weight:700}
+.cr-gt{display:flex;flex-direction:column;gap:2px}
+.cr-gr{display:grid;grid-template-columns:minmax(180px,260px) 1fr 96px;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}
+.cr-gn{display:flex;flex-direction:column;min-width:0}.cr-gn b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cr-gn .sub{font-size:11.5px}
+.cr-gl{position:relative;height:18px;background:var(--chip);border-radius:6px;overflow:hidden}
+.cr-gb{position:absolute;top:3px;bottom:3px;background:color-mix(in srgb,var(--muted) 40%,transparent);border-radius:4px}
+.cr-gf{position:absolute;top:3px;bottom:3px;background:var(--ok);border-radius:4px}
+.cr-gh{position:absolute;top:0;bottom:0;width:2px;background:var(--bad)}
+.cr-st{font-size:12px;font-weight:700;border-radius:99px;padding:2px 8px;text-align:center;background:var(--chip)}
+.cr-st.mal{background:var(--bad-bg);color:var(--bad)}.cr-st.ok,.cr-st.bien{background:var(--ok-bg);color:var(--ok)}.cr-st.sf{background:var(--warn-bg);color:var(--warn)}
+.cr-opc{display:grid;grid-template-columns:1fr 1fr;gap:12px}.cr-op{padding:14px;display:flex;flex-direction:column;gap:8px}.cr-op .btn{align-self:flex-start}
+.cr-bf{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}.cr-bf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.cr-bf input,.cr-te input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
+@media (max-width:899px){.cr-sem{grid-template-columns:1fr 1fr}.cr-opc{grid-template-columns:1fr}.cr-gr{grid-template-columns:1fr 84px}.cr-gl{grid-column:1/-1;grid-row:2}}
 `;document.head.appendChild(css);
 })();
 
