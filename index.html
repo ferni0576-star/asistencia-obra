@@ -4036,7 +4036,7 @@ function render(){
   ${detalle()}`;
   if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.id==='tk-desc'&&sel){el.setSelectionRange(sel[0],sel[1]);el.scrollTop=sel[2]}else if(el.type==='text'&&el.setSelectionRange)el.setSelectionRange(el.value.length,el.value.length)}}
 }
-window.TAREAS={mount:render,contar:async oid=>{try{const L=await window.TDB.list(oid);const h=hoyT();return{pend:L.filter(t=>!t.hecha).length,venc:L.filter(t=>!t.hecha&&t.fecha&&t.fecha<h).length}}catch(e){return null}}};
+window.TAREAS={md,mount:render,contar:async oid=>{try{const L=await window.TDB.list(oid);const h=hoyT();return{pend:L.filter(t=>!t.hecha).length,venc:L.filter(t=>!t.hecha&&t.fecha&&t.fecha<h).length}}catch(e){return null}}};
 
 function pdf(){
   if(!PDFK.ok())return;const o=OB()||{};const doc=PDFK.nuevo('portrait');
@@ -5386,7 +5386,7 @@ function vNuevo(){const n=P.nuevo;return `<div class="rs-ov" data-pa="cerrar"></
     <label class="wide">Nombre del proyecto<input name="nombre" required value="${esc(n.nombre||'')}" placeholder="Ej.: Vivienda unifamiliar Arévalos"></label>
     <label>Tipo<select name="tipo">${TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></label>
     <label>Fecha del pedido<input type="date" name="fecha" value="${hoyP()}"></label>
-    <label class="wide">¿Qué te pidió?<textarea name="pedido" rows="3" placeholder="Ej.: casa de 2 dormitorios en terreno de 12x30, quiere quincho y piscina"></textarea></label>
+    <label class="wide">¿Qué te pidió?<textarea name="pedido" rows="7" placeholder="Ej.: casa de 2 dormitorios en terreno de 12x30, quiere quincho y piscina"></textarea></label>
     <label class="wide">Colegas que participan (opcional)<input name="colegas" placeholder="Ej.: Arq. Laura Giménez, Ing. Pablo Sosa"><span class="sub" style="font-size:12.5px;text-transform:none;letter-spacing:0;font-weight:400">Separalos con coma. Después marcás qué ítems hace cada uno.</span></label>
   </div><div class="bar"><button class="btn primary">Crear proyecto</button><button type="button" class="btn ghost" data-pa="cerrar">Cancelar</button></div></form></div>`}
 
@@ -5401,13 +5401,25 @@ function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';con
     <p class="pry-say" style="margin:0">${frase(p,c)}</p></div>
   <div class="pry-pasos" role="tablist" aria-label="Pasos del proyecto">${PASOS.map(([k,t],i)=>`<button type="button" role="tab" data-pa="paso" data-p="${k}" aria-selected="${paso===k}"><i>${i+1}</i>${t}${badge[k]?`<small class="${k==='cuentas'?'w':''}">${badge[k]}</small>`:''}</button>`).join('')}</div>
   <div class="rs-wc" id="pry-wc">${paso==='pedido'?vPedido(p):paso==='cobros'?vCobros(p,c,m):paso==='cuentas'?vCuentas(p,c,m):paso==='historial'?vHist(p):vPres(p,c,m)}</div></div>`}
+/* ---------- "¿Qué te pidió?": se lee ordenado (párrafos, listas, casillas) y se edita en grande ---------- */
+function vPidio(p){const txt=p.pedido||'';const ed=P.pidEd||!txt.trim();const md=window.TAREAS&&window.TAREAS.md;
+  return `<section class="pry-sec pry-pid"><div class="pry-sh"><h3>¿Qué te pidió?</h3>${ed?(txt.trim()?'<button type="button" class="btn sm primary" data-pa="pidlisto">Listo</button>':''):'<button type="button" class="btn sm" data-pa="pided">Editar</button>'}</div>
+   ${ed?`<div class="pry-pbar" role="toolbar" aria-label="Formato"><button type="button" data-pa="pidfmt" data-f="tit">Título</button><button type="button" data-pa="pidfmt" data-f="li">• Lista</button><button type="button" data-pa="pidfmt" data-f="num">1. Lista numerada</button><button type="button" data-pa="pidfmt" data-f="chk">☐ Casilla</button><span class="sub">Cada renglón es un punto. Las casillas se pueden tildar después.</span></div>
+     <textarea id="pry-pid" data-pf="pedido" rows="14" placeholder="Ej.:
+## Programa
+- 3 dormitorios, uno en suite
+- Quincho con parrilla y piscina
+## Pendientes
+- [ ] Pedir plano de mensura
+- [ ] Confirmar presupuesto de estructura">${esc(txt)}</textarea>`
+   :`<div class="md pry-pidv" title="Tocá Editar para cambiarlo">${md?md(txt,true):esc(txt).replace(/\n/g,'<br>')}</div>`}</section>`}
 function vPedido(p){return `<section class="pry-sec"><h3>Pedido del cliente</h3><div class="form" style="padding:0">
      <label>Cliente<input type="text" data-pf="cliente" value="${esc(p.cliente||'')}"></label>
      <label>Teléfono / contacto<input type="text" data-pf="contacto" value="${esc(p.contacto||'')}" placeholder="Ej.: 0985 123 456"></label>
      <label class="wide">Nombre del proyecto<input type="text" data-pf="nombre" value="${esc(p.nombre||'')}"></label>
      <label>Tipo<select data-pf="tipo">${TIPOS.map(t=>`<option ${t===p.tipo?'selected':''}>${t}</option>`).join('')}</select></label>
-     <label>Fecha del pedido<input type="date" data-pf="fecha" value="${esc(p.fecha||'')}"></label>
-     <label class="wide">¿Qué te pidió?<textarea data-pf="pedido" rows="4">${esc(p.pedido||'')}</textarea></label></div></section>
+     <label>Fecha del pedido<input type="date" data-pf="fecha" value="${esc(p.fecha||'')}"></label></div></section>
+   ${vPidio(p)}
    <div class="pry-del">${P.borrar?`<span>¿Eliminar este proyecto y sus cobros? No se puede deshacer.</span><button type="button" class="btn sm" style="background:var(--bad);color:#fff" data-pa="borrarsi">Sí, eliminar</button><button type="button" class="btn sm ghost" data-pa="borrarno">Cancelar</button>`:`<button type="button" class="btn sm ghost" data-pa="borrar">Eliminar proyecto</button>`}</div>`}
 function vPres(p,c,m){const E=window.EMPRESAS?window.EMPRESAS():[];const G=colegas(p);const gente=[{id:'yo',nombre:'Yo'},...G];
   const items=(p.items||[]).filter((it,i)=>P.verItems||(p.items.length<=14)||i<10);
@@ -5538,7 +5550,7 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='filtro'){P.filtro=t.dataset.f;if(P.filtro!=='todos')P.vista='cartera';return mount()}
   if(a==='colab'){P.colab=!P.colab;return mount()}
   if(a==='nuevo'){P.nuevo={};return mount()}
-  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=normColab(JSON.parse(JSON.stringify(x)));P.paso=t.dataset.paso||(ACTIVOS.includes(x.estado)?'cobros':'presupuesto');P.pctOpen=-1;P.otro=null;P.quitarCol=null;P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
+  if(a==='abrir'){const x=(P.lista||[]).find(y=>y.id===t.dataset.id);if(x){P.edit=normColab(JSON.parse(JSON.stringify(x)));P.pidEd=false;P.paso=t.dataset.paso||(ACTIVOS.includes(x.estado)?'cobros':'presupuesto');P.pctOpen=-1;P.otro=null;P.quitarCol=null;P.estadoG='';P.borrar=false;P.imp=null;P.verItems=false}return mount()}
   if(a==='cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;if(P.edit&&P.t){clearTimeout(P.t);P.t=null;await guardar(P.edit,true)}P.edit=null;P.nuevo=null;return mount()}
   if(!p)return;
   if(a==='estado'){const ne=t.dataset.e;if(ne===p.estado)return;nota(p,`Estado: ${ES(p.estado)[1]} → ${ES(ne)[1]}`);p.estado=ne;if(ne==='aprobado'&&!p.aprobado)p.aprobado=hoyP();
@@ -5566,6 +5578,10 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='colquitarno'){P.quitarCol=null;return mount()}
   if(a==='colquitarsi'){const g=p.colab.colegas.splice(+t.dataset.k,1)[0];P.quitarCol=null;if(g){p.items.forEach(it=>{if(it.rep){delete it.rep[g.id];if(!Object.values(it.rep).some(v=>num(v)>0))it.rep={yo:100}}});nota(p,`Colega quitado: ${g.nombre||'sin nombre'}`)}p.colab.si=p.colab.colegas.length>0;await guardar(p,true);return mount()}
   if(a==='quitarpago'){p.pagos=(p.pagos||[]).filter(x=>x.id!==t.dataset.id);await guardar(p,true);return mount()}
+  if(a==='pided'){P.pidEd=true;mount();const t=document.getElementById('pry-pid');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length)}return}
+  if(a==='pidlisto'){P.pidEd=false;if(P.t){clearTimeout(P.t);P.t=null;await guardar(p,true)}return mount()}
+  if(a==='pidfmt'){const ta=document.getElementById('pry-pid');if(!ta)return;const v=ta.value,i0=v.lastIndexOf('\n',ta.selectionStart-1)+1;const pre={tit:'## ',li:'- ',num:'1. ',chk:'- [ ] '}[t.dataset.f];
+    ta.value=v.slice(0,i0)+pre+v.slice(i0);ta.focus();const k=ta.selectionStart+pre.length;ta.setSelectionRange(k,k);p.pedido=ta.value;autoguardar();return}
   if(a==='nota'){const i=document.getElementById('pry-nt');const v=i.value.trim();if(!v)return;nota(p,v);await guardar(p,true);return mount()}
   if(a==='veritems'){P.verItems=!P.verItems;return mount()}
   if(a==='impno'){P.imp=null;return mount()}
@@ -5592,6 +5608,7 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.pg!=null){const g=colegas(p)[+t.dataset.pg];if(!g)return;g[t.dataset.f]=t.value;autoguardar();return}
 });
 document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;const p=P.edit;if(!p)return;
+  if(t.dataset.tline!=null&&t.closest('.pry-pidv')){const L=String(p.pedido||'').split('\n');const i=+t.dataset.tline;if(L[i]!=null){L[i]=L[i].replace(/\[( |x|X)\]/,t.checked?'[x]':'[ ]');p.pedido=L.join('\n');autoguardar();mount()}return}
   if(t.id==='pry-arch'){const f=t.files&&t.files[0];t.value='';if(f)leerArchivo(p,f,true);return}
   if(t.dataset.rp!=null){const it=p.items[+t.dataset.rp];if(!it)return;it.rep=it.rep||{};const v=Math.max(0,Math.min(100,num(t.value)));if(v)it.rep[t.dataset.p]=v;else delete it.rep[t.dataset.p];if(!Object.keys(it.rep).length)it.rep={yo:100};autoguardar();return mount()}
   if(t.dataset.re){mount()}
@@ -5600,6 +5617,8 @@ document.addEventListener('change',e=>{if(!dentro(e))return;const t=e.target;con
 document.addEventListener('keydown',e=>{if(!dentro(e))return;
   if(e.key==='Escape'&&(P.edit||P.nuevo)){const x=document.querySelector('#pry-root .rs-x');if(x)x.click()}
   if(e.key==='Enter'&&e.target.id==='pry-ncol'){e.preventDefault();const b=document.querySelector('[data-pa="colnuevo"]');if(b)b.click()}
+  if(e.key==='Enter'&&e.target.id==='pry-pid'&&!e.shiftKey){const ta=e.target;const v=ta.value,i0=v.lastIndexOf('\n',ta.selectionStart-1)+1;const ln=v.slice(i0,ta.selectionStart);const m=ln.match(/^(\s*(?:[-*] \[[ xX]\] |[-*] |(\d+)[.)] ))/);
+    if(m){e.preventDefault();if(ln.trim()===m[1].trim()){ta.value=v.slice(0,i0)+v.slice(ta.selectionStart);ta.setSelectionRange(i0,i0)}else{let pre=m[1].replace('[x]','[ ]').replace('[X]','[ ]');if(m[2])pre=pre.replace(m[2],String(+m[2]+1));const k=ta.selectionStart;ta.value=v.slice(0,k)+'\n'+pre+v.slice(k);ta.setSelectionRange(k+1+pre.length,k+1+pre.length)}if(P.edit){P.edit.pedido=ta.value;autoguardar()}}}
   if(e.key==='Enter'&&e.target.id==='pry-nt'){e.preventDefault();const b=document.querySelector('[data-pa="nota"]');if(b)b.click()}
   if(e.key==='Enter'&&/^pry-tv-\d+$/.test(e.target.id)){e.preventDefault();const b=document.querySelector(`[data-pa="transf"][data-k="${e.target.id.slice(7)}"]`);if(b)b.click()}
   if(e.key==='Enter'&&e.target.id==='pry-pv'){e.preventDefault();const b=document.querySelector('[data-pa="pago"]');if(b)b.click()}});
@@ -5749,6 +5768,10 @@ const css=document.createElement('style');css.textContent=`
 @media (max-width:899px){.pry-fb.con{grid-template-columns:1fr}.pry-side{position:static}.pry-row{grid-template-columns:1fr}}
 @media (max-width:560px){.pry-top .pry-steps button{padding:5px 10px;font-size:12.5px}.pry-top .pry-say{font-size:13.5px}.pry-r3{grid-template-columns:1fr;gap:6px}.pry-r3>div{flex-direction:row;flex-wrap:wrap;align-items:baseline;column-gap:8px}.pry-r3 b{font-size:24px}.pry-r3 small{width:100%}
   .pry-flow{grid-template-columns:1fr;}.pry-flow>span{transform:rotate(90deg)}.pry-top{padding:8px 14px}}
+.pry-pid textarea{width:100%;min-height:320px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit;font-size:15px;line-height:1.55;resize:vertical;box-sizing:border-box}
+.pry-pbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.pry-pbar button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:5px 10px;font:600 13px inherit;cursor:pointer}.pry-pbar button:hover{border-color:var(--accent)}.pry-pbar .sub{font-size:12.5px}
+.pry-pidv{font-size:15.5px;line-height:1.6;background:color-mix(in srgb,var(--chip) 45%,var(--panel));border-radius:10px;padding:14px 18px;max-width:75ch}
+.pry-pidv ul,.pry-pidv ol{margin:4px 0 8px;padding-left:22px}.pry-pidv li{margin:2px 0}.pry-pidv .md-chk{list-style:none;padding-left:2px}.pry-pidv .md-chk label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.pry-pidv .md-chk li.ok span{text-decoration:line-through;color:var(--muted)}
 .pry-del{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 @media (max-width:899px){.pry-k{grid-template-columns:1fr 1fr}.pry-np{grid-template-columns:1fr 1fr}.pry-np .btn{grid-column:1/-1}}
 @media (max-width:560px){.pry-it{grid-template-columns:1fr 120px 30px}.pry-res{grid-template-columns:1fr}.pry-head h2{font-size:28px}.pry-tab{grid-template-columns:1fr}}
