@@ -1732,6 +1732,10 @@ function barraDinero(pag,sinPagar,tot,leyenda){const f=x=>tot?Math.max(0,Math.mi
   return `<div class="cv-money"><i class="pg" style="width:${f(pag)}%"></i><i class="sp" style="width:${f(sinPagar)}%"></i></div>
   ${leyenda?`<div class="cv-ml"><span><i class="pg"></i>Pagado <b>${mill(pag)}</b></span>${sinPagar>1?`<span><i class="sp"></i>Certificado sin pagar <b>${mill(sinPagar)}</b></span>`:''}<span><i class="rs"></i>Por ejecutar <b>${mill(resto)}</b></span></div>`:''}`}
 const estTxt={verde:'Todo en regla',amarillo:'Para revisar',rojo:'Atención'};
+/* motivo corto de los avisos, para mostrarlo en la tarjeta */
+function motivos(al){const c={};al.forEach(([n,h])=>{const k=/pendiente de pago/.test(h)?'Certificado sin pagar':/pagó más/.test(h)?'Pagado de más':/Adicionales por encima/.test(h)?'Adicionales sobre el 5%':/sin precio en el contrato/.test(h)?'sinp':/presupuesto del cliente/.test(h)?'sobre':/por encima del contrato/.test(h)?'exc':'Otro';
+  if(k==='sinp'){const m=h.match(/<b>(\d+) ítem/);c[k]=(c[k]||0)+(m?+m[1]:1)}else c[k]=(c[k]||0)+1});
+  return Object.entries(c).map(([k,v])=>k==='sinp'?`${v} ítem${v>1?'s':''} sin precio`:k==='sobre'?`${v} ítem${v>1?'s':''} sobre el presupuesto del cliente`:k==='exc'?`${v} ítem${v>1?'s':''} pasado${v>1?'s':''} de lo contratado`:k).join(' · ')}
 
 /* ---------- Todos ---------- */
 function vTodos(){
@@ -1743,6 +1747,7 @@ function vTodos(){
       <div class="cv-ch"><span class="cv-av">${esc(iniciales(c.nombre))}</span><span class="cv-cn"><b>${esc(c.nombre)}</b><span class="sub">${esc(tipoCorto(c.tipo))}</span></span>${anilloC(X.avance,62)}</div>
       ${barraDinero(X.pag,X.sinPagar,X.tot,false)}
       <div class="cv-cs"><span><small>Contrato</small><b>${mill(X.tot)}</b></span><span><small>Certificado</small><b>${mill(X.cert)}</b></span><span><small>Pagado</small><b>${mill(X.pag)}</b></span></div>
+      ${X.R.alertas.length?`<div class="cv-mot ${X.estado}">${esc(motivos(X.R.alertas))}</div>`:''}
       <div class="cv-cf"><span class="cv-est ${X.estado}"><i class="dot ${X.estado}"></i>${estTxt[X.estado]}</span><span class="sub">${u?`Cert. N°${u.n}${u.hasta?' al '+fcorta(u.hasta):''}`:'Sin certificados'}</span></div>
     </button>`};
   return `
@@ -1833,6 +1838,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&CV.ver&&document.ge
 .cv-ch{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}.cv-cn{display:flex;flex-direction:column;min-width:0}.cv-cn b{font-size:17px;line-height:1.2}
 .cv-cs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.cv-cs span{display:flex;flex-direction:column}.cv-cs small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.cv-cs b{font-family:var(--f-num,monospace);font-size:15px}
 .cv-cf{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.cv-mot{font-size:12.5px;line-height:1.35;color:var(--warn)}.cv-mot.rojo{color:var(--bad)}
 .cv-est{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;border-radius:99px;padding:3px 10px 3px 6px;border:0;color:inherit;background:var(--chip)}
 .cv-est.verde{background:var(--ok-bg);color:var(--ok)}.cv-est.amarillo{background:var(--warn-bg);color:var(--warn)}.cv-est.rojo{background:var(--bad-bg);color:var(--bad)}
 button.cv-est,button.cv-chip{cursor:pointer}
