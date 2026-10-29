@@ -2347,6 +2347,35 @@ function vResumen(){
   <p class="sub">Diferencia = mano de obra contratada − presupuestada, solo en rubros con contrato. Verde: dentro; amarillo: por encima de la mano de obra presupuestada; rojo: por encima del total del rubro; gris: sin contratar.</p>`;
 }
 
+/* ---------- editar / agregar / eliminar un ítem: solo desde una ventana, con confirmación ---------- */
+function usoItem(id){const d=ES.doc;let cert=0;(d.certs||[]).forEach(c=>{cert+=Number((c.pres||{})[id])||0});const base=Number((d.base||{})[id])||0;
+  const links=Object.entries(d.vinculos||{}).filter(([k,v])=>v===id&&k!=='_base_cobrada').length;return{cert,base,links}}
+function resIt(x,it){const ind=ES.doc.indice||1;const pu=((Number(x.mat)||0)+(Number(x.mo)||0))*ind,tot=pu*(Number(x.cant)||0),antes=it?it.cant*precio(it):0;
+  return `<span>Precio unitario <b>${gs(pu)}</b>${ind!==1?` <small>(×${q2(ind)} índice)</small>`:''}</span><span>Total del ítem <b>${gs(tot)}</b></span>${it?`<span>Antes <b>${gs(antes)}</b> · diferencia <b class="${tot-antes>0?'w':''}">${tot-antes>=0?'+':''}${gs(tot-antes)}</b></span>`:''}`}
+function vItemEd(){const e=ES.itEd;const it=e.id?ES.doc.items.find(x=>x.id===e.id):null;const nuevo=!it;const U=it?usoItem(it.id):{cert:0,base:0,links:0};
+  const rubros=[...new Set(ES.doc.items.map(i=>i.rubro))];const sectores=[...new Set(ES.doc.items.map(i=>i.sector).filter(Boolean))];
+  const antes=it?it.cant*precio(it):0;const bloq=U.cert>0||U.base>0;
+  return `<div class="rs-ov" data-pact="it-cerrar"></div><div class="rs-win ancho" role="dialog" aria-modal="true" aria-label="${nuevo?'Agregar ítem':'Editar ítem'}">
+  <div class="rs-wh"><b>${nuevo?'Agregar ítem al presupuesto':`Editar ítem ${esc(it.n)}`}</b><button type="button" class="rs-x" data-pact="it-cerrar" aria-label="Cerrar sin guardar">✕</button></div>
+  <form class="rs-wc" id="it-f" autocomplete="off">
+    ${!nuevo&&(U.cert||U.base||U.links)?`<div class="hint amarillo">Este ítem tiene ${[U.base?`avance anterior ${q2(U.base)} ${esc(it.unidad)}`:'',U.cert?`${q2(U.cert)} ${esc(it.unidad)} certificados al cliente`:'',U.links?`${U.links} ítem${U.links>1?'s':''} de contratistas vinculado${U.links>1?'s':''}`:''].filter(Boolean).join(' · ')}. Cambiar la cantidad o el precio recalcula esos avances.</div>`:''}
+    <div class="form" style="padding:0">
+      <label>N°<input type="text" name="n" value="${esc(e.n||'')}" placeholder="Ej.: 3.12"></label>
+      <label class="wide">Rubro<input type="text" name="rubro" list="it-rubs" value="${esc(e.rubro||'')}" required></label>
+      <label>Sector (opcional)<input type="text" name="sector" list="it-secs" value="${esc(e.sector||'')}"></label>
+      <label class="wide">Descripción<textarea name="desc" rows="2" required>${esc(e.desc||'')}</textarea></label>
+      <label>Unidad<input type="text" name="unidad" value="${esc(e.unidad||'')}" placeholder="m2, ml, Unid."></label>
+      <label>Cantidad<input type="number" name="cant" step="0.0001" min="0" value="${e.cant??''}" required></label>
+      <label>Costo material (unit.)<input type="number" name="mat" step="1" min="0" value="${e.mat??''}"></label>
+      <label>Costo M.O. (unit.)<input type="number" name="mo" step="1" min="0" value="${e.mo??''}"></label>
+    </div>
+    <datalist id="it-rubs">${rubros.map(r=>`<option value="${esc(r)}">`).join('')}</datalist><datalist id="it-secs">${sectores.map(r=>`<option value="${esc(r)}">`).join('')}</datalist>
+    <div class="it-res" id="it-res">${resIt(e,it)}</div>
+    <div class="bar"><button class="btn primary">${nuevo?'Agregar ítem':'Guardar cambios'}</button><button type="button" class="btn ghost" data-pact="it-cerrar">Cancelar</button></div>
+    ${nuevo?'':`<div class="it-del">${ES.itBorrar?(bloq?`<div class="hint rojo">No se puede eliminar: tiene ${U.base?'avance anterior':''}${U.base&&U.cert?' y ':''}${U.cert?'avance certificado al cliente':''}. Si ya no va, bajá su cantidad a lo ya avanzado o anulá antes esos certificados.</div><button type="button" class="btn ghost" data-pact="it-borrarno">Entendido</button>`
+      :`<div class="hint rojo"><b>¿Eliminar "${esc(it.n)} ${esc(it.desc.slice(0,70))}"?</b> Se descuentan ${gs(antes)} del presupuesto${U.links?` y se desvinculan ${U.links} ítem${U.links>1?'s':''} de contratistas`:''}. No se puede deshacer.</div><div class="bar"><button type="button" class="btn" style="background:var(--bad);color:#fff" data-pact="it-borrarsi">Sí, eliminar el ítem</button><button type="button" class="btn ghost" data-pact="it-borrarno">No, volver</button></div>`)
+      :`<button type="button" class="btn ghost it-delb" data-pact="it-borrar">Eliminar este ítem…</button>`}</div>`}
+  </form></div>`}
 function vDetalle(){
   const T=totales();const q=(ES.buscar||'').toLowerCase();const rows=[];let lastR=null,lastS=null;const sub={};
   for(const i of ES.doc.items){const k=i.rubro;sub[k]=sub[k]||{m:0,o:0,t:0};sub[k].m+=i.cant*i.mat*(ES.doc.indice||1);sub[k].o+=i.cant*i.mo*(ES.doc.indice||1);sub[k].t+=i.cant*precio(i)}
@@ -2354,12 +2383,12 @@ function vDetalle(){
     if(q&&!(i.desc+' '+i.n+' '+i.rubro).toLowerCase().includes(q))continue;
     if(i.rubro!==lastR){const s=sub[i.rubro];rows.push(`<tr class="rubro"><td colspan="6">${esc(i.rubro)}</td><td class="n">${gs(s.m)}</td><td class="n">${gs(s.o)}</td><td></td><td class="n">${gs(s.t)}</td></tr>`);lastR=i.rubro;lastS=null}
     if(i.sector&&i.sector!==lastS){rows.push(`<tr class="sector"><td></td><td colspan="9">${esc(i.sector)}</td></tr>`);lastS=i.sector}
-    rows.push(`<tr><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(i.mat)}</td><td class="n">${gs(i.mo)}</td><td class="n">${gs(i.cant*i.mat*(ES.doc.indice||1))}</td><td class="n">${gs(i.cant*i.mo*(ES.doc.indice||1))}</td><td class="n">${gs(precio(i))}</td><td class="n">${gs(i.cant*precio(i))}</td></tr>`);
+    rows.push(`<tr ${window.CLI?'':`class="it-row" data-pact="it-abrir" data-id="${esc(i.id)}" title="Tocá para editar este ítem"`}><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}</td><td>${esc(i.unidad)}</td><td class="n">${q2(i.cant)}</td><td class="n">${gs(i.mat)}</td><td class="n">${gs(i.mo)}</td><td class="n">${gs(i.cant*i.mat*(ES.doc.indice||1))}</td><td class="n">${gs(i.cant*i.mo*(ES.doc.indice||1))}</td><td class="n">${gs(precio(i))}</td><td class="n">${gs(i.cant*precio(i))}</td></tr>`);
   }
   const m2=Number(ES.doc.m2)||0,usd=Number(ES.doc.usd)||0;
   return `
-  <div class="bar between"><div><h2>Presupuesto detallado</h2><div class="sub">${ES.doc.items.length} ítems · índice aplicado ${q2(ES.doc.indice||1)||'1'}</div></div><div class="bar"><button class="btn imp-btn" data-pact="imp-abrir">Reemplazar desde Excel</button><button class="btn primary" data-pact="pdfdet">Descargar PDF</button></div></div>
-  <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">
+  <div class="bar between"><div><h2>Presupuesto detallado</h2><div class="sub">${ES.doc.items.length} ítems · índice aplicado ${q2(ES.doc.indice||1)||'1'}</div></div><div class="bar">${window.CLI?'':'<button class="btn" data-pact="it-nuevo">+ Agregar ítem</button>'}<button class="btn imp-btn" data-pact="imp-abrir">Reemplazar desde Excel</button><button class="btn primary" data-pact="pdfdet">Descargar PDF</button></div></div>
+  <input type="search" id="p-buscar" placeholder="Buscar ítem o rubro" value="${esc(ES.buscar)}">${window.CLI?'':'<p class="sub" style="margin:0">Para corregir o eliminar un ítem, tocá su fila: se abre una ventana y nada cambia hasta que confirmes.</p>'}
   <div class="panel tw"><table>
     <thead><tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Costo material</th><th class="n">Costo M.O.</th><th class="n">Total material</th><th class="n">Total M.O.</th><th class="n">Precio unit.</th><th class="n">Precio total</th></tr></thead>
     <tbody>${rows.join('')||'<tr><td colspan="10" class="sub">Ningún ítem coincide.</td></tr>'}</tbody>
@@ -2604,7 +2633,7 @@ function render(){
   if(window.PRES_IR!=null){ES.tab='avance';ES.cert=window.PRES_IR;window.PRES_IR=null}
   const V={resumen:vResumen,detalle:vDetalle,avance:vAvance,crono:()=>'<div id="crono-root"></div>'}[ES.tab]||vResumen;
   const cuerpo=V();const ban=ES.tab==='avance'&&window.APROB&&(ES.doc.certs||[]).some(x=>x.n===ES.cert)?window.APROB.banner('cert_cliente',String(ES.cert),infoCli(ES.cert)):'';
-  root.innerHTML=sub+ban+cuerpo;if(ES.tab==='crono'&&window.CRONO)window.CRONO.mount();
+  root.innerHTML=sub+ban+cuerpo+(ES.tab==='detalle'&&ES.itEd?vItemEd():'');if(ES.tab==='crono'&&window.CRONO)window.CRONO.mount();
   if(foco){const el=document.getElementById(foco);if(el&&root.contains(el)){el.focus();if(el.type==='search'||el.type==='text'){const v=el.value;el.setSelectionRange(v.length,v.length)}}}
 }
 function infoCli(n){const c=(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return null;const m=Object.entries(c.pres||{}).reduce((s,[k,v])=>{const i=ES.doc.items.find(x=>x.id===k);return s+(i?v*precio(i):0)},0);
@@ -2642,6 +2671,14 @@ document.addEventListener('click',e=>{
   if(!dentro(e))return;const t=e.target.closest('[data-ptab],[data-pact]');if(!t)return;
   if(t.dataset.ptab){ES.tab=t.dataset.ptab;ES.buscar='';return render()}
   const a=t.dataset.pact;
+  if(a==='it-abrir'){const it=ES.doc.items.find(x=>x.id===t.dataset.id);if(!it)return;ES.itEd={...it};ES.itBorrar=false;return render()}
+  if(a==='it-nuevo'){const ult=ES.doc.items[ES.doc.items.length-1]||{};ES.itEd={id:null,n:'',rubro:ult.rubro||'',sector:'',desc:'',unidad:'',cant:'',mat:'',mo:''};ES.itBorrar=false;render();const f=document.querySelector('#it-f [name="desc"]');if(f)f.focus();return}
+  if(a==='it-cerrar'){if(t.classList.contains('rs-ov')&&e.target!==t)return;ES.itEd=null;ES.itBorrar=false;return render()}
+  if(a==='it-borrar'){leerIt();ES.itBorrar=true;return render()}
+  if(a==='it-borrarno'){leerIt();ES.itBorrar=false;return render()}
+  if(a==='it-borrarsi'){const id=ES.itEd.id;const U=usoItem(id);if(U.cert>0||U.base>0)return;const it=ES.doc.items.find(x=>x.id===id);
+    ES.doc.items=ES.doc.items.filter(x=>x.id!==id);const V=ES.doc.vinculos||{};Object.keys(V).forEach(k=>{if(V[k]===id)delete V[k]});
+    ES.itEd=null;ES.itBorrar=false;ES.cargado=null;ES.raw={};guardar();render();return toast(`Ítem ${it?it.n:''} eliminado`)}
   if(a==='ver'){ES.cert=+t.dataset.n;return render()}
   if(a==='hoy'){ES.corte=hoy;ES.cargado=null;ES.raw={};return render()}
   if(a==='basecob'){ES.doc.vinculos=ES.doc.vinculos||{};if(t.dataset.v==='si')ES.doc.vinculos._base_cobrada='si';else delete ES.doc.vinculos._base_cobrada;ES.cargado=null;ES.raw={};guardar();render();return toast(t.dataset.v==='si'?'La planilla cuenta como ya certificada':'La planilla se incluye en el próximo certificado')}
@@ -2674,10 +2711,23 @@ document.addEventListener('change',e=>{
   if(t.dataset.vinc){ES.doc.vinculos=ES.doc.vinculos||{};if(t.value)ES.doc.vinculos[t.dataset.vinc]=t.value;else delete ES.doc.vinculos[t.dataset.vinc];guardar();
     ES.cargado=null;ES.raw={};render();toast('Vínculo guardado')}
 });
+function leerIt(){const f=document.getElementById('it-f');if(!f||!ES.itEd)return;const fd=Object.fromEntries(new FormData(f));Object.assign(ES.itEd,{n:fd.n,rubro:fd.rubro,sector:fd.sector,desc:fd.desc,unidad:fd.unidad,cant:fd.cant,mat:fd.mat,mo:fd.mo})}
+document.addEventListener('input',e=>{const f=e.target.closest&&e.target.closest('#it-f');if(!f)return;leerIt();const x=ES.itEd;const it=x.id?ES.doc.items.find(y=>y.id===x.id):null;const el=document.getElementById('it-res');if(el)el.innerHTML=resIt(x,it)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ES.itEd&&document.getElementById('it-f')){ES.itEd=null;ES.itBorrar=false;render()}});
 document.addEventListener('submit',e=>{
   if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
+  if(f.id==='it-f'){leerIt();const x=ES.itEd;const desc=String(x.desc||'').trim(),rubro=String(x.rubro||'').trim();const cant=Number(x.cant);
+    if(!desc||!rubro)return toast('Completá rubro y descripción');if(!(cant>=0)||String(x.cant).trim()==='')return toast('Revisá la cantidad');
+    const v={n:String(x.n||'').trim(),rubro,sector:String(x.sector||'').trim(),desc,unidad:String(x.unidad||'').trim(),cant:Math.round(cant*10000)/10000,mat:Number(x.mat)||0,mo:Number(x.mo)||0};
+    if(x.id){const i=ES.doc.items.findIndex(y=>y.id===x.id);ES.doc.items[i]={...ES.doc.items[i],...v};toast(`Ítem ${v.n} guardado`)}
+    else{const id='p'+Date.now().toString(36);let k=-1;ES.doc.items.forEach((y,j)=>{if(y.rubro===rubro)k=j});const nv={id,...v};if(k>=0)ES.doc.items.splice(k+1,0,nv);else ES.doc.items.push(nv);toast(`Ítem agregado a ${rubro}`)}
+    ES.itEd=null;ES.itBorrar=false;ES.cargado=null;ES.raw={};guardar();return render()}
   if(f.id==='p-datos'){ES.doc.m2=Number(fd.m2)||0;ES.doc.usd=Number(fd.usd)||0;ES.doc.indice=Number(fd.indice)||1;guardar();render();toast('Datos guardados')}
 },true);
+const cssIt=document.createElement('style');cssIt.textContent=`.it-row{cursor:pointer}.it-row:hover td{background:var(--chip)}
+.it-res{display:flex;flex-wrap:wrap;gap:6px 18px;background:var(--chip);border-radius:10px;padding:10px 12px;font-size:14px}.it-res b{font-variant-numeric:tabular-nums}.it-res b.w{color:var(--warn)}
+.it-del{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}.it-delb{align-self:flex-start;color:var(--bad)!important}
+#it-f textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;resize:vertical;box-sizing:border-box}`;document.head.appendChild(cssIt);
 })();
 
 (function(){
