@@ -2,6 +2,14 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d2321">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Obras">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <title>Control de Obras</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -6342,5 +6350,21 @@ const css=document.createElement('style');css.textContent=`
 @media (max-width:760px){#ot-q{width:100%!important;flex:1 1 100%}.ot-lista{grid-template-columns:1fr}}
 `;document.head.appendChild(css);
 })();
+</script><script>
+/* app instalable: registra el service worker y ofrece "Instalar app" */
+(function(){
+  if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+  const inst=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;if(inst)return;
+  const visto=k=>{try{return localStorage.getItem(k)}catch(e){return null}},marcar=k=>{try{localStorage.setItem(k,'1')}catch(e){}};
+  let ev=null;const css=document.createElement('style');css.textContent=`.pwa-b{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:90;display:flex;gap:6px;align-items:center;background:#1d2321;color:#e8ecea;border:1px solid #2f3835;border-radius:14px;padding:8px 8px 8px 12px;box-shadow:0 8px 24px rgb(0 0 0/.3);font:600 14px system-ui,sans-serif;max-width:calc(100% - 28px)}
+.pwa-b button{border:0;border-radius:10px;padding:8px 12px;font:700 14px system-ui,sans-serif;cursor:pointer}.pwa-b .si{background:#f2b705;color:#1d2321}.pwa-b .no{background:transparent;color:#9aa5a1;padding:8px}
+.pwa-b small{display:block;font-weight:400;color:#9aa5a1;font-size:12.5px}@media(min-width:900px){.pwa-b{bottom:20px}}`;document.head.appendChild(css);
+  function mostrar(html,onSi){if(visto('pwa_no'))return;const b=document.createElement('div');b.className='pwa-b';b.setAttribute('role','dialog');b.innerHTML=html;document.body.appendChild(b);
+    const si=b.querySelector('.si');if(si)si.onclick=()=>{onSi&&onSi();b.remove()};b.querySelector('.no').onclick=()=>{marcar('pwa_no');b.remove()}}
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();ev=e;mostrar('<span>📲 Instalá Control de Obras en tu equipo</span><button class="si">Instalar</button><button class="no" aria-label="No mostrar más">✕</button>',()=>{ev.prompt();ev=null})});
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)&&/safari/i.test(navigator.userAgent)&&!/crios|fxios/i.test(navigator.userAgent);
+  if(ios)setTimeout(()=>mostrar('<span>📲 Para instalarla: tocá <b>Compartir</b> <span aria-hidden="true">⎋</span> y después <b>Agregar a inicio</b><small>Queda como una app más en tu iPhone</small></span><button class="no" aria-label="Cerrar">✕</button>'),2500);
+})();
 </script>
+
 </html>
