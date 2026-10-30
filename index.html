@@ -240,6 +240,9 @@ td .nlink{font-weight:600}
 #cert-root .chip,#pres-root .chip,#planos-root .chip,#ped-root .chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:5px 12px;font-weight:600;font-size:14px}
 #cert-root .chip[aria-pressed="true"],#pres-root .chip[aria-pressed="true"],#planos-root .chip[aria-pressed="true"],#ped-root .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #cert-root .chip.nuevo,#pres-root .chip.nuevo,#planos-root .chip.nuevo,#ped-root .chip.nuevo{border-style:dashed}
+#cert-root tr.ad-fila,#pres-root tr.ad-fila,#planos-root tr.ad-fila,#ped-root tr.ad-fila{cursor:pointer}
+#cert-root form#f-aded textarea,#pres-root form#f-aded textarea,#planos-root form#f-aded textarea,#ped-root form#f-aded textarea{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:transparent;color:inherit;resize:vertical}
+#cert-root tr.ad-fila:hover td,#pres-root tr.ad-fila:hover td,#planos-root tr.ad-fila:hover td,#ped-root tr.ad-fila:hover td{background:color-mix(in srgb,var(--ink) 5%,transparent)}
 #cert-root,#pres-root,#planos-root{display:flex;flex-direction:column;gap:16px}
 #cert-root .subnav{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
 #cert-root .subnav select{max-width:100%}
@@ -252,6 +255,8 @@ td .nlink{font-weight:600}
 @media (min-width:761px){header.top nav.tabs button{font-size:15px;padding:8px 9px}}
 .cli-banner{background:color-mix(in srgb,var(--ok) 16%,var(--panel));color:var(--ink)}
 .cli-banner .btn{margin-left:8px;padding:3px 10px;font-size:12.5px}
+.modo-cliente #cert-root .ad-ed-td{display:none}
+.modo-cliente #cert-root tr.ad-fila{cursor:default}
 .modo-cliente #cert-root form,.modo-cliente #cert-root .chip.nuevo,.modo-cliente .imp-btn,.modo-cliente [data-cact="emitir"],.modo-cliente [data-cact="corregir"],.modo-cliente [data-cact="anularcert"],.modo-cliente [data-cact="guardared"],.modo-cliente [data-cact="pagar"],.modo-cliente [data-cact="reset"],.modo-cliente #cert-root input[data-id],.modo-cliente #cruce,
 .modo-cliente #pres-root #p-datos,.modo-cliente [data-pact="emitir"],.modo-cliente [data-pact="anular"],.modo-cliente [data-pact="pdfborr"],.modo-cliente #pres-root .chip-p[style*="dashed"],.modo-cliente #pres-root select[data-vinc],.modo-cliente #pres-root .p-controles,
 .modo-cliente #planos-root #pl-subir,.modo-cliente [data-lact="editar"],.modo-cliente [data-lact="conf"],.modo-cliente [data-lact="borrar"],
@@ -2073,9 +2078,9 @@ function vAdicionales(){
     <div class="kpi"><small>Pagado</small><b>${mill(R.desA)}</b><em>saldo ${mill(R.adic-R.desA)}</em></div>
   </div>
   <div class="panel tw"><table>
-    <thead><tr><th>N°</th><th>Adicional</th><th>Aprobado</th><th>Unid.</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th class="n">Certificado</th><th>Avance</th></tr></thead>
-    <tbody>${ad.map(i=>{const a=R.ac[i.id]||0;return `<tr class="${a>i.cant+1e-9?'over':''}"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}${i.motivo?`<div class="sub">${esc(i.motivo)}</div>`:''}</td><td class="num">${i.aprobado?fdm(i.aprobado):'—'}</td><td>${esc(i.unidad)}</td><td class="n">${qf(i.cant)}</td><td class="n">${gs(i.pu)}</td><td class="n">${gs(i.cant*i.pu)}</td><td class="n">${qf(a)}</td><td>${barra(i.cant?a/i.cant:0,a>i.cant+1e-9)}</td></tr>`}).join('')||'<tr><td colspan="9" class="sub">Sin adicionales por ahora.</td></tr>'}</tbody>
-    <tfoot><tr><td></td><td>Total adicionales</td><td colspan="4"></td><td class="n">${gs(R.adic)}</td><td class="n">${gs(certA)}</td><td></td></tr></tfoot>
+    <thead><tr><th>N°</th><th>Adicional</th><th>Aprobado</th><th>Unid.</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th class="n">Certificado</th><th>Avance</th><th class="ad-ed-td"></th></tr></thead>
+    <tbody>${ad.map(i=>{const a=R.ac[i.id]||0;return `<tr class="${a>i.cant+1e-9?'over':''} ad-fila" data-cact="adeditar" data-id="${esc(i.id)}" title="Tocá para editar"><td class="num">${esc(i.n)}</td><td class="desc">${esc(i.desc)}${i.motivo?`<div class="sub">${esc(i.motivo)}</div>`:''}</td><td class="num">${i.aprobado?fdm(i.aprobado):'—'}</td><td>${esc(i.unidad)}</td><td class="n">${qf(i.cant)}</td><td class="n">${gs(i.pu)}</td><td class="n">${gs(i.cant*i.pu)}</td><td class="n">${qf(a)}</td><td>${barra(i.cant?a/i.cant:0,a>i.cant+1e-9)}</td><td class="ad-ed-td"><button type="button" class="btn sm ghost" data-cact="adeditar" data-id="${esc(i.id)}">Editar</button></td></tr>`}).join('')||'<tr><td colspan="10" class="sub">Sin adicionales por ahora.</td></tr>'}</tbody>
+    <tfoot><tr><td></td><td>Total adicionales</td><td colspan="4"></td><td class="n">${gs(R.adic)}</td><td class="n">${gs(certA)}</td><td></td><td class="ad-ed-td"></td></tr></tfoot>
   </table></div>
   <form class="panel form" id="f-adic">
     <h3 style="grid-column:1/-1">Agregar adicional</h3>
@@ -2087,8 +2092,30 @@ function vAdicionales(){
     <label>Precio unitario Gs<input id="a-pu" name="pu" type="text" inputmode="decimal" autocomplete="off" required></label>
     <button class="btn primary">Agregar adicional</button>
   </form>
-  <p class="sub">Los adicionales aparecen en cada certificado debajo del contrato original, en su propio rubro, y se suman aparte como "Total adicional".</p>`;
+  <p class="sub">Los adicionales aparecen en cada certificado debajo del contrato original, en su propio rubro, y se suman aparte como "Total adicional". Para corregir o eliminar uno, tocá su fila.</p>${vAdEd()}`;
 }
+function usoAdic(id){const cs=D.certs.filter(c=>Number(c.pres&&c.pres[id]));const q=cs.reduce((s,c)=>s+Number(c.pres[id]),0);const pg=cs.filter(c=>D.des.some(d=>d.cert===c.n));return{q,certs:cs,pagos:pg}}
+function vAdEd(){if(!S.adEd)return'';const it=D.items.find(x=>x.id===S.adEd&&x.sec==='ADIC');if(!it){S.adEd=null;return''}
+  const U=usoAdic(it.id);const bloq=U.q>0;const num=v=>v==null?'':String(v).replace('.',',');
+  return `<div class="rs-ov" data-cact="adcerrar"></div><div class="rs-win ancho" role="dialog" aria-modal="true" aria-label="Editar adicional">
+  <div class="rs-wh"><b>Editar adicional ${esc(it.n)}</b><button type="button" class="rs-x" data-cact="adcerrar" aria-label="Cerrar sin guardar">✕</button></div>
+  <form class="rs-wc" id="f-aded" autocomplete="off">
+    ${bloq?`<div class="hint amarillo">Este adicional ya tiene <b>${qf(U.q)} ${esc(it.unidad)}</b> certificados en ${U.certs.map(c=>'N°'+c.n).join(', ')}. Si cambiás el precio, se recalcula el monto de esos certificados${U.pagos.length?` y de su${U.pagos.length>1?'s':''} pago${U.pagos.length>1?'s':''} en Desembolsos`:''}. La cantidad no puede quedar por debajo de lo certificado.</div>`:''}
+    <div class="form" style="padding:0">
+      <label>N°<input name="n" value="${esc(it.n)}" required></label>
+      <label class="wide">Descripción<textarea name="desc" rows="2" required>${esc(it.desc)}</textarea></label>
+      <label class="wide">Motivo<input name="motivo" value="${esc(it.motivo||'')}" placeholder="Ej.: pedido del cliente, lluvia, cambio de proyecto"></label>
+      <label>Aprobado el<input name="aprobado" type="date" value="${esc(it.aprobado||'')}"></label>
+      <label>Unidad<input name="unidad" value="${esc(it.unidad)}" required></label>
+      <label>Cantidad<input name="cant" type="text" inputmode="decimal" value="${num(it.cant)}" required></label>
+      <label>Precio unitario Gs<input name="pu" type="text" inputmode="decimal" value="${gs(it.pu)}" required></label>
+    </div>
+    <div class="sub" style="margin:6px 0 10px">Total actual: <b>${gs(it.cant*it.pu)} Gs</b></div>
+    <div class="bar"><button class="btn primary">Guardar cambios</button><button type="button" class="btn ghost" data-cact="adcerrar">Cancelar</button></div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">${S.adBorrar?(bloq?`<div class="hint rojo">No se puede eliminar: ya está certificado en ${U.certs.map(c=>'N°'+c.n).join(', ')}. Si ya no va, bajá su cantidad a lo certificado o corregí esos certificados primero.</div><button type="button" class="btn ghost" data-cact="adborrarno">Entendido</button>`
+      :`<div class="hint rojo"><b>¿Eliminar el adicional ${esc(it.n)} "${esc(it.desc.slice(0,70))}"?</b> Se descuentan ${gs(it.cant*it.pu)} Gs de los adicionales. No se puede deshacer.</div><div class="bar"><button type="button" class="btn" style="background:var(--bad);color:#fff" data-cact="adborrarsi">Sí, eliminar</button><button type="button" class="btn ghost" data-cact="adborrarno">No, volver</button></div>`)
+      :`<button type="button" class="btn ghost" style="color:var(--bad)" data-cact="adborrar">Eliminar este adicional…</button>`}</div>
+  </form></div>`}
 
 
 /* ---------- PDF ---------- */
@@ -2213,6 +2240,11 @@ document.addEventListener('click',e=>{
   if(a==='pdfres'){return pdfResumen()}
   if(a==='pdfcontrato'){return pdfContrato()}
   if(a==='pdfadic'){return pdfAdicionales()}
+  if(a==='adeditar'){if(window.CLI)return;S.adEd=t.dataset.id;S.adBorrar=false;return render()}
+  if(a==='adcerrar'){S.adEd=null;S.adBorrar=false;return render()}
+  if(a==='adborrar'){S.adBorrar=true;return render()}
+  if(a==='adborrarno'){S.adBorrar=false;return render()}
+  if(a==='adborrarsi'){const id=S.adEd;if(usoAdic(id).q>0)return;const it=D.items.find(x=>x.id===id);D.items=D.items.filter(x=>x.id!==id);S.adEd=null;S.adBorrar=false;guardar();render();return toast('Adicional '+(it?it.n:'')+' eliminado')}
   if(a==='vercert'){S.cert=+t.dataset.n;S.soloAvance=true;if(S.ed){S.ed=null;S.borrador={};S.raw={}}S.anular=null;return render()}
   if(a==='corregir'){const c=D.certs.find(x=>x.n===+t.dataset.n);if(!c)return;S.ed=c.n;S.borrador={...c.pres};S.raw={};S.soloAvance=true;S.anular=null;return render()}
   if(a==='cancelared'){S.ed=null;S.borrador={};S.raw={};return render()}
@@ -2238,7 +2270,13 @@ document.addEventListener('submit',e=>{
   if(f.id==='f-datos'){D.nombre=fd.nombre.trim();D.tipo=fd.tipo.trim();guardar();render();return toast('Datos guardados')}
   if(f.id==='f-nuevo'){ALL.contratistas.push({id:(crypto.randomUUID?crypto.randomUUID():'c'+Date.now()),obra_id:OBRA_CARGADA,nombre:fd.nombre.trim(),tipo:fd.tipo.trim(),cuadrilla:false,items:[],certs:[],des:[]});usar(ALL.contratistas.length-1);S.tab='contrato';guardar();render();return toast('Contratista agregado: cargá su contrato')}
   if(f.id==='f-item'){D.items.push({id:'o'+Date.now(),sec:'ORIG',rubro:fd.rubro.trim(),sector:'',n:fd.n.trim(),desc:fd.desc.trim(),unidad:fd.unidad.trim(),cant:window.numES(fd.cant)||0,pu:window.numES(fd.pu)||0});guardar();render();return toast('Ítem agregado al contrato')}
-  if(f.id==='f-adic'){const ad=D.items.filter(i=>i.sec==='ADIC');const n='1.'+(ad.length+1);
+  if(f.id==='f-aded'){const it=D.items.find(x=>x.id===S.adEd);if(!it)return;const U=usoAdic(it.id);const cant=window.numES(fd.cant),pu=window.numES(fd.pu);
+    if(cant==null||cant<0)return toast('Revisá la cantidad');if(pu==null||pu<0)return toast('Revisá el precio');
+    if(cant+1e-9<U.q)return toast('La cantidad no puede ser menor a lo certificado ('+qf(U.q)+')');
+    Object.assign(it,{n:fd.n.trim()||it.n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant,pu});
+    let np=0;for(const c of U.certs){const pg=D.des.find(d=>d.cert===c.n);if(pg){const m=montoCert(c);pg.orig=m.o;pg.adic=m.ad;pg.total=m.t;np++}}
+    S.adEd=null;S.adBorrar=false;guardar();render();return toast('Adicional '+it.n+' guardado'+(np?' · '+np+' pago'+(np>1?'s':'')+' actualizado'+(np>1?'s':''):''))}
+  if(f.id==='f-adic'){const ad=D.items.filter(i=>i.sec==='ADIC');const n='1.'+(Math.max(0,...ad.map(i=>{const m=/^1\.(\d+)$/.exec(i.n);return m?+m[1]:0}))+1);
     D.items.push({id:'a'+Date.now(),sec:'ADIC',rubro:'ADICIONALES',sector:'',n,desc:fd.desc.trim(),motivo:(fd.motivo||'').trim(),aprobado:fd.aprobado||null,unidad:fd.unidad.trim(),cant:window.numES(fd.cant)||0,pu:window.numES(fd.pu)||0});guardar();render();toast('Adicional '+n+' agregado')}
 });
 
