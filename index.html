@@ -6350,7 +6350,48 @@ const css=document.createElement('style');css.textContent=`
 @media (max-width:760px){#ot-q{width:100%!important;flex:1 1 100%}.ot-lista{grid-template-columns:1fr}}
 `;document.head.appendChild(css);
 })();
-</script><script>
+</script><style>
+.totales>.tot-tg{display:none}
+@media (max-width:760px){
+  #cert-root .totales,#pres-root .totales,#planos-root .totales,#ped-root .totales{padding:8px 12px;gap:8px;border-radius:12px;box-shadow:0 -8px 22px rgba(0,0,0,.18)}
+  .totales>.tot-tg{display:flex;grid-column:1/-1;align-items:center;gap:10px;width:100%;background:none;border:0;color:inherit;padding:2px 0;text-align:left;font:inherit;cursor:pointer;min-height:44px}
+  .tot-tg .tg-m small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;line-height:1.2}
+  .tot-tg .tg-m b{font-family:var(--f-num);font-size:18px;line-height:1.15}
+  .tot-tg .tg-p{font-family:var(--f-num);font-weight:700;font-size:13px;padding:3px 9px;border-radius:99px;background:color-mix(in srgb,var(--ink) 10%,transparent)}
+  .tot-tg .tg-a{margin-left:auto;font-weight:700;font-size:13.5px;border:1px solid var(--line);border-radius:9px;padding:8px 11px;white-space:nowrap}
+  .totales:not(.abierta)>*:not(.tot-tg):not(.hint){display:none!important}
+  #cert-root .totales.abierta,#pres-root .totales.abierta,#planos-root .totales.abierta,#ped-root .totales.abierta{grid-template-columns:1fr 1fr;max-height:62vh;overflow:auto;overscroll-behavior:contain}
+  .totales.abierta>.btn:not(.ghost),.totales.abierta>select,.totales.abierta>.letras,.totales.abierta>label,.totales.abierta>.hint{grid-column:1/-1}
+  .totales.abierta>div b{font-size:16px!important}
+}
+</style>
+<script>
+(function(){
+  let abierto=false;
+  const txt=el=>el?el.textContent.trim():'';
+  function armar(t){
+    const st=[...t.children].filter(d=>d.tagName==='DIV'&&d.querySelector(':scope>small')&&d.querySelector(':scope>b'));
+    if(!st.length)return;
+    const lab=d=>txt(d.querySelector('small'));const main=st.find(d=>/pagar/i.test(lab(d)))||st.find(d=>/este certificado/i.test(lab(d)))||st[0];
+    const pc=st.find(d=>d!==main&&/%/.test(txt(d.querySelector('b'))));
+    let b=t.querySelector(':scope>.tot-tg');
+    if(!b){b=document.createElement('button');b.type='button';b.className='tot-tg';t.prepend(b)}
+    const html=abierto?`<span class="tg-m"><b style="font-family:inherit;font-size:15px">Totales y acciones</b></span><span class="tg-a">Cerrar ▼</span>`:`<span class="tg-m"><small>${txt(main.querySelector('small'))}</small><b>${txt(main.querySelector('b'))}</b></span>${pc?`<span class="tg-p" title="${txt(pc.querySelector('small'))}">${txt(pc.querySelector('b'))}</span>`:''}<span class="tg-a">${abierto?'Cerrar ▼':'Ver detalle ▲'}</span>`;
+    if(b.innerHTML!==html)b.innerHTML=html;
+    b.setAttribute('aria-expanded',abierto?'true':'false');
+    t.classList.toggle('abierta',abierto);
+  }
+  const todo=()=>document.querySelectorAll('.totales').forEach(armar);
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('.tot-tg');if(!b)return;
+    e.preventDefault();e.stopPropagation();abierto=!abierto;todo();
+  },true);
+  let pend=false;
+  new MutationObserver(()=>{if(pend)return;pend=true;requestAnimationFrame(()=>{pend=false;todo()})}).observe(document.documentElement,{childList:true,subtree:true});
+  todo();
+})();
+</script>
+<script>
 /* app instalable: registra el service worker y ofrece "Instalar app" */
 (function(){
   if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
