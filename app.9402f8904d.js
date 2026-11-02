@@ -490,8 +490,9 @@ const PDFK={
   cerrar(doc,nombre){const{W,H}=this.dims(doc);const m=MEMB();const emp=m.nombre;const n=doc.getNumberOfPages();
     const co=doc.__etq?colorObra(doc.__etq):null;const rgb=co?[1,3,5].map(k=>parseInt(co.hex.slice(k,k+2),16)):null;
     for(let i=1;i<=n;i++){doc.setPage(i);
-      if(co){doc.setFillColor(...rgb);doc.rect(0,0,6,H,'F');const tx=String(doc.__etq.nombre||'').toUpperCase();doc.setFont('helvetica','bold');doc.setFontSize(9);const w=doc.getTextWidth(tx)+8;
-        doc.roundedRect(W-this.MR-w,31,w,7,1.5,1.5,'F');doc.setTextColor(255,255,255);doc.text(tx,W-this.MR-w/2,35.8,{align:'center'});doc.setTextColor(0,0,0)}
+      if(co){/* etiqueta de color de la obra: debajo de la línea del membrete (y=32 mm), sin franjas laterales */
+        doc.setFillColor(...rgb);const tx=String(doc.__etq.nombre||'').toUpperCase();doc.setFont('helvetica','bold');doc.setFontSize(9);const w=doc.getTextWidth(tx)+8;
+        doc.roundedRect(W-this.MR-w,33.5,w,6,1.5,1.5,'F');doc.setTextColor(255,255,255);doc.text(tx,W-this.MR-w/2,37.6,{align:'center'});doc.setTextColor(0,0,0)}
       membretePdf(doc,m,this.ML,this.MR,W,10);
       doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text('©'+new Date().getFullYear()+' | '+emp,this.ML,H-8);doc.text('Pág. '+i+' de '+n,W-this.MR,H-8,{align:'right'})}
     if(this.capturar){this.capturado=new File([doc.output('blob')],nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf',{type:'application/pdf'});return}
