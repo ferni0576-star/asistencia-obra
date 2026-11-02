@@ -5020,21 +5020,24 @@ const planAj=(A,C,LL)=>x=>planAl(A,C,x-perdAl(LL,x));
 function atraso(A,C,P,H,ej){if(ej<P(H)){let x=H;while(x>dn('2000-01-01')&&P(x)>ej)x--;return H-x}let x=H;const R=rango(A,C);while(x<R.b+400&&P(x)<ej)x++;return -(x-H)}
 /* ---------- atraso por rubro (avance físico, sin plata) ---------- */
 const metodo=C=>C&&C.metodo==='plata'?'plata':'rubros';
-function porRubro(A,C,LL,H){H=H??hoyN();const xa=H-perdAl(LL,H);const man=C.real||{};
+function porRubro(A,C,LL,H){H=H??hoyN();const xa=H-perdAl(LL,H);const man=C.real||{};const EX=C.excl||{},IX=C.itExcl||{};
   return A.rubros.filter(r=>r.tot>0&&C.rubros[r.k]&&(C.rubros[r.k].tramos||[]).length).map(r=>{
     const T=C.rubros[r.k].tramos;const pT=T.reduce((s,t)=>s+t.p,0)||1;const pd=x=>T.reduce((s,t)=>s+t.p*frac(t,x),0)/pT;
     const pi=Math.min(...T.map(t=>dn(t.d))),pf=Math.max(...T.map(t=>dn(t.h)));
-    const real=Math.min(1,r.ej/r.tot),deb=pd(xa);const se=(r.serie||[]).filter(p=>dn(p.f)<=H);const m=man[r.k]||{};
+    const its=(r.items||[]).filter(i=>!IX[i.id]);const nx=(r.items||[]).length-its.length;
+    const tot2=nx?its.reduce((s,i)=>s+i.cant*i.precio,0):r.tot,ej2=nx?its.reduce((s,i)=>s+i.ej*i.precio,0):r.ej;
+    const real=tot2>0?Math.min(1,ej2/tot2):0,deb=pd(xa);const se=(r.serie||[]).filter(p=>dn(p.f)<=H);const m=man[r.k]||{};
     const ri=m.ini||(se.find(p=>p.v>0)||{}).f||null;
-    const rf=m.fin||(real>=0.999?((se.find(p=>p.v>=r.tot*0.999)||{}).f||nd(H)):null);
+    const rf=m.fin||(tot2>0&&real>=0.999?((se.find(p=>p.v>=tot2*0.999)||{}).f||nd(H)):null);
     let atr=0,est;
-    if(rf){atr=Math.round(dn(rf)-(pf+perdAl(LL,dn(rf))));est='term'}
+    if(EX[r.k]||tot2<=0){est='excl'}
+    else if(rf){atr=Math.round(dn(rf)-(pf+perdAl(LL,dn(rf))));est='term'}
     else if(real<=0&&deb<=0){est='nada'}
     else{let y=pi-1;if(real>0)while(y<pf+400&&pd(y)<real-1e-9)y++;atr=Math.round(xa-y);est=atr>7?'mal':atr<-7?'bien':'ok'}
-    return{k:r.k,nombre:String(r.nombre).replace(/^\d+[.)]?\s*/,''),tot:r.tot,real,deb,pi,pf,ri,rf,atr,est,man:!!(m.ini||m.fin)}})}
+    return{k:r.k,nombre:String(r.nombre).replace(/^\d+[.)]?\s*/,''),tot:r.tot,real,deb,pi,pf,ri,rf,atr,est,man:!!(m.ini||m.fin),nx,items:r.items||[]}})}
 function resRub(L){const act=L.filter(x=>x.est==='mal'||x.est==='ok'||x.est==='bien');const w=x=>x.pf-x.pi+1;const sw=act.reduce((s,x)=>s+w(x),0);
   const prom=act.length?Math.round(act.reduce((s,x)=>s+x.atr,0)/act.length):0;const atr=L.filter(x=>x.est==='mal').sort((a,b)=>b.atr-a.atr);
-  return{prom,act:act.length,atr,term:L.filter(x=>x.est==='term').length,tot:L.length}}
+  return{prom,act:act.length,atr,term:L.filter(x=>x.est==='term').length,tot:L.filter(x=>x.est!=='excl').length,excl:L.filter(x=>x.est==='excl').length}}
 const planificado=C=>C&&Object.values(C.rubros||{}).some(r=>r.tramos&&r.tramos.length);
 
 /* ---------- vista ---------- */
@@ -5053,14 +5056,14 @@ function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el pre
   const estR=Math.abs(RR.prom)<=7?'ok':RR.prom>0?'mal':'bien';
   const tg=window.CLI?'':`<div class="cr-met"><span class="sub">Medir el atraso por</span><span class="pry-seg cr-seg"><button data-cr="metodo" data-v="rubros" aria-pressed="${MR}">Avance de cada rubro</button><button data-cr="metodo" data-v="plata" aria-pressed="${!MR}">Plata (Gs)</button></span></div>`;
   const semR=`<div class="cr-sem ${estR}">
-     <div><span class="sub">Rubros en marcha</span><b>${RR.act}</b><small>de ${RR.tot} con fechas · ${RR.term} terminado${RR.term===1?'':'s'}</small></div>
+     <div><span class="sub">Rubros en marcha</span><b>${RR.act}</b><small>de ${RR.tot} con fechas · ${RR.term} terminado${RR.term===1?'':'s'}${RR.excl?` · ${RR.excl} sin contar`:''}</small></div>
      <div><span class="sub">Rubros atrasados</span><b>${RR.atr.length}</b><small>${RR.atr.length?'el que más: '+esc(RR.atr[0].nombre)+' ('+RR.atr[0].atr+' días)':'ninguno con más de una semana'}</small></div>
      <div><span class="sub">Lluvia descontada</span><b>${nn(perd)} días</b><small>${nll?nll+' día'+(nll>1?'s':'')+' con lluvia en el libro':'sin lluvias anotadas'}</small></div>
      <div class="cr-est"><span class="sub">Situación de la obra</span><b>${estR==='ok'?'En tiempo':estR==='mal'?`${RR.prom} días de atraso`:`${-RR.prom} días adelantada`}</b><small>${perd>0&&RR0.prom>7&&estR!=='mal'?`sin la lluvia figurarían ${RR0.prom} días de atraso`:RR.act?'promedio de los rubros en marcha':'todavía no hay rubros en marcha'}</small></div></div>`;
-  const ordE={mal:0,ok:1,bien:2,term:3,nada:4};
+  const ordE={mal:0,ok:1,bien:2,term:3,nada:4,excl:5};
   const filasR=RL.slice().sort((a,b)=>ordE[a.est]-ordE[b.est]||(a.est==='mal'?b.atr-a.atr:a.pi-b.pi)).map(x=>{
-    const sit=x.est==='mal'?['mal',`${x.atr} días atrasado`]:x.est==='ok'?['ok','En tiempo']:x.est==='bien'?['bien',`${-x.atr} días adelantado`]:x.est==='nada'?['nada','Todavía no le toca']:x.atr>7?['mal',`Terminó ${x.atr} días tarde`]:x.atr<-7?['bien',`Terminó ${-x.atr} días antes`]:['ok','Terminó a tiempo'];
-    return `<tr><td class="rn"><b>${esc(x.nombre)}</b></td><td class="num rp" data-l="Plan">${fdm(nd(x.pi))} → ${fdm(nd(x.pf))}</td><td class="num rr" data-l="Real">${x.ri?`${fdm(x.ri)} → ${x.rf?fdm(x.rf):'…'}`:'—'}${x.man?' <span class="sub" title="Fechas cargadas a mano">✎</span>':''}</td><td class="n rd" data-l="Debería">${pct(x.deb)}</td><td class="n rv" data-l="Va"><b>${pct(x.real)}</b></td><td class="rs"><span class="cr-st ${sit[0]}">${sit[1]}</span></td>${window.CLI?'':`<td class="rb"><button class="btn sm ghost" data-cr="rreal" data-k="${esc(String(x.k))}">Fechas</button></td>`}</tr>`}).join('');
+    const sit=x.est==='mal'?['mal',`${x.atr} días atrasado`]:x.est==='ok'?['ok','En tiempo']:x.est==='bien'?['bien',`${-x.atr} días adelantado`]:x.est==='nada'?['nada','Todavía no le toca']:x.est==='excl'?['nada','No se cuenta']:x.atr>7?['mal',`Terminó ${x.atr} días tarde`]:x.atr<-7?['bien',`Terminó ${-x.atr} días antes`]:['ok','Terminó a tiempo'];
+    return `<tr class="${x.est==='excl'?'cr-rx':''}"><td class="rn"><b>${esc(x.nombre)}</b>${x.nx&&x.est!=='excl'?`<div class="sub">${x.nx} ítem${x.nx>1?'s':''} no se ejecuta${x.nx>1?'n':''}</div>`:''}</td><td class="num rp" data-l="Plan">${fdm(nd(x.pi))} → ${fdm(nd(x.pf))}</td><td class="num rr" data-l="Real">${x.ri?`${fdm(x.ri)} → ${x.rf?fdm(x.rf):'…'}`:'—'}${x.man?' <span class="sub" title="Fechas cargadas a mano">✎</span>':''}</td><td class="n rd" data-l="Debería">${pct(x.deb)}</td><td class="n rv" data-l="Va"><b>${pct(x.real)}</b></td><td class="rs"><span class="cr-st ${sit[0]}">${sit[1]}</span></td>${window.CLI?'':`<td class="rb"><button class="btn sm ghost" data-cr="rreal" data-k="${esc(String(x.k))}">Ajustar</button></td>`}</tr>`}).join('');
   const secR=`<section class="panel cr-box"><div class="cr-bh"><h3>Atraso por rubro</h3><span class="sub">Avance físico de cada rubro (cantidades certificadas a contratistas) contra sus semanas del cronograma${perd>0?' · corrido por la lluvia':''}</span></div>
      <div class="tw"><table class="cr-tm cr-rt"><thead><tr><th>Rubro</th><th>Plan</th><th>Real</th><th class="n">Debería</th><th class="n">Va</th><th>Situación</th>${window.CLI?'':'<th></th>'}</tr></thead><tbody>${filasR||'<tr><td colspan="7" class="sub">Ningún rubro tiene fechas en el cronograma.</td></tr>'}</tbody></table></div></section>${vRReal(RL,C)}`;
   return `<div class="cr">
@@ -5075,12 +5078,16 @@ function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el pre
    <section class="panel cr-box"><div class="cr-bh"><h3>Rubros</h3><span class="sub">Barra = fechas del cronograma · relleno = avance ejecutado · línea = hoy</span></div>${gantt(A,C)}</section>
   </div>`}
 
-function vRReal(RL,C){if(!CR.rEd||window.CLI)return '';const x=RL.find(z=>String(z.k)===String(CR.rEd));if(!x)return '';const m=(C.real||{})[x.k]||{};
-  return `<div class="rs-ov" data-cr="rcerrar"></div><div class="rs-win" role="dialog" aria-modal="true" aria-label="Fechas reales del rubro"><div class="rs-wh"><b>Fechas reales · ${esc(x.nombre)}</b><button type="button" class="rs-x" data-cr="rcerrar" aria-label="Cerrar">✕</button></div>
-   <div class="rs-wc"><p class="sub" style="margin-top:0">Se toman solas: empieza con el primer certificado de contratista que incluye este rubro y termina cuando llega al 100%. Si no coincide con lo que pasó en obra, corregilo acá.</p>
+function vRReal(RL,C){if(!CR.rEd||window.CLI)return '';const x=RL.find(z=>String(z.k)===String(CR.rEd));if(!x)return '';const m=(C.real||{})[x.k]||{};const EX=C.excl||{},IX=C.itExcl||{};
+  return `<div class="rs-ov" data-cr="rcerrar"></div><div class="rs-win ancho" role="dialog" aria-modal="true" aria-label="Ajustar rubro"><div class="rs-wh"><b>Ajustar · ${esc(x.nombre)}</b><button type="button" class="rs-x" data-cr="rcerrar" aria-label="Cerrar">✕</button></div>
+   <div class="rs-wc">
+   <label class="cr-chk"><input type="checkbox" id="cr-rx" ${EX[x.k]?'checked':''}><span><b>No contar este rubro en el atraso</b><span class="sub">Para rubros que todavía no se usan o no se van a ejecutar. Lo volvés a activar cuando quieras.</span></span></label>
+   <h4 style="margin:14px 0 4px">Ítems que se ejecutan</h4><p class="sub" style="margin:0 0 6px">Destildá los que no se van a hacer: el % del rubro se calcula solo con los que quedan.</p>
+   <div class="cr-its">${x.items.map(i=>`<label class="cr-chk sm"><input type="checkbox" data-crit="${esc(i.id)}" ${IX[i.id]?'':'checked'}><span><span>${esc(i.n||'')} ${esc(i.desc)}</span><span class="sub">${gs(i.cant*i.precio)} Gs${i.ej>0?' · '+pct(i.ej/(i.cant||1))+' hecho':''}</span></span></label>`).join('')}</div>
+   <h4 style="margin:14px 0 4px">Fechas reales</h4><p class="sub" style="margin:0 0 6px">Se toman solas: empieza con el primer certificado de contratista que incluye este rubro y termina cuando llega al 100%. Corregilas si no coinciden con la obra.</p>
    <div class="form" style="padding:0"><label>Empezó el<input type="date" id="cr-ri" value="${m.ini||x.ri||''}"></label><label>Terminó el<input type="date" id="cr-rf" value="${m.fin||(x.rf&&!m.fin?x.rf:'')}"></label></div>
-   <p class="sub">Plan: ${fdm(nd(x.pi))} → ${fdm(nd(x.pf))} · avance certificado ${pct(x.real)}</p>
-   <div class="bar"><button type="button" class="btn primary" data-cr="rguardar">Guardar</button>${x.man?'<button type="button" class="btn ghost" data-cr="rauto">Volver a automático</button>':''}<button type="button" class="btn ghost" data-cr="rcerrar">Cancelar</button></div></div></div>`}
+   <p class="sub">Plan: ${fdm(nd(x.pi))} → ${fdm(nd(x.pf))}${x.est!=='excl'?' · avance '+pct(x.real):''}</p>
+   <div class="bar"><button type="button" class="btn primary" data-cr="rguardar">Guardar</button>${x.man?'<button type="button" class="btn ghost" data-cr="rauto">Fechas automáticas</button>':''}<button type="button" class="btn ghost" data-cr="rcerrar">Cancelar</button></div></div></div>`}
 function curvaSVG(A,C){const R=rango(A,C);const W=760,H=260,pl=58,pr=14,pt=14,pb=34;const tot=A.tot||1;
   const xs=x=>pl+(x-R.a)/((R.b-R.a)||1)*(W-pl-pr),ys=v=>pt+(1-v/tot)*(H-pt-pb);
   const pasos=[];for(let x=R.a;x<=R.b;x+=Math.max(1,Math.round((R.b-R.a)/120)))pasos.push(x);pasos.push(R.b);
@@ -5195,7 +5202,11 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-cr]');if(!
   if(a==='rcerrar'){CR.rEd=null;return mount()}
   if(a==='rauto'){const C=JSON.parse(JSON.stringify(X.C));if(C.real)delete C.real[CR.rEd];guardar(X,C);CR.rEd=null;toast('Fechas automáticas');return mount()}
   if(a==='rguardar'){const vi=document.getElementById('cr-ri').value,vf=document.getElementById('cr-rf').value;if(vi&&vf&&vf<vi)return toast('El fin tiene que ser después del inicio');
-    const C=JSON.parse(JSON.stringify(X.C));C.real=C.real||{};if(vi||vf)C.real[CR.rEd]={ini:vi||null,fin:vf||null};else delete C.real[CR.rEd];guardar(X,C);CR.rEd=null;toast('Fechas del rubro guardadas');return mount()}
+    const C=JSON.parse(JSON.stringify(X.C));C.real=C.real||{};const ex=document.getElementById('cr-rx').checked;const auto=(()=>{const RL=porRubro(X.A,{...X.C,real:{}},[]);return(RL.find(z=>String(z.k)===String(CR.rEd))||{})})();
+    if((vi&&vi!==auto.ri)||vf)C.real[CR.rEd]={ini:vi&&vi!==auto.ri?vi:null,fin:vf&&vf!==auto.rf?vf:null};else delete C.real[CR.rEd];if(C.real[CR.rEd]&&!C.real[CR.rEd].ini&&!C.real[CR.rEd].fin)delete C.real[CR.rEd];
+    C.excl=C.excl||{};if(ex)C.excl[CR.rEd]=true;else delete C.excl[CR.rEd];
+    C.itExcl=C.itExcl||{};document.querySelectorAll('[data-crit]').forEach(b=>{if(b.checked)delete C.itExcl[b.dataset.crit];else C.itExcl[b.dataset.crit]=true});
+    guardar(X,C);CR.rEd=null;toast(ex?'Rubro sin contar en el atraso':'Rubro ajustado');return mount()}
   if(a==='semab'){CR.semAb=!CR.semAb;return mount()}
   if(a==='editar'){CR.edit=true;CR.imp=null;return mount()}
   if(a==='listo'){CR.edit=false;CR.imp=null;return mount()}
@@ -5239,6 +5250,9 @@ const css=document.createElement('style');css.textContent=`
 .cr-bh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}.cr-bh h3{margin:0}
 .cr-ley{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}.cr-ley i{display:inline-block;width:16px;height:4px;border-radius:2px;margin-left:8px}
 .cr-ley .lo{background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--muted) 45%,transparent) 0 2px,transparent 2px 5px)}.cr-lo{fill:none;stroke:color-mix(in srgb,var(--muted) 55%,transparent);stroke-width:1.5;stroke-dasharray:2 4}.cr-llm{fill:#3b82c4}
+.cr-chk{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer}.cr-chk input{margin-top:3px;width:18px;height:18px;flex:none}.cr-chk>span{display:flex;flex-direction:column;gap:2px}
+.cr-chk.sm{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:7px 2px}.cr-its{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:0 10px}
+.cr-rx td{opacity:.55}
 .cr-met{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cr-rt td{vertical-align:middle}.cr-rt td.rn{white-space:normal!important;min-width:150px;max-width:260px}.cr-rt td:first-child b{font-size:13.5px}.cr-rt td.num{white-space:nowrap;font-size:13px}.cr-rt .cr-st{white-space:nowrap;display:inline-block}.cr-st.nada{color:var(--muted)}
 @media (max-width:760px){.cr-rt thead{display:none}.cr-rt,.cr-rt tbody{display:block}
