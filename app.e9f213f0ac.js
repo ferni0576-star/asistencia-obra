@@ -2698,7 +2698,7 @@ function filaChk(p,i,idx,conPedido){
     ${ab?`<div class="m-rec">
       <label>Cantidad que llegó<input type="text" inputmode="decimal" data-mrec="cant" data-pid="${p.id}" data-iid="${i.id}" value="${r.cant!=null?String(r.cant).replace('.',','):''}" placeholder="de ${fq(i.cant)}"></label>
       <label>Fecha de llegada<input type="date" data-mrec="fecha" data-pid="${p.id}" data-iid="${i.id}" value="${r.fecha||''}"></label>
-      <label class="wide">Observación<input type="text" data-mrec="obs" data-pid="${p.id}" data-iid="${i.id}" value="${esc(r.obs||'')}" placeholder="Ej.: remisión 1234, llegó dañado…"></label>
+      <label class="wide">Observación / por qué no llegó todo <span class="sub">(lo ve el cliente)</span><input type="text" data-mrec="obs" data-pid="${p.id}" data-iid="${i.id}" value="${esc(r.obs||'')}" placeholder="Ej.: el proveedor no tenía stock, llega el jueves"></label>
     </div>`:''}
   </div>`;
 }
@@ -4131,7 +4131,11 @@ function ventana(){if(!RS.ver)return '';const D=RS.D,A=D.A;let t='',h='',ancho=f
     h=L.length?cats.map(c=>`<div class="rs-sec">${esc(c)}</div>${L.filter(p=>(p.categoria||'Otros')===c).map(p=>`<button class="rs-row" data-rplano="${p.id}"><span class="rs-ico">PDF</span><span><b>${esc(p.nombre)}</b><span class="sub">${p.revision?'Rev. '+esc(p.revision)+' · ':''}subido ${fdma((p.creado||'').slice(0,10))}</span></span><span class="rs-go">Abrir ›</span></button>`).join('')}`).join(''):'<p>Todavía no hay planos cargados.</p>'}
   else if(RS.ver==='materiales'){t='Pedidos de materiales';const P=D.ped.slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.numero||0)-(a.numero||0));
     h=P.length?P.map(p=>{const e=estPed(p);return `<details class="rs-ped"><summary><span class="rs-est ${e[0]}">${e[1]}</span><span><b>Pedido N° ${esc(p.numero)}</b> <span class="sub">${fdma(p.fecha)}${p.ref?' · '+esc(p.ref):''}</span></span><span class="sub">${(p.items||[]).length} ítems</span></summary>
-      <ul>${(p.items||[]).map(i=>{const ok=i.rec&&(i.rec.cant==null||Number(i.rec.cant)>=Number(i.cant));return `<li class="${ok?'ok':''}"><span>${ok?'✓':'○'}</span> ${esc(i.desc)} <span class="sub">${String(i.cant??'').replace('.',',')} ${esc(i.ud||'')}</span></li>`}).join('')}</ul></details>`}).join(''):'<p>Todavía no hay pedidos.</p>'}
+      <ul>${(p.items||[]).map(i=>{const r=i.rec||null;const q=v=>String(Math.round((Number(v)||0)*100)/100).replace('.',',');
+        const e=!r?'pend':(!i.cant||r.cant==null||Number(r.cant)>=Number(i.cant))?'ok':Number(r.cant)>0?'par':'pend';
+        const lle=!r?0:r.cant==null?Number(i.cant)||0:Number(r.cant)||0;const fal=Math.max(0,(Number(i.cant)||0)-lle);const ud=esc(i.ud||'');
+        const est=e==='ok'?`<span class="rs-pq ok">Llegó ${q(lle)} ${ud}${r&&r.fecha?' · '+fdma(r.fecha):''}</span>`:e==='par'?`<span class="rs-pq par">Llegaron ${q(lle)} de ${q(i.cant)} ${ud} · faltan ${q(fal)}${r&&r.fecha?' · '+fdma(r.fecha):''}</span>`:`<span class="rs-pq pend">${r?'No llegó':'Todavía no llegó'} · ${q(i.cant)} ${ud} pedidos</span>`;
+        return `<li class="rs-pi ${e}"><span class="rs-pm" aria-hidden="true">${e==='ok'?'✓':e==='par'?'!':'○'}</span><span class="rs-pd"><span>${esc(i.desc)}</span>${est}${r&&r.obs&&e!=='ok'?`<span class="rs-pw"><b>Motivo:</b> ${esc(r.obs)}</span>`:r&&r.obs?`<span class="rs-pw">${esc(r.obs)}</span>`:''}</span></li>`}).join('')}</ul></details>`}).join(''):'<p>Todavía no hay pedidos.</p>'}
   else if(RS.ver==='novedades'){t='Novedades';const N=novedades();h=N.length?N.map(x=>`<button class="rs-nv" data-rver="${x.v}"><span class="rs-ni">${x.ic}</span><span><b>${esc(x.t)}</b><span class="sub">${fdia(x.f)}${x.s?' · '+esc(x.s):''}</span></span><span class="rs-go">›</span></button>`).join(''):'<p>Todavía no hay novedades.</p>'}
   else if(RS.ver==='contratistas'){t='Contratistas';h=D.con.length?D.con.map(c=>{const r=resC(c);return `<div class="rs-con">${anillo(r.f,null,64)}<div><b>${esc(c.nombre)}</b><div class="sub">${esc(c.tipo||'')}</div><div class="sub">${r.n} certificado${r.n===1?'':'s'}${r.ult?' · último al '+fdma(r.ult):''}</div></div></div>`}).join(''):'<p>No hay contratistas cargados.</p>'}
   if(!t)return '';
@@ -4373,6 +4377,9 @@ body.rs-modal{overflow:hidden}
 .rs-ped{border:1px solid var(--line);border-radius:10px;padding:0 12px}.rs-ped summary{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 0;cursor:pointer;list-style:none}
 .rs-ped summary::-webkit-details-marker{display:none}
 .rs-ped ul{list-style:none;margin:0 0 10px;padding:8px 0 0;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:4px;font-size:14px}.rs-ped li.ok>span:first-child{color:var(--ok);font-weight:700}
+.rs-pi{display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:start;padding:5px 0}.rs-pm{font-weight:700;color:var(--muted)}.rs-pi.ok .rs-pm{color:var(--ok)}.rs-pi.par .rs-pm{color:#b98300}
+.rs-pd{display:flex;flex-direction:column;gap:2px}.rs-pq{font-size:12.5px;color:var(--muted)}.rs-pq.ok{color:var(--ok)}.rs-pq.par{color:#b98300;font-weight:600}
+.rs-pw{font-size:12.5px;color:var(--ink);background:color-mix(in srgb,var(--muted) 14%,transparent);border-radius:6px;padding:3px 8px;align-self:flex-start}
 .rs-est{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:3px 9px;white-space:nowrap}.rs-est.ok{background:var(--ok-bg);color:var(--ok)}.rs-est.par{background:var(--warn-bg);color:var(--warn)}.rs-est.pend{background:var(--chip);color:var(--muted)}
 .rs-con{display:flex;gap:14px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}.rs-con:first-child{border-top:0}
 .rs-con .rs-ring .rv{font-size:28px}
