@@ -1,7 +1,7 @@
 /* Control de Obras: hace que la app abra rápido y se pueda instalar.
    La página siempre se busca primero en internet (así cada index.html nuevo se ve enseguida);
    si no hay señal, abre la última versión guardada. Los datos de Supabase nunca se guardan acá. */
-const CACHE = 'control-obras-v2';
+const CACHE = 'control-obras-v3';
 const BASE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting()));
@@ -17,8 +17,13 @@ self.addEventListener('fetch', e => {
   const libreria = /cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net|fonts\.(googleapis|gstatic)\.com/.test(u.host);
   if (!propio && !libreria) return; /* Supabase y todo lo demás va directo a internet */
   if (propio && (r.mode === 'navigate' || u.pathname.endsWith('.html') || u.pathname.endsWith('/'))) {
-    e.respondWith(fetch(r).then(res => { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)); return res; })
-      .catch(() => caches.match(r).then(m => m || caches.match('index.html'))));
+    /* con señal floja no se espera más de 2,5 s: se abre la versión guardada y la nueva queda lista para la próxima vez */
+    const red = fetch(r).then(res => { if (res && res.ok) { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)); } return res; });
+    e.respondWith(caches.match(r).then(m => m || caches.match('index.html')).then(m => {
+      if (!m) return red;
+      return Promise.race([red.catch(() => m), new Promise(ok => setTimeout(() => ok(m), 2500))]);
+    }));
+    e.waitUntil(red.catch(() => {}));
     return;
   }
   e.respondWith(caches.match(r).then(m => {

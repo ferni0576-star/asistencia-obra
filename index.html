@@ -13,7 +13,7 @@
 <title>Control de Obras</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: herramienta de obra — cabecera fija, contenido en una columna, barra de pestañas abajo en el celular */
 :root{
@@ -270,6 +270,9 @@ td .nlink{font-weight:600}
 <style>
 /* Libro de lluvias (por obra) */
 :root{--ll:#1f5f96;--ll-ink:#ffffff;--ll-soft:#d6e5f2;--llp:#c9821c;--llp-soft:#f6e6cc}
+:root{--ch-ej:#b98300;--ch-ce:#2f6fbf;--ch-pl:#7d8783}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ch-ej:#e0a800;--ch-ce:#5b93e6;--ch-pl:#9aa5a1}}
+:root[data-theme="dark"]{--ch-ej:#e0a800;--ch-ce:#5b93e6;--ch-pl:#9aa5a1}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}}
 :root[data-theme="dark"]{--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}
 @media (max-width:760px){nav.tabs{gap:0}nav.tabs button{padding:8px 3px;font-size:14px;letter-spacing:.01em}}
@@ -329,9 +332,26 @@ td.wrap{white-space:normal;min-width:200px}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.4/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+/* Las librerías de Excel y PDF pesan más de 1 MB: se cargan después de que la pantalla ya se ve, así la app abre rápido en el celular */
+(function(){
+  const L=['https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js','https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'];
+  let pr=null;
+  const uno=u=>new Promise(ok=>{const s=document.createElement('script');s.src=u;s.async=false;s.onload=ok;s.onerror=ok;document.head.appendChild(s)});
+  function cargar(){if(!pr)pr=(async()=>{for(const u of L)await uno(u)})();return pr}
+  const listas=()=>!!(window.XLSX&&window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API&&window.jspdf.jsPDF.API.autoTable);
+  window.LIBS={cargar,listas};
+  const arr=()=>setTimeout(cargar,1200);if(document.readyState==='complete')arr();else addEventListener('load',arr);
+  const avisa=()=>{try{typeof toast==='function'&&toast('Preparando…')}catch(e){}};
+  const RX=/pdf|excel|xls|descargar|exportar|importar|imprimir|whatsapp|respaldo|compartir/i;
+  /* si se toca algo de PDF o Excel antes de que estén listas, se espera un momento y se repite el toque */
+  document.addEventListener('click',e=>{if(listas())return;const t=e.target.closest('button,a,[data-act],[data-cact],[data-pact],[data-cr],[data-pa],[data-iact],[data-ract]');if(!t||t._libRe||t.closest('label'))return;
+    const tx=(t.textContent||'')+' '+Object.values(t.dataset||{}).join(' ');if(!RX.test(tx))return;
+    e.preventDefault();e.stopImmediatePropagation();avisa();cargar().then(()=>{t._libRe=true;try{t.click()}finally{t._libRe=false}})},true);
+  document.addEventListener('change',e=>{const t=e.target;if(listas()||!t||t.type!=='file'||t._libRe)return;
+    e.stopImmediatePropagation();avisa();cargar().then(()=>{t._libRe=true;try{t.dispatchEvent(new Event('change',{bubbles:true}))}finally{t._libRe=false}})},true);
+})();
+</script>
 <script>
 /* ============================================================
    CONFIGURACIÓN — pegá acá los datos de tu proyecto de Supabase
@@ -497,7 +517,16 @@ function backendNube(sb){
   const ok=({data,error})=>{if(error){toast('Error: '+error.message);throw error}return data};
   const normA=r=>({...r,ent_am:t5(r.ent_am),sal_am:t5(r.sal_am),ent_pm:t5(r.ent_pm),sal_pm:t5(r.sal_pm),horas:Number(r.horas)});
   return{
-    async obras(){return ok(await sb.from('obras').select('*').order('creado'))},
+    /* las fotos y membretes pesan mucho: se guardan en el dispositivo y solo se bajan cuando cambian (huella media_v) */
+    async obras(){const LIG='id,nombre,cliente,activa,creado,ubicacion,inicio,tipo,estado,avance';
+      let L=await sb.from('obras').select(LIG+',media_v').order('creado');
+      if(L.error)return ok(await sb.from('obras').select('*').order('creado'));
+      L=L.data||[];let C={};try{C=JSON.parse(localStorage.getItem('obras_media')||'{}')}catch(e){}
+      const falta=L.filter(o=>!C[o.id]||C[o.id].v!==o.media_v).map(o=>o.id);
+      if(falta.length){let r=await sb.from('obras').select('id,foto,empresa').in('id',falta);if(r.error)r=await sb.from('obras').select('id,foto').in('id',falta);
+        for(const m of ok(r)){const o=L.find(x=>x.id===m.id);C[m.id]={v:o&&o.media_v,foto:m.foto??null,empresa:m.empresa??null}}
+        const N={};L.forEach(o=>{if(C[o.id])N[o.id]=C[o.id]});try{localStorage.setItem('obras_media',JSON.stringify(N))}catch(e){}}
+      return L.map(o=>{const m=C[o.id]||{};const{media_v,...x}=o;return{...x,foto:m.foto??null,empresa:m.empresa??null}})},
     async saveObra(o){const row={...o};if(!row.id)delete row.id;let r=await sb.from('obras').upsert(row).select().single();
       if(r.error&&/empresa/i.test(r.error.message||'')&&'empresa' in row){delete row.empresa;r=await sb.from('obras').upsert(row).select().single();if(!r.error){toast('Falta pegar el SQL 22 en Supabase para guardar la empresa de la obra');return{...ok(r),empresa:o.empresa}}}
       return ok(r)},
@@ -512,7 +541,10 @@ function backendNube(sb){
     async addDesc(r){ok(await sb.from('descuentos').insert(r))},
     async delDesc(id){ok(await sb.from('descuentos').delete().eq('id',id))},
     async updDesc(id,r){ok(await sb.from('descuentos').update(r).eq('id',id))},
-    async ajustes(){const r=ok(await sb.from('ajustes').select('valor').eq('clave','general'));return r[0]?.valor||null},
+    async ajustes(){let h=await sb.from('ajustes').select('ajustes_v').eq('clave','general');
+      if(!h.error){const v=h.data&&h.data[0]&&h.data[0].ajustes_v;if(!v)return null;try{const c=JSON.parse(localStorage.getItem('ajustes_cache')||'null');if(c&&c.v===v)return c.valor}catch(e){}
+        const r=ok(await sb.from('ajustes').select('valor').eq('clave','general'));const val=r[0]?.valor||null;try{localStorage.setItem('ajustes_cache',JSON.stringify({v,valor:val}))}catch(e){}return val}
+      const r=ok(await sb.from('ajustes').select('valor').eq('clave','general'));return r[0]?.valor||null},
     async saveAjustes(v){ok(await sb.from('ajustes').upsert({clave:'general',valor:v}))},
     async lluvias(oid){return ok(await sb.from('lluvias').select('*').eq('obra_id',oid).order('fecha'))
       .map(r=>({...r,horas:Number(r.horas)||0,mm:r.mm==null?null:Number(r.mm),actividades:r.actividades||[],observaciones:r.observaciones||''}))},
@@ -1350,13 +1382,14 @@ async function iniciar(session){
     if(pr==='sin'){document.getElementById('app').innerHTML=`<main><div class="panel" style="padding:20px;max-width:520px;margin:40px auto"><h2>Sin acceso todavía</h2><p class="sub">Tu usuario (${esc(session.user.email)}) existe pero la dirección de obra todavía no te dio acceso a ninguna obra.</p><button class="btn" data-act="salir">Cerrar sesión</button></div></main>`;return}
     if(pr&&(pr.rol==='cliente'||pr.rol==='aprobador')){window.CLI={aprobador:pr.rol==='aprobador',mods:['obra',...(pr.modulos||[]).filter(m=>['contratistas','presupuesto','planos','materiales'].includes(m))],nombre:pr.nombre||'',preview:false};document.body.classList.add('modo-cliente')}
     if(pr&&pr.rol==='equipo'){window.COL={mods:pr.modulos||[],obras:pr.obras||[],nombre:pr.nombre||''};document.body.classList.add('modo-col')}}
-  S.aj={...AJ_DEF,...(await DB.ajustes()||{})};
-  S.obras=await DB.obras();
+  /* todo lo inicial se pide a la vez (antes iba de a uno y en el celular se sumaban las esperas) */
+  const[aj,obs,per,ult]=await Promise.all([DB.ajustes(),DB.obras(),DB.personal(),DB.ultimaFecha()]);
+  S.aj={...AJ_DEF,...(aj||{})};
+  S.obras=obs;
   let guardada=null;try{guardada=localStorage.getItem('obra_sel')}catch(e){}
   const ok=S.obras.find(o=>o.id===guardada)||S.obras.find(o=>o.activa!==false)||S.obras[0];
   S.obra=ok?ok.id:null;
-  S.personal=await DB.personal();S.tab='inicio';
-  const ult=await DB.ultimaFecha();
+  S.personal=per;S.tab='inicio';
   if(ult&&ult<periodo(hoy).a)S.ref=ult;
   render();refrescar();
 }
@@ -4550,7 +4583,7 @@ document.addEventListener('pointerleave',e=>{},true);
 document.addEventListener('pointerout',e=>{const svg=e.target.closest&&e.target.closest('.rs-curva');if(!svg||svg.contains(e.relatedTarget))return;svg.querySelector('.gu').style.display='none';svg.querySelector('.gp').style.display='none';const tt=svg.parentElement.querySelector('.rs-tt');if(tt)tt.style.display='none'});
 
 const css=document.createElement('style');css.textContent=`
-#rs-root{display:flex;flex-direction:column;gap:14px;--k1:var(--accent);--k2:var(--ink)}
+#rs-root{display:flex;flex-direction:column;gap:14px;--k1:var(--ch-ej,var(--accent));--k2:var(--ch-ce,var(--ink))}
 .rs-hero{position:relative;border-radius:16px;overflow:hidden;background:var(--ink);color:var(--bg);background-image:linear-gradient(100deg,rgb(16 20 19/.9) 0%,rgb(16 20 19/.7) 38%,rgb(16 20 19/.25) 75%,rgb(16 20 19/.45) 100%),var(--rs-foto,none);background-size:cover;background-position:center;min-height:250px;display:flex;align-items:center}
 .rs-hi{width:100%}
 .rs-hb{display:flex;gap:8px;flex-wrap:wrap}
@@ -4567,10 +4600,10 @@ const css=document.createElement('style');css.textContent=`
 .rs-hl{display:flex;flex-direction:column;gap:6px;font-size:14px}.rs-hl b{font-size:16px}.rs-hl span{color:rgb(255 255 255/.8);display:flex;align-items:center;gap:6px}
 .rs-ring .tr{fill:none;stroke:rgb(127 127 127/.25);stroke-width:9}.rs-ring .t2{stroke-width:7}
 .rs-ring .a1{fill:none;stroke:var(--k1);stroke-width:9;stroke-linecap:round;transition:stroke-dasharray .6s}
-.rs-ring .a2{fill:none;stroke:color-mix(in srgb,currentColor 75%,transparent);stroke-width:7;stroke-linecap:round}
+.rs-ring .a2{fill:none;stroke:var(--k2);stroke-width:7;stroke-linecap:round}
 .rs-ring .rv{font-family:var(--f-num,monospace);font-size:26px;font-weight:700;fill:currentColor}.rs-ring .rp{font-size:14px}
-.k3{display:inline-block;width:14px;height:0;border-top:2px dashed var(--muted);vertical-align:middle}
-.rs-curva .l3{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4}.rs-curva .hy{stroke:var(--bad);stroke-width:1.2;stroke-dasharray:3 3}
+.k3{display:inline-block;width:14px;height:0;border-top:2px dashed var(--ch-pl,var(--muted));vertical-align:middle}
+.rs-curva .l3{fill:none;stroke:var(--ch-pl,var(--muted));stroke-width:2;stroke-dasharray:6 4}.rs-curva .hy{stroke:var(--bad);stroke-width:1.2;stroke-dasharray:3 3}
 .rs-sit{margin:0 0 4px;font-size:13px;color:var(--muted)}.rs-sit.mal b{color:var(--bad)}.rs-sit.ok b{color:var(--ok)}
 .rs-cron{display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(220px,1.4fr) auto auto;gap:18px;align-items:center;padding:16px 18px;text-align:left;width:100%;cursor:pointer;color:var(--ink);font:inherit;border-left:6px solid var(--line)}
 .rs-cron.mal{border-left-color:var(--bad)}.rs-cron.ok,.rs-cron.bien{border-left-color:var(--ok)}
@@ -4598,8 +4631,8 @@ const css=document.createElement('style');css.textContent=`
 .rs-crr{grid-template-columns:minmax(90px,130px) 1fr 52px}.rs-crr>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rs-crb b.neg{color:var(--bad)}.rs-crt i{display:block;height:100%;border-radius:99px}.rs-crt .p{background:color-mix(in srgb,var(--muted) 55%,transparent)}.rs-crt .r{background:var(--k1,var(--accent))}
 .rs-cr3{display:flex;flex-direction:column;gap:2px;font-size:13.5px;white-space:nowrap}
 @media (max-width:900px){.rs-cron{grid-template-columns:1fr;gap:12px}.rs-cron .rs-go{justify-self:start}.rs-cr3{flex-direction:row;flex-wrap:wrap;gap:4px 14px;white-space:normal}}
-.k1,.k2{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--k1)}.k2{background:currentColor;opacity:.75}
-.rs-hero .k2{background:#fff}
+.k1,.k2{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--k1)}.k2{background:var(--k2)}
+.rs-hero .k2{background:var(--k2)}
 .rs-sem{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:14px 16px;text-align:left;cursor:pointer;width:100%;border:1px solid var(--line);color:inherit}
 .rs-sem:hover,.rs-tile:hover,.rs-nv:hover,.rs-rb:hover,.rs-row:hover{border-color:var(--accent)}
 .rs-semt{display:flex;flex-direction:column}
@@ -4614,11 +4647,11 @@ const css=document.createElement('style');css.textContent=`
 .rs-leg{display:flex;gap:14px;font-size:12px;color:var(--muted)}.rs-leg span{display:flex;align-items:center;gap:6px}
 .rs-chart{position:relative}.rs-curva{width:100%;height:auto;display:block;touch-action:pan-y}
 .rs-curva .gr{stroke:var(--line);stroke-width:1}.rs-curva .ax{font-size:11px;fill:var(--muted);font-family:var(--f-body,inherit)}
-.rs-curva .ar{fill:color-mix(in srgb,var(--k1) 22%,transparent)}.rs-curva .l1{fill:none;stroke:var(--k1);stroke-width:3;stroke-linejoin:round}
-.rs-curva .l2{fill:none;stroke:var(--k2);stroke-width:2;stroke-dasharray:5 4;opacity:.7}.rs-curva .p1{fill:var(--panel);stroke:var(--k1);stroke-width:2}
+.rs-curva .ar{fill:color-mix(in srgb,var(--k1) 22%,transparent)}.rs-curva .l1{fill:none;stroke:var(--k1);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.rs-curva .l2{fill:none;stroke:var(--k2);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.rs-curva .p1{fill:var(--panel);stroke:var(--k1);stroke-width:2}
 .rs-curva .gu{stroke:var(--muted);stroke-dasharray:3 3}.rs-curva .gp{fill:var(--k1);stroke:var(--panel);stroke-width:2}
 .rs-tt{position:absolute;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:8px;padding:6px 10px;font-size:12px;display:flex;flex-direction:column;gap:2px;white-space:nowrap;box-shadow:0 4px 12px rgb(0 0 0/.2)}
-.rs-tt span{display:flex;align-items:center;gap:6px}.rs-tt .k2{background:var(--bg)}
+.rs-tt span{display:flex;align-items:center;gap:6px}.rs-tt .k2{background:var(--k2)}
 .rs-vacio{padding:30px 10px;text-align:center;color:var(--muted);font-size:14px}
 .rs-rl{display:flex;flex-direction:column;gap:2px}
 .rs-rb{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.4fr) 58px;gap:10px;align-items:center;background:none;border:1px solid transparent;border-radius:8px;padding:7px 8px;cursor:pointer;text-align:left;color:inherit;width:100%}
@@ -5119,7 +5152,8 @@ volver();
 /* ============ Cronograma de obra: plan por rubro vs avance real (pagos semanales) y desembolso mes a mes ============ */
 const CR={edit:false,imp:null,borr:false,dur:32};
 const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-const dn=s=>{const[a,b,c]=String(s).slice(0,10).split('-').map(Number);return Date.UTC(a,b-1,c)/864e5};
+/* fecha 'aaaa-mm-dd' → n° de día. Se memoriza: los cálculos del cronograma la llaman miles de veces */
+const DNC=new Map();const dn=s=>{let v=DNC.get(s);if(v!==undefined)return v;const[a,b,c]=String(s).slice(0,10).split('-').map(Number);v=Date.UTC(a,b-1,c)/864e5;if(DNC.size>5000)DNC.clear();DNC.set(s,v);return v};
 const nd=n=>new Date(n*864e5).toISOString().slice(0,10);
 const hoyN=()=>{const d=new Date();return Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5};
 const fdm=s=>{if(!s)return '';const[a,b,c]=s.split('-');return `${c}/${b}/${a.slice(2)}`};
@@ -5224,7 +5258,7 @@ function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el pre
    <div class="cr-dos"><section class="panel cr-box"><div class="cr-bh"><h3>Próximas 3 semanas</h3><span class="sub">según el cronograma${perd>0?', corrido por la lluvia':''}</span></div>${vProx(A,C)}</section>
      <section class="panel cr-box"><div class="cr-bh"><h3>Diario de obra</h3><span class="sub">${window.CLI?'del director de obra':'el cliente las ve en el inicio de la obra'}</span></div>${vNotas(C)}</section></div>
    <section class="panel cr-box"><div class="cr-bh"><h3>Curva de avance</h3><span class="cr-ley">${perd>0?'<i class="lo"></i>Original sin lluvia':''}<i class="lp"></i>Cronograma${perd>0?' con lluvia':' estimado'} <i class="le"></i>Ejecutado <i class="lc"></i>Certificado al cliente</span></div>${curvaSVG(A,C)}</section>
-   <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3>${C.semanas?`<span class="pry-seg cr-seg"><button data-cr="mes" data-v="obra" aria-pressed="${CR.mes!=='cal'}">Mes de obra (4 sem.)</button><button data-cr="mes" data-v="cal" aria-pressed="${CR.mes==='cal'}">Mes calendario</button></span>`:''}<span class="cr-ley"><i class="lp"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
+   <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3>${C.semanas?`<span class="pry-seg cr-seg"><button data-cr="mes" data-v="obra" aria-pressed="${CR.mes!=='cal'}">Mes de obra (4 sem.)</button><button data-cr="mes" data-v="cal" aria-pressed="${CR.mes==='cal'}">Mes calendario</button></span>`:''}<span class="cr-ley"><i class="lb"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
    ${C.semanas?semanas(A,C):''}
    <section class="panel cr-box"><div class="cr-bh"><h3>Rubros</h3><span class="sub">Barra = fechas del cronograma · relleno = avance ejecutado · línea = hoy</span></div>${gantt(A,C)}</section>
   </div>`}
@@ -5398,7 +5432,12 @@ document.addEventListener('change',async e=>{if(!document.getElementById('crono-
       if(R.no.length)setTimeout(()=>toast('Sin coincidencia en el presupuesto: '+R.no.slice(0,4).join(', ')),2600)}
     catch(err){CR.imp={err:true,msg:'No se pudo leer el archivo. Guardalo como .xlsx e intentá de nuevo.'};mount()}}});
 /* para el Resumen: valor planificado a una fecha, rango del plan y situación de hoy */
-function situacion(A,C){if(!planificado(C))return null;const H=hoyN();const LL=lluvias(C);const PA=planAj(A,C,LL);const perd=perdAl(LL,H);
+/* situacion se pide varias veces por pantalla (tarjeta, resumen, avance): se recuerda mientras no cambien los datos */
+const SITC=new WeakMap();
+function situacion(A,C){if(!A||!C)return sit0(A,C);let L='';try{L=JSON.stringify(lluvias(C).map(r=>[r.n,r.p]))}catch(e){}
+  const k=hoyN()+'|'+L+'|'+JSON.stringify([C.metodo,C.excl,C.itExcl,C.real]);const m=SITC.get(A);if(m&&m.C===C&&m.k===k)return m.r;
+  const r=sit0(A,C);SITC.set(A,{C,k,r});return r}
+function sit0(A,C){if(!planificado(C))return null;const H=hoyN();const LL=lluvias(C);const PA=planAj(A,C,LL);const perd=perdAl(LL,H);
   const plan=PA(H),planO=planAl(A,C,H),ej=realAl(A,H,'ej');const atr=atraso(A,C,PA,H,ej),atrO=perd>0?atraso(A,C,x=>planAl(A,C,x),H,ej):atr;
   const T=Object.values(C.rubros).flatMap(r=>r.tramos||[]);const d=new Date(H*864e5);let m0=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)/864e5,mn=MES[d.getUTCMonth()];if(C.semanas&&C.inicio){const d0=dn(C.inicio);const k=Math.max(0,Math.floor((H-d0)/28));m0=d0+28*k;mn='el mes '+(k+1)+' de obra'}
   const fin=Math.max(...T.map(t=>dn(t.h)));
@@ -5444,16 +5483,16 @@ const css=document.createElement('style');css.textContent=`
 .cr-rt td.rp{grid-area:p}.cr-rt td.rr{grid-area:r}.cr-rt td.rd,.cr-rt td.rv{display:inline}.cr-rt tr>td.rd{grid-area:d}.cr-rt td.rv{grid-area:d;justify-self:end}.cr-rt td.rb{grid-area:b}
 .cr-rt td[data-l]::before{content:attr(data-l) " ";color:var(--muted);font-family:var(--f-body,inherit);font-size:12px}}
 .cr-ll{background:color-mix(in srgb,#3b82c4 13%,var(--panel));border:1px solid color-mix(in srgb,#3b82c4 30%,transparent);border-radius:12px;padding:10px 14px;font-size:14px}
-.cr-ley .lp{background:repeating-linear-gradient(90deg,var(--muted) 0 4px,transparent 4px 7px)}.cr-ley .le{background:var(--ok)}.cr-ley .lc{background:#2f6fbf}
+.cr-ley .lp{background:repeating-linear-gradient(90deg,var(--ch-pl) 0 4px,transparent 4px 7px)}.cr-ley .lb{background:color-mix(in srgb,var(--muted) 45%,transparent);height:10px;width:10px;border-radius:3px}.cr-ley .le{background:var(--ch-ej)}.cr-ley .lc{background:var(--ch-ce)}
 .cr-svgw{overflow-x:auto}.cr-svg{width:100%;min-width:520px;height:auto;display:block}
 .cr-g{stroke:var(--line);stroke-width:1}.cr-t{fill:var(--muted);font-size:11px;font-family:inherit}.cr-th{fill:var(--bad)}
 .cr-hoy{stroke:var(--bad);stroke-width:1.5;stroke-dasharray:3 3}
-.cr-lp{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:6 4}.cr-le{fill:none;stroke:var(--ok);stroke-width:3;stroke-linejoin:round}.cr-lc{fill:none;stroke:#2f6fbf;stroke-width:2;stroke-linejoin:round}
-.cr-pe{fill:var(--panel);stroke:var(--ok);stroke-width:2}
+.cr-lp{fill:none;stroke:var(--ch-pl);stroke-width:2;stroke-dasharray:6 4}.cr-le{fill:none;stroke:var(--ch-ej);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}.cr-lc{fill:none;stroke:var(--ch-ce);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.cr-pe{fill:var(--panel);stroke:var(--ch-ej);stroke-width:2}
 .cr-bars{display:flex;gap:6px;align-items:flex-end;height:150px;overflow-x:auto;padding-bottom:2px}
 .cr-bm{flex:1 0 42px;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%}.cr-bm span{font-size:11px;color:var(--muted);white-space:nowrap}.cr-bm.act span{color:var(--ink);font-weight:700}
 .cr-bb{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px;border-bottom:1px solid var(--line)}
-.cr-bb i{display:block;width:40%;max-width:18px;border-radius:4px 4px 0 0;min-height:1px}.cr-bb .bp{background:color-mix(in srgb,var(--muted) 45%,transparent)}.cr-bb .be{background:var(--ok)}
+.cr-bb i{display:block;width:40%;max-width:18px;border-radius:4px 4px 0 0;min-height:1px}.cr-bb .bp{background:color-mix(in srgb,var(--muted) 45%,transparent)}.cr-bb .be{background:var(--ch-ej)}
 .cr-tm td.neg{color:var(--bad)}.cr-tm td.pos{color:var(--ok)}.cr-tm tr.fut td{color:var(--muted)}
 .cr-seg{font-size:12px}.cr-seg button{padding:5px 10px;font-size:12.5px}
 .cr-chip{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 7px;font-size:11px;font-weight:700}
