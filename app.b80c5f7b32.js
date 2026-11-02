@@ -4202,6 +4202,7 @@ function render(){
     </div>
   </section>
   ${A?cronoCard(A):''}
+  ${window.FOTOS?window.FOTOS.html():''}
   ${accesos()}
   ${A&&A.semana&&A.semana.rubros.length?`<button class="panel rs-sem" data-rver="semana"><span class="rs-semt"><b>Último período</b><span class="sub">${fdia(A.semana.desde)} al ${fdia(A.semana.hasta)}</span></span>
     <span class="rs-semc"><span class="rs-up">+${pct(A.semana.total/A.tot)}</span>${A.semana.rubros.slice(0,3).map(x=>`<span class="rs-pill">${esc(cap(x.nombre))} <b>+${pct(x.pct)}</b></span>`).join('')}${A.semana.rubros.length>3?`<span class="sub">y ${A.semana.rubros.length-3} más</span>`:''}</span><span class="rs-go">Ver ›</span></button>`:''}
@@ -4214,6 +4215,7 @@ function render(){
   ${N.length?`<div class="panel rs-nov"><div class="rs-ch"><b>Novedades</b>${N.length>5?`<button class="btn sm ghost" data-rmas>${RS.todas?'Ver menos':'Ver todas ('+N.length+')'}</button>`:''}</div>
     ${(RS.todas?N:N.slice(0,5)).map(x=>`<button class="rs-nv" data-rver="${x.v}"><span class="rs-ni">${x.ic}</span><span><b>${esc(x.t)}</b><span class="sub">${fdia(x.f)}${x.s?' · '+esc(x.s):''}</span></span><span class="rs-go">›</span></button>`).join('')}</div>`:''}
   ${ventana()}`;
+  if(window.FOTOS)window.FOTOS.montar();
   document.body.classList.toggle('rs-modal',!!RS.ver);
 }
 window.RESUMEN={mount:()=>{RS.refrescar=!RS.ver;render()}};
@@ -5176,6 +5178,115 @@ const css=document.createElement('style');css.textContent=`
 .cr-bf input,.cr-te input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}
 @media (max-width:899px){.cr-sem{grid-template-columns:1fr 1fr}.cr-opc{grid-template-columns:1fr}.cr-gr{grid-template-columns:1fr 84px}.cr-gl{grid-column:1/-1;grid-row:2}}
 `;document.head.appendChild(css);
+})();
+
+(function(){
+/* ============ Fotos de obra: avance día a día que ve el cliente ============
+   Web real: Supabase Storage, bucket privado "fotos", ruta <obra>/<fecha>/<id>.jpg (+ _t.jpg miniatura).
+   Cada cliente solo ve las fotos de su obra (reglas en la base). Demo: quedan en este navegador. */
+const FO={oid:null,lista:[],cargando:false,url:{},ver:null,limite:40,borrar:null,sub:null};
+const hoyF=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const DS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const fdia=f=>{const d=new Date(f+'T12:00:00');const h=hoyF();const ay=new Date(Date.now()-864e5);const ays=new Date(ay.getTime()-ay.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+  const t=(f===h?'Hoy · ':f===ays?'Ayer · ':'')+DS[d.getDay()]+' '+f.slice(8,10)+'/'+f.slice(5,7);return t.charAt(0).toUpperCase()+t.slice(1)};
+const nube=()=>typeof NUBE!=='undefined'&&NUBE&&typeof SB!=='undefined'&&SB;
+const uidF=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(36).slice(2,8);
+const esc2=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const aviso=m=>{try{toast(m)}catch(e){}};
+
+/* achica en el celular antes de subir: foto ~1600 px y miniatura ~400 px */
+async function achicar(file,max,q){let im=null;try{im=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){try{im=await createImageBitmap(file)}catch(e2){}}
+  if(!im){im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('No se pudo leer la foto'));i.src=URL.createObjectURL(file)})}
+  const w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;const k=Math.min(1,max/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+  c.getContext('2d').drawImage(im,0,0,c.width,c.height);const b=await new Promise(ok=>c.toBlob(ok,'image/jpeg',q));return{b,w:c.width,h:c.height}}
+const aURL=b=>new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.readAsDataURL(b)});
+
+/* ---------- datos ---------- */
+const demoGet=()=>{try{return JSON.parse(localStorage.getItem('fotos_demo')||'[]')}catch(e){return[]}};
+const demoSet=L=>{try{localStorage.setItem('fotos_demo',JSON.stringify(L))}catch(e){aviso('En la demo no entran más fotos en este navegador')}};
+async function listar(oid){if(!nube())return demoGet().filter(f=>f.obra_id===oid).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.creado.localeCompare(a.creado));
+  const{data,error}=await SB.from('fotos').select('*').eq('obra_id',oid).order('fecha',{ascending:false}).order('creado',{ascending:false}).limit(500);
+  if(error){if(/fotos/.test(error.message||''))return[];throw error}return data||[]}
+async function firmar(paths){const falta=paths.filter(p=>p&&!FO.url[p]);if(!falta.length||!nube())return;
+  for(let i=0;i<falta.length;i+=100){const{data,error}=await SB.storage.from('fotos').createSignedUrls(falta.slice(i,i+100),3600*6);if(!error)(data||[]).forEach(x=>{if(x.signedUrl)FO.url[x.path]=x.signedUrl})}}
+const src=(f,full)=>nube()?FO.url[full?f.path:f.thumb]||'':(full?f.full:f.th);
+async function subir(oid,files,fecha,nota,prog){const hechos=[];let i=0;
+  for(const file of files){i++;prog&&prog(i,files.length);
+    const g=await achicar(file,1600,0.8),t=await achicar(file,420,0.7);const id=uidF();const base=`${oid}/${fecha}/${id}`;
+    if(!nube()){const L=demoGet();const r={id,obra_id:oid,fecha,nota:nota||null,path:base+'.jpg',thumb:base+'_t.jpg',w:g.w,h:g.h,tam:g.b.size,creado:new Date().toISOString(),full:await aURL(await achicar(file,900,0.7).then(x=>x.b)),th:await aURL(t.b)};L.push(r);demoSet(L);hechos.push(r);continue}
+    let r=await SB.storage.from('fotos').upload(base+'.jpg',g.b,{contentType:'image/jpeg',upsert:false});if(r.error)throw r.error;
+    r=await SB.storage.from('fotos').upload(base+'_t.jpg',t.b,{contentType:'image/jpeg',upsert:false});if(r.error){await SB.storage.from('fotos').remove([base+'.jpg']);throw r.error}
+    const row={id,obra_id:oid,fecha,nota:nota||null,path:base+'.jpg',thumb:base+'_t.jpg',w:g.w,h:g.h,tam:g.b.size,autor:(window.USR&&window.USR.email&&window.USR.email())||null};
+    const q=await SB.from('fotos').insert(row).select().single();if(q.error){await SB.storage.from('fotos').remove([row.path,row.thumb]);throw q.error}hechos.push(q.data)}
+  return hechos}
+async function borrar(f){if(!nube()){demoSet(demoGet().filter(x=>x.id!==f.id));return}
+  await SB.storage.from('fotos').remove([f.path,f.thumb]);const{error}=await SB.from('fotos').delete().eq('id',f.id);if(error)throw error}
+
+/* ---------- vistas ---------- */
+const porDia=L=>{const m=new Map();L.forEach(f=>{if(!m.has(f.fecha))m.set(f.fecha,[]);m.get(f.fecha).push(f)});return[...m.entries()]};
+const puedeSubir=()=>!window.CLI;
+function grilla(fs,max,borr){const v=max?fs.slice(0,max):fs;
+  return `<div class="fo-g" data-fotog>${v.map(f=>`<span class="fo-c">${borr?`<button type="button" class="fo-x" data-fo="del" data-id="${f.id}" aria-label="Borrar foto">${FO.borrar===f.id?'¿Borrar?':'✕'}</button>`:''}<button type="button" class="fo-t" data-fotov="${esc2(src(f,true)||src(f))}" data-fo-full="${esc2(f.path)}" aria-label="Ver foto del ${esc2(f.fecha)}"><img src="${esc2(src(f))}" alt="" loading="lazy"></button></span>`).join('')}${max&&fs.length>max?`<button type="button" class="fo-mas" data-fo="ver">+${fs.length-max}</button>`:''}</div>`}
+function notas(fs){const n=[...new Set(fs.map(f=>f.nota).filter(Boolean))];return n.length?`<p class="fo-n">${n.map(esc2).join(' · ')}</p>`:''}
+function vCard(){const L=FO.lista;const dias=porDia(L);const d0=dias[0];
+  const sube=puedeSubir()?`<label class="btn sm primary fo-up">+ Subir fotos<input type="file" id="fo-file" accept="image/*" multiple hidden></label>`:'';
+  return `<section class="panel fo-card"><div class="fo-h"><div><b>Fotos de la obra</b><span class="sub">${L.length?`${L.length} foto${L.length>1?'s':''} · ${dias.length} día${dias.length>1?'s':''}`:FO.cargando?'Cargando…':'Todavía no hay fotos'}</span></div><div class="fo-ha">${L.length?'<button class="btn sm ghost" data-fo="ver">Ver todas</button>':''}${sube}</div></div>
+    ${d0?`<div class="fo-dia"><span class="fo-dt">${fdia(d0[0])}</span>${notas(d0[1])}${grilla(d0[1],8,false)}</div>`:puedeSubir()&&!FO.cargando?'<p class="sub" style="margin:0">Subí las fotos del día y el cliente ve cómo avanza su obra.</p>':''}
+    ${vSub()}</section>`}
+function vSub(){if(!FO.sub)return '';const s=FO.sub;
+  return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
+    <div class="fo-sf"><label>Fecha<input type="date" id="fo-fecha" value="${s.fecha}" max="${hoyF()}"></label><label class="fo-wide">Qué se ve (opcional)<input type="text" id="fo-nota" value="${esc2(s.nota||'')}" placeholder="Ej.: hormigonado de vigas del bloque 2" maxlength="160"></label></div>
+    <div class="bar"><button class="btn primary" data-fo="subir" ${s.subiendo?'disabled':''}>${s.subiendo?esc2(s.subiendo):`Subir ${s.files.length} foto${s.files.length>1?'s':''}`}</button><button class="btn ghost" data-fo="cancelar" ${s.subiendo?'disabled':''}>Cancelar</button></div></div>`}
+function vGaleria(){const dias=porDia(FO.lista);let n=0;const vis=[];for(const d of dias){if(n>=FO.limite)break;vis.push(d);n+=d[1].length}
+  return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Fotos de la obra"><div class="rs-wh"><b>Fotos de la obra</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
+   <div class="rs-wc">${vis.map(([f,fs])=>`<div class="fo-dia"><span class="fo-dt">${fdia(f)} <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span></span>${notas(fs)}${grilla(fs,0,puedeSubir())}</div>`).join('')||'<p class="sub">Todavía no hay fotos.</p>'}
+   ${dias.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver días anteriores</button>':''}</div></div>`}
+
+/* ---------- montaje: la tarjeta va en el inicio de la obra (debajo del cronograma) ---------- */
+function pintar(){const el=document.getElementById('fo-root');if(!el)return;el.innerHTML=vCard();
+  let g=document.getElementById('fo-gal');if(FO.ver){if(!g){g=document.createElement('div');g.id='fo-gal';document.body.appendChild(g)}g.innerHTML=vGaleria()}else if(g)g.remove()}
+async function cargar(oid,forzar){if(FO.oid===oid&&!forzar&&!FO.cargando){pintar();return}
+  FO.oid=oid;FO.cargando=true;FO.lista=[];pintar();
+  try{const L=await listar(oid);if(FO.oid!==oid)return;FO.lista=L;await firmar(L.slice(0,60).flatMap(f=>[f.thumb,f.path]))}catch(e){aviso('No se pudieron cargar las fotos')}
+  FO.cargando=false;pintar()}
+window.FOTOS={html:()=>'<div id="fo-root"></div>',montar:()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();if(!o)return;setTimeout(()=>cargar(o.id),0)},cargar};
+
+document.addEventListener('change',async e=>{if(e.target.id!=='fo-file')return;const fs=[...(e.target.files||[])].filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|heic|webp)$/i.test(f.name));e.target.value='';if(!fs.length)return;
+  const prev=FO.sub?FO.sub.prev:[],files=FO.sub?FO.sub.files:[];FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:hoyF(),nota:FO.sub?FO.sub.nota:''};pintar()});
+document.addEventListener('input',e=>{if(!FO.sub)return;if(e.target.id==='fo-nota')FO.sub.nota=e.target.value;if(e.target.id==='fo-fecha')FO.sub.fecha=e.target.value});
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('[data-fo]');if(!t)return;const a=t.dataset.fo;
+  if(a==='ver'){FO.ver=true;FO.limite=40;await firmar(FO.lista.slice(0,60).flatMap(f=>[f.thumb,f.path]));return pintar()}
+  if(a==='cerrar'){FO.ver=false;FO.borrar=null;return pintar()}
+  if(a==='masdias'){FO.limite+=40;await firmar(FO.lista.slice(0,FO.limite+40).flatMap(f=>[f.thumb,f.path]));return pintar()}
+  if(a==='cancelar'){FO.sub=null;return pintar()}
+  if(a==='qp'){const i=+t.dataset.i;FO.sub.files.splice(i,1);FO.sub.prev.splice(i,1);if(!FO.sub.files.length)FO.sub=null;return pintar()}
+  if(a==='subir'){const s=FO.sub;if(!s||s.subiendo)return;const n=document.getElementById('fo-nota'),f=document.getElementById('fo-fecha');s.nota=n?n.value.trim():'';s.fecha=(f&&f.value)||hoyF();
+    try{s.subiendo='Preparando…';pintar();const L=await subir(FO.oid,s.files,s.fecha,s.nota,(i,k)=>{s.subiendo=`Subiendo ${i} de ${k}…`;pintar()});
+      FO.sub=null;aviso(`${L.length} foto${L.length>1?'s':''} subida${L.length>1?'s':''}`);await cargar(FO.oid,true)}
+    catch(err){s.subiendo=null;pintar();aviso('No se pudo subir: '+(err.message||err))}return}
+  if(a==='del'){const id=t.dataset.id;if(FO.borrar!==id){FO.borrar=id;return pintar()}const f=FO.lista.find(x=>x.id===id);if(!f)return;
+    try{await borrar(f);FO.lista=FO.lista.filter(x=>x.id!==id);FO.borrar=null;aviso('Foto borrada');pintar()}catch(err){aviso('No se pudo borrar')}}
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FO.ver&&!document.querySelector('.fv-ov')){FO.ver=false;pintar()}});
+
+const css=document.createElement('style');css.textContent=`
+.fo-card{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.fo-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fo-h>div:first-child{display:flex;flex-direction:column}.fo-h b{font-size:16px}.fo-ha{display:flex;gap:8px;align-items:center}
+.fo-up{cursor:pointer}
+.fo-dia{display:flex;flex-direction:column;gap:6px}.fo-dt{font-weight:700;font-size:14px}.fo-n{margin:0;font-size:13.5px;color:var(--muted)}
+.fo-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
+.fo-c{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:color-mix(in srgb,var(--muted) 18%,transparent)}
+.fo-c img{width:100%;height:100%;object-fit:cover;display:block}
+.fo-t{padding:0;border:0;background:none;width:100%;height:100%;cursor:zoom-in;display:block}
+.fo-x{position:absolute;top:4px;right:4px;z-index:1;min-width:26px;height:26px;padding:0 7px;border-radius:99px;border:0;background:rgb(0 0 0/.62);color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+.fo-mas{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--panel);font:700 18px/1 inherit;color:var(--ink);cursor:pointer}
+.fo-sub{border:1px dashed var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.fo-sf{display:grid;grid-template-columns:150px 1fr;gap:10px}.fo-sf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.fo-sf input{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:9px 10px}
+@media (max-width:560px){.fo-sf{grid-template-columns:1fr}}
+.fo-win .rs-wc{display:flex;flex-direction:column;gap:18px}`;
+document.head.appendChild(css);
 })();
 
 (function(){
