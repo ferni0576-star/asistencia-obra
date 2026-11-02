@@ -4392,11 +4392,33 @@ function ventana(){if(!RS.ver)return '';const D=RS.D,A=D.A;let t='',h='',ancho=f
     const pl=planCrono(A);h=`<div class="rs-leg"><span><i class="k1"></i>Avance de obra</span>${ve('presupuesto')?'<span><i class="k2"></i>Certificado al cliente</span>':''}${pl?'<span><i class="k3"></i>Cronograma</span>':''}</div>${sitCrono(A)}<div class="rs-chart big">${curvaSVG(C,A.tot,true,pl)}</div>
     <div class="tw"><table><thead><tr><th>Semana al</th><th class="n">Avance de obra</th><th class="n">En la semana</th>${ve('presupuesto')?'<th class="n">Certificado</th>':''}</tr></thead><tbody>
     ${C.slice().reverse().map((p,i,a)=>{const prev=a[i+1];return `<tr><td>${fdia(p.f)}</td><td class="n">${pct(p.ej/A.tot)}</td><td class="n">${prev?'+'+pct((p.ej-prev.ej)/A.tot):'—'}</td>${ve('presupuesto')?`<td class="n">${pct(p.ce/A.tot)}</td>`:''}</tr>`}).join('')}</tbody></table></div>`}
+  else if(RS.ver==='avance'&&A){const C=RS.D.doc&&RS.D.doc.cronograma;if(!C||!window.CRONO||!window.CRONO.hay(C)){RS.ver='rubros';return ventana()}
+    t='Avance de obra';ancho=true;const CR=window.CRONO;const s=CR.situacion(A,C);const tt=A.tot||1;const est=Math.abs(s.atr)<=7?'ok':s.atr>0?'mal':'bien';
+    const RL=s.rub||CR.porRubro(A,C);const ord={mal:0,ok:1,bien:2,term:3,nada:4,excl:5};const vis=RL.filter(x=>x.est!=='excl').sort((a,b)=>ord[a.est]-ord[b.est]||(a.est==='mal'?b.atr-a.atr:a.pi-b.pi));
+    const chip=x=>x.est==='mal'?['mal',`${x.atr} días atrasado`]:x.est==='ok'?['ok','En tiempo']:x.est==='bien'?['ok',`${-x.atr} días adelantado`]:x.est==='nada'?['nada','Todavía no empieza']:x.atr>7?['mal','Terminado tarde']:['ok','Terminado'];
+    const nAtr=vis.filter(x=>x.est==='mal').length,nMar=vis.filter(x=>['mal','ok','bien'].includes(x.est)).length,nTer=vis.filter(x=>x.est==='term').length;
+    const N=CR.notasDe(C);const nn=CR.nn;
+    h=`<div class="av-top ${est}"><div class="av-est"><span class="sub">Según el cronograma</span><b>${est==='ok'?'La obra va en tiempo':est==='mal'?`Va ${s.atr} días atrasada`:`Va ${-s.atr} días adelantada`}</b>
+        <span class="sub">Fin estimado <b>${fdma(s.finProy||s.fin)}</b> · plan ${fdma(s.fin)}${s.perd>0?` · ${nn(s.perd)} días de lluvia descontados`:''}</span></div>
+      <div class="av-bars"><span class="rs-crb"><span>Debería ir</span><span class="rs-crt"><i class="p" style="width:${Math.min(1,s.plan/tt)*100}%"></i></span><b>${pct(Math.min(1,s.plan/tt))}</b></span>
+        <span class="rs-crb"><span>Va</span><span class="rs-crt"><i class="r" style="width:${Math.min(1,s.ej/tt)*100}%"></i></span><b>${pct(Math.min(1,s.ej/tt))}</b></span></div></div>
+      <div class="av-kpi"><div><b>${nMar}</b><span>rubros en marcha</span></div><div class="${nAtr?'mal':''}"><b>${nAtr}</b><span>atrasados</span></div><div><b>${nTer}</b><span>terminados</span></div><div><b>${vis.length-nMar-nTer}</b><span>por empezar</span></div></div>
+      <div class="rs-leg"><span><i class="k1"></i>Avance de obra</span><span><i class="k3"></i>Cronograma</span></div><div class="rs-chart big">${curvaSVG(A.curva,A.tot,true,planCrono(A))}</div>
+      <h4 class="av-h">Rubro por rubro <span class="sub">tocá uno para ver sus ítems</span></h4>
+      <div class="av-rl">${(()=>{const fila=x=>{const c=chip(x);return `<button class="av-r" data-rver="rubro" data-k="${esc(x.k)}"><span class="av-rn">${esc(cap(x.nombre))}</span><span class="rs-crt" title="Debería ir ${pct(x.deb)} · va ${pct(x.real)}"><i class="r" style="width:${Math.min(1,x.real)*100}%"></i>${x.deb>0?`<i class="m" style="left:${Math.min(1,x.deb)*100}%"></i>`:''}</span><span class="av-rp">${pct(x.real)}</span><span class="cr-st ${c[0]}">${c[1]}</span></button>`};const ya=vis.filter(x=>x.est!=='nada'),pe=vis.filter(x=>x.est==='nada');
+        return ya.map(fila).join('')+(pe.length?`<details class="av-pe"><summary>${pe.length} rubro${pe.length>1?'s':''} todavía no empieza${pe.length>1?'n':''} <span class="sub">· ver</span></summary>${pe.map(fila).join('')}</details>`:'')})()}</div>
+      <p class="sub" style="margin:4px 0 0">Barra = lo hecho · rayita = dónde debería estar hoy según el cronograma.</p>
+      <div class="av-dos"><section><h4 class="av-h">Próximas 3 semanas</h4>${CR.vProx(A,C)}</section>
+        <section><h4 class="av-h">Diario de obra ${N.length>1?`<button class="btn sm ghost" data-rver="diario">Ver las ${N.length} notas</button>`:''}</h4>${N[0]?CR.vNota(N[0],false):'<p class="sub" style="margin:0">Todavía no hay notas de obra.</p>'}</section></div>
+      <div class="bar" style="margin-top:6px"><button class="btn sm" data-rver="curva">Semana a semana</button><button class="btn sm ghost" data-rver="rubros">Avance por rubro (solo %)</button></div>`}
+  else if(RS.ver==='diario'){const C=RS.D.doc&&RS.D.doc.cronograma;const N=window.CRONO?window.CRONO.notasDe(C):[];t='Diario de obra';ancho=true;
+    h=`<p class="sub" style="margin-top:0"><button class="lnk" data-rver="avance">‹ Volver al avance</button></p><div class="av-dia">${N.map(n=>window.CRONO.vNota(n,false)).join('')||'<p class="sub">Todavía no hay notas de obra.</p>'}</div>`}
   else if(RS.ver==='rubros'&&A){t='Avance por rubro';ancho=true;
     h=`<p class="sub" style="margin-top:0">Tocá un rubro para ver el detalle de sus ítems. ${ve('presupuesto')?'La marca vertical es lo certificado al cliente.':''}</p><div class="rs-rl">${A.rubros.map(r=>barraR(r,A.tot)).join('')}</div>`}
   else if(RS.ver==='rubro'&&A){const r=A.rubros.find(x=>x.k===RS.arg);if(!r){RS.ver=null;return ''}ancho=true;t=cap(r.nombre);
     const its=r.items.filter(i=>!RS.soloAv||i.ej>0);let ls=null;
-    h=`<div class="rs-rh">${anillo(r.tot?r.ej/r.tot:0,ve('presupuesto')?(r.tot?r.ce/r.tot:0):null,92)}<div><div class="sub">Rubro ${esc(r.k)} · ${r.items.length} ítems</div><b class="rs-big">${pct(r.tot?r.ej/r.tot:0)} hecho</b>
+    const hcr=RS.D.doc&&RS.D.doc.cronograma&&window.CRONO&&window.CRONO.hay(RS.D.doc.cronograma);
+    h=`${hcr?'<p class="sub" style="margin:0 0 8px"><button class="lnk" data-rver="avance">‹ Volver al avance de obra</button></p>':''}<div class="rs-rh">${anillo(r.tot?r.ej/r.tot:0,ve('presupuesto')?(r.tot?r.ce/r.tot:0):null,92)}<div><div class="sub">Rubro ${esc(r.k)} · ${r.items.length} ítems</div><b class="rs-big">${pct(r.tot?r.ej/r.tot:0)} hecho</b>
       ${ve('presupuesto')?`<div class="sub">Certificado ${pct(r.tot?r.ce/r.tot:0)} · ${mil(r.tot)} Gs en el presupuesto (${pct(A.tot?r.tot/A.tot:0)} de la obra)</div>`:''}</div></div>
       <label class="rs-chk"><input type="checkbox" data-rsolo ${RS.soloAv?'checked':''}> Mostrar solo ítems con avance</label>
       <div class="rs-its">${its.map(i=>{const f=i.cant?i.ej/i.cant:0;const s=i.sector&&i.sector!==ls?`<div class="rs-sec">${esc(i.sector)}</div>`:'';ls=i.sector||ls;
@@ -4442,7 +4464,9 @@ const ICO={
 const icono=k=>`<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]||''}</svg>`;
 function accesos(){const D=RS.D,A=D.A;const L=[];const ap=window.APROB?window.APROB.resumen(D.obra.id):null;
   if(ap&&ap.total&&(!window.CLI||window.CLI.aprobador))L.push(['aprob',window.CLI?'Por aprobar':'Aprobaciones del cliente',window.CLI?'Certificados y pedidos que esperan tu verificación.':'Lo que el cliente aprobó, observó o tiene pendiente.',window.CLI?(ap.pend?`${ap.pend} pendiente${ap.pend>1?'s':''}`:'Todo al día'):`${ap.pend} esperando · ${ap.obs} observado${ap.obs===1?'':'s'}`,{apb:1},window.CLI?ap.pend:ap.obs]);const pe=D.ped.map(estPed);const enC=pe.filter(x=>x[0]!=='ok').length;const N=novedades();
-  if(A)L.push(['avance','Avance de obra','Etapas, rubros y estado general de la obra.',`${pct(A.tot?A.ej/A.tot:0)} hecho`,{ver:'rubros'}]);
+  if(A){const C=RS.D.doc&&RS.D.doc.cronograma;const hc=C&&window.CRONO&&window.CRONO.hay(C);let dato=`${pct(A.tot?A.ej/A.tot:0)} hecho`;
+    if(hc){const s=window.CRONO.situacion(A,C);dato+=Math.abs(s.atr)<=7?' · en tiempo':s.atr>0?` · ${s.atr} d de atraso`:` · ${-s.atr} d adelantada`}
+    L.push(['avance','Avance de obra',hc?'Cómo vamos contra el cronograma, rubro por rubro.':'Etapas, rubros y estado general de la obra.',dato,{ver:hc?'avance':'rubros'}])}
   if(ve('presupuesto')&&A)L.push(['presupuesto','Presupuesto','Montos por rubro, materiales y mano de obra.',`${mil(A.tot)} Gs`,{tab:'presupuesto'}]);
   if(ve('presupuesto')&&A)L.push(['certificados','Certificados','Lo certificado, lo pagado y el saldo de la obra.',`${A.certs.length} emitido${A.certs.length===1?'':'s'} · ${pct(A.tot?A.ce/A.tot:0)}`,{ver:'pagos'}]);
   if(ve('planos'))L.push(['planos','Planos','Arquitectura, estructura e instalaciones para ver o descargar.',D.pla.length?`${D.pla.length} plano${D.pla.length===1?'':'s'}`:'Sin planos aún',{tab:'planos'}]);
@@ -4560,6 +4584,16 @@ const css=document.createElement('style');css.textContent=`
 .rs-cron.mal .rs-crd{background:var(--bad);box-shadow:0 0 0 5px var(--bad-bg)}.rs-cron.ok .rs-crd,.rs-cron.bien .rs-crd{background:var(--ok);box-shadow:0 0 0 5px var(--ok-bg)}
 .rs-cr2{display:flex;flex-direction:column;gap:8px;min-width:0}
 .rs-crb{display:grid;grid-template-columns:72px 1fr 56px;gap:8px;align-items:center;font-size:13.5px}.rs-crb b{text-align:right;font-variant-numeric:tabular-nums}
+.av-top{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;align-items:center;padding:14px 16px;border-radius:14px;border-left:6px solid var(--line);background:color-mix(in srgb,var(--chip) 55%,transparent)}
+.av-top.mal{border-left-color:var(--bad)}.av-top.ok,.av-top.bien{border-left-color:var(--ok)}.av-est{display:flex;flex-direction:column;gap:3px}.av-est>b{font-family:var(--f-display);font-size:26px;line-height:1.05;text-transform:uppercase}
+.av-top.mal .av-est>b{color:var(--bad)}.av-top.ok .av-est>b,.av-top.bien .av-est>b{color:var(--ok)}.av-bars{display:flex;flex-direction:column;gap:8px}
+.av-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}.av-kpi>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}.av-kpi b{font-family:var(--f-display);font-size:26px;line-height:1}.av-kpi span{font-size:12.5px;color:var(--muted)}.av-kpi .mal b{color:var(--bad)}
+.av-h{margin:16px 0 8px;display:flex;align-items:center;gap:10px;justify-content:space-between}.av-h .sub{font-weight:400;font-size:12.5px}
+.av-rl{display:flex;flex-direction:column}.av-r{display:grid;grid-template-columns:minmax(120px,1.3fr) 2fr 52px 150px;gap:10px;align-items:center;padding:9px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.av-r:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}.av-rn{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.av-rp{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:13.5px}.av-r .cr-st{justify-self:start;white-space:nowrap}
+.av-pe summary{cursor:pointer;padding:11px 4px;font-weight:600;font-size:14px;color:var(--muted)}
+.av-dos{display:grid;grid-template-columns:1fr 1.3fr;gap:18px}.av-dia{display:flex;flex-direction:column;gap:14px}
+@media (max-width:760px){.av-top{grid-template-columns:1fr}.av-kpi{grid-template-columns:repeat(2,1fr)}.av-r{grid-template-columns:1fr 52px;grid-template-areas:"n p" "t t" "s s";gap:5px 10px}.av-rn{grid-area:n}.av-rp{grid-area:p}.av-r .rs-crt{grid-area:t}.av-r .cr-st{grid-area:s}.av-dos{grid-template-columns:1fr}}
 .rs-crx{display:grid;grid-template-columns:1fr 1.3fr;gap:12px;margin-top:12px}@media (max-width:860px){.rs-crx{grid-template-columns:1fr}}.rs-crxp{padding:14px 16px;display:flex;flex-direction:column;gap:8px}.rs-crxh{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .rs-crt{height:10px;border-radius:99px;background:var(--chip);overflow:hidden;position:relative}
 .rs-crt .m{position:absolute;top:0;bottom:0;width:2px;border-radius:0;background:var(--ink);opacity:.7}
@@ -5365,7 +5399,7 @@ function situacion(A,C){if(!planificado(C))return null;const H=hoyN();const LL=l
   let RR=null;if(metodo(C)==='rubros'){const RL=porRubro(A,C,LL,H);RR=resRub(RL);const RR0=perd>0?resRub(porRubro(A,C,[],H)):RR;
     return{metodo:'rubros',rub:RL,rr:RR,plan,planO,ej,atr:RR.prom,atrO:RR0.prom,perd,nll:LL.filter(r=>r.n<=H).length,ini:nd(Math.min(...T.map(t=>dn(t.d)))),fin:nd(fin),finAj:nd(fin+Math.round(perd)),finProy:nd(fin+Math.round(perd)+Math.max(0,RR?RR.prom:atr)),mes:{plan:plan-PA(m0-1),ej:ej-realAl(A,m0-1,'ej'),nombre:mn}}}
   return{metodo:'plata',plan,planO,ej,atr,atrO,perd,nll:LL.filter(r=>r.n<=H).length,ini:nd(Math.min(...T.map(t=>dn(t.d)))),fin:nd(fin),finAj:nd(fin+Math.round(perd)),finProy:nd(fin+Math.round(perd)+Math.max(0,RR?RR.prom:atr)),mes:{plan:plan-PA(m0-1),ej:ej-realAl(A,m0-1,'ej'),nombre:mn}}}
-window.CRONO={vProx,notasDe,vNota,fds,mount,html,leerCrono,planAl,borrador,situacion,planFecha:(A,C,f)=>planAj(A,C,lluvias(C))(dn(f)),nn,hay:planificado};
+window.CRONO={porRubro:(A,C)=>porRubro(A,C,lluvias(C)),resRub,vProx,notasDe,vNota,fds,mount,html,leerCrono,planAl,borrador,situacion,planFecha:(A,C,f)=>planAj(A,C,lluvias(C))(dn(f)),nn,hay:planificado};
 
 const css=document.createElement('style');css.textContent=`
 .cr{display:flex;flex-direction:column;gap:14px}
