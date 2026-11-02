@@ -1,7 +1,7 @@
 /* Control de Obras: hace que la app abra rápido y se pueda instalar.
    La página siempre se busca primero en internet (así cada index.html nuevo se ve enseguida);
    si no hay señal, abre la última versión guardada. Los datos de Supabase nunca se guardan acá. */
-const CACHE = 'control-obras-v3';
+const CACHE = 'control-obras-v4';
 const BASE = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting()));
@@ -27,7 +27,10 @@ self.addEventListener('fetch', e => {
     return;
   }
   e.respondWith(caches.match(r).then(m => {
-    const red = fetch(r).then(res => { if (res && (res.ok || res.type === 'opaque')) { const c = res.clone(); caches.open(CACHE).then(x => x.put(r, c)); } return res; }).catch(() => m);
+    const red = fetch(r).then(res => { if (res && (res.ok || res.type === 'opaque')) { const c = res.clone(); caches.open(CACHE).then(async x => {
+        /* el código de la app cambia de nombre en cada versión: se borran las versiones viejas guardadas */
+        if (/\/app\.[0-9a-f]{10}\.js$/.test(u.pathname)) for (const k of await x.keys()) { const p = new URL(k.url).pathname; if (/\/app\.[0-9a-f]{10}\.js$/.test(p) && p !== u.pathname) x.delete(k); }
+        x.put(r, c); }); } return res; }).catch(() => m);
     return m || red;
   }));
 });
