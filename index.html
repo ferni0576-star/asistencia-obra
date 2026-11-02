@@ -4994,6 +4994,84 @@ const css=document.createElement('style');css.textContent=`
 })();
 
 (function(){
+/* ============ Dropbox: fotos del diario de obra (y archivos) guardados en el Dropbox del director ============ */
+const KEY_DEF='6qsku5m91k10ias';
+const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
+const appKey=()=>(KEY_DEF&&!/^__/.test(KEY_DEF)?KEY_DEF:'')||LS.get('dbx_key')||'';
+const redir=()=>location.origin+location.pathname.replace(/index\.html$/,'');
+const nube=()=>!!(window.USR&&window.USR.nube&&window.USR.nube());
+const tok=()=>{try{return JSON.parse(LS.get('dbx_tok')||'null')}catch(e){return null}};
+const b64u=buf=>btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const azar=n=>{const a=new Uint8Array(n);crypto.getRandomValues(a);return b64u(a.buffer).slice(0,n)};
+/* Dropbox-API-Arg solo acepta ASCII: los acentos van como \uXXXX */
+const argH=o=>JSON.stringify(o).replace(/[\u007f-￿]/g,c=>'\\u'+('000'+c.charCodeAt(0).toString(16)).slice(-4));
+
+async function conectar(){
+  if(!appKey()){const k=prompt('Pegá el "App key" de tu app de Dropbox (lo ves en dropbox.com/developers/apps → tu app → Settings):');if(!k)return;LS.set('dbx_key',k.trim())}
+  const ver=azar(64);const ch=b64u(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(ver)));const st=azar(16);
+  try{sessionStorage.setItem('dbx_pkce',JSON.stringify({ver,st,vuelta:location.hash||''}))}catch(e){}
+  location.href='https://www.dropbox.com/oauth2/authorize?'+new URLSearchParams({client_id:appKey(),response_type:'code',code_challenge:ch,code_challenge_method:'S256',token_access_type:'offline',redirect_uri:redir(),state:st});
+}
+async function token(body){const r=await fetch('https://api.dropboxapi.com/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error_description||j.error||'Dropbox no respondió');return j}
+/* vuelta de la autorización: ?code=...&state=... */
+async function volver(){const q=new URLSearchParams(location.search);const code=q.get('code'),st=q.get('state');if(!code||!st)return;
+  let P=null;try{P=JSON.parse(sessionStorage.getItem('dbx_pkce')||'null')}catch(e){}
+  if(!P||P.st!==st)return;
+  history.replaceState(null,'',redir()+(P.vuelta||''));try{sessionStorage.removeItem('dbx_pkce')}catch(e){}
+  try{const j=await token({code,grant_type:'authorization_code',code_verifier:P.ver,client_id:appKey(),redirect_uri:redir()});
+    LS.set('dbx_tok',JSON.stringify({a:j.access_token,r:j.refresh_token,e:Date.now()+(j.expires_in-60)*1000}));
+    const c=await api('users/get_current_account',null).catch(()=>null);if(c)LS.set('dbx_cta',c.name&&c.name.display_name||c.email||'');
+    aviso('Dropbox conectado'+(c?' · '+(c.name&&c.name.display_name||''):''))}
+  catch(e){aviso('No se pudo conectar Dropbox: '+e.message)}}
+async function acceso(){const t=tok();if(!t)throw new Error('Dropbox no está conectado en este dispositivo');
+  if(t.a&&Date.now()<t.e)return t.a;
+  const j=await token({grant_type:'refresh_token',refresh_token:t.r,client_id:appKey()});t.a=j.access_token;t.e=Date.now()+(j.expires_in-60)*1000;LS.set('dbx_tok',JSON.stringify(t));return t.a}
+async function api(ruta,body){const a=await acceso();const r=await fetch('https://api.dropboxapi.com/2/'+ruta,{method:'POST',headers:{Authorization:'Bearer '+a,...(body!=null?{'Content-Type':'application/json'}:{})},body:body!=null?JSON.stringify(body):null});
+  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error_summary||('Error '+r.status));e.dbx=j;throw e}return j}
+const crudo=u=>u.replace(/([?&])dl=0/,'$1raw=1').replace(/([?&])dl=1/,'$1raw=1')+(/[?&]raw=1/.test(u)?'':(u.includes('?')?'&':'?')+'raw=1');
+async function enlace(path){try{const j=await api('sharing/create_shared_link_with_settings',{path,settings:{requested_visibility:'public'}});return crudo(j.url)}
+  catch(e){const L=await api('sharing/list_shared_links',{path,direct_only:true});if(L.links&&L.links[0])return crudo(L.links[0].url);throw e}}
+async function subir(blob,path){const a=await acceso();
+  const r=await fetch('https://content.dropboxapi.com/2/files/upload',{method:'POST',headers:{Authorization:'Bearer '+a,'Content-Type':'application/octet-stream','Dropbox-API-Arg':argH({path,mode:'add',autorename:true,mute:true})},body:blob});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error_summary||('No se pudo subir ('+r.status+')'));
+  return{path:j.path_display,url:await enlace(j.path_lower)}}
+/* achica la foto antes de subir: ahorra espacio y datos del celular */
+async function achicar(file,max,q){max=max||1600;q=q||0.8;
+  try{const bm=await createImageBitmap(file);const k=Math.min(1,max/Math.max(bm.width,bm.height));const c=document.createElement('canvas');c.width=Math.round(bm.width*k);c.height=Math.round(bm.height*k);
+    c.getContext('2d').drawImage(bm,0,0,c.width,c.height);return await new Promise(ok=>c.toBlob(b=>ok(b||file),'image/jpeg',q))}catch(e){return file}}
+const aDataURL=b=>new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.readAsDataURL(b)});
+const limpio=s=>String(s||'Obra').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w .-]+/g,'').replace(/\s+/g,' ').trim().slice(0,60)||'Obra';
+/* sube las fotos de una nota: en la web real van a Dropbox; en la demo quedan en este navegador */
+async function subirFotos(files,obra,fecha,progreso){const out=[];let i=0;
+  for(const f of files){i++;progreso&&progreso(i,files.length);
+    if(!nube()){const b=await achicar(f,900,0.72);out.push({url:await aDataURL(b),nombre:f.name,demo:true});continue}
+    const b=await achicar(f);const hh=new Date().toTimeString().slice(0,8).replace(/:/g,'');
+    const r=await subir(b,`/${limpio(obra)}/Diario de obra/${fecha}/${fecha}_${hh}_${i}.jpg`);out.push({url:r.url,path:r.path,nombre:f.name})}
+  return out}
+async function borrar(path){try{await api('files/delete_v2',{path})}catch(e){}}
+function desconectar(){const t=tok();LS.set('dbx_tok',null);LS.set('dbx_cta',null);if(t&&t.a)fetch('https://api.dropboxapi.com/2/auth/token/revoke',{method:'POST',headers:{Authorization:'Bearer '+t.a}}).catch(()=>{})}
+const aviso=m=>{if(typeof toast==='function')toast(m);else console.log(m)};
+window.DBX={nube,conectado:()=>!nube()||!!tok(),cuenta:()=>LS.get('dbx_cta')||'',conectar,desconectar,subirFotos,subir,borrar,appKey};
+
+/* visor de fotos (sirve para el diario en el inicio y en el cronograma) */
+document.addEventListener('click',e=>{const t=e.target.closest('[data-fotov]');if(!t)return;e.preventDefault();e.stopPropagation();
+  const g=t.closest('[data-fotog]');const L=g?[...g.querySelectorAll('[data-fotov]')].map(x=>x.dataset.fotov):[t.dataset.fotov];let i=Math.max(0,L.indexOf(t.dataset.fotov));
+  const ov=document.createElement('div');ov.className='fv-ov';const pinta=()=>{ov.innerHTML=`<img src="${L[i]}" alt="Foto de obra"><button class="fv-x" aria-label="Cerrar">✕</button>${L.length>1?`<button class="fv-p" aria-label="Anterior">‹</button><button class="fv-n" aria-label="Siguiente">›</button><span class="fv-c">${i+1} / ${L.length}</span>`:''}`};pinta();
+  ov.addEventListener('click',ev=>{if(ev.target.closest('.fv-p')){i=(i-1+L.length)%L.length;return pinta()}if(ev.target.closest('.fv-n')){i=(i+1)%L.length;return pinta()}if(ev.target.tagName!=='IMG')ov.remove()});
+  const k=ev=>{if(!document.body.contains(ov))return document.removeEventListener('keydown',k);if(ev.key==='Escape')ov.remove();if(ev.key==='ArrowRight'){i=(i+1)%L.length;pinta()}if(ev.key==='ArrowLeft'){i=(i-1+L.length)%L.length;pinta()}};document.addEventListener('keydown',k);
+  document.body.appendChild(ov)},true);
+const css=document.createElement('style');css.textContent=`
+.fv-ov{position:fixed;inset:0;z-index:200;background:rgb(0 0 0/.88);display:flex;align-items:center;justify-content:center;padding:16px}
+.fv-ov img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px}
+.fv-ov button{position:absolute;background:rgb(255 255 255/.14);color:#fff;border:0;border-radius:99px;width:44px;height:44px;font-size:24px;cursor:pointer}
+.fv-x{top:14px;right:14px}.fv-p{left:12px;top:50%;transform:translateY(-50%)}.fv-n{right:12px;top:50%;transform:translateY(-50%)}
+.fv-c{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);color:#fff;font-size:13px;background:rgb(0 0 0/.4);padding:3px 10px;border-radius:99px}`;
+document.head.appendChild(css);
+volver();
+})();
+
+(function(){
 /* ============ Cronograma de obra: plan por rubro vs avance real (pagos semanales) y desembolso mes a mes ============ */
 const CR={edit:false,imp:null,borr:false,dur:32};
 const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
@@ -5004,7 +5082,7 @@ const fdm=s=>{if(!s)return '';const[a,b,c]=s.split('-');return `${c}/${b}/${a.sl
 const mesTxt=s=>{const[a,b]=s.split('-');return MES[+b-1]+' '+a.slice(2)};
 const M=n=>{const a=Math.abs(n);return a>=1e9?(n/1e9).toFixed(2).replace('.',',')+' mil M':a>=1e6?(n/1e6).toFixed(1).replace('.',',')+' M':gs(n)};
 const pct=x=>(Math.round(x*1000)/10).toString().replace('.',',')+'%';
-const nrm=t=>String(t??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/^\s*\d+[.)-]?\s*/,'').replace(/\(.*?\)/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const nrm=t=>String(t??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^\s*\d+[.)-]?\s*/,'').replace(/\(.*?\)/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const rnum=t=>{const m=String(t||'').match(/^\s*(\d+)/);return m?m[1]:''};
 
 function ctx(){const P=window.PRES_DOC&&window.PRES_DOC();if(!P||!P.doc)return null;const A=window.PRES.analizar(P.doc,P.con);return{...P,A,C:P.doc.cronograma||null}}
@@ -5052,14 +5130,21 @@ const notasDe=C=>((C&&C.notas)||[]).slice().sort((a,b)=>a.f<b.f?1:a.f>b.f?-1:(b.
 function vProx(A,C,max){const L=proximas(A,C);const v=max?L.slice(0,max):L;
   return v.length?`<ul class="cr-px">${v.map(x=>`<li><span class="cr-pxd">${fds(x.n)}</span><span class="cr-pxt ${x.t}">${x.t==='arranca'?'Arranca':'Termina'}</span><span class="cr-pxn">${esc(x.nom)}${x.t==='termina'&&x.real!=null?` <span class="sub">(va ${pct(x.real)})</span>`:''}</span></li>`).join('')}${max&&L.length>max?`<li class="sub">y ${L.length-max} más</li>`:''}</ul>`:'<p class="sub" style="margin:0">Ningún rubro arranca ni termina en las próximas 3 semanas.</p>'}
 function vNota(n,ed){return `<article class="cr-nt"><div class="cr-nth"><b>${fds(dn(n.f))}</b>${ed?`<span class="cr-nta"><button class="btn sm ghost" data-cr="nota-ed" data-id="${n.id}">Editar</button><button class="btn sm ghost" data-cr="nota-del" data-id="${n.id}" ${CR.notaDel===n.id?'style="color:var(--bad)"':''}>${CR.notaDel===n.id?'¿Borrar? Tocá otra vez':'Borrar'}</button></span>`:''}</div>
-  ${n.hecho?`<p><span class="cr-ntl">Se hizo</span>${esc(n.hecho)}</p>`:''}${n.freno?`<p><span class="cr-ntl fr">Frenó</span>${esc(n.freno)}</p>`:''}${n.sigue?`<p><span class="cr-ntl sg">Sigue</span>${esc(n.sigue)}</p>`:''}</article>`}
+  ${n.hecho?`<p><span class="cr-ntl">Se hizo</span>${esc(n.hecho)}</p>`:''}${n.freno?`<p><span class="cr-ntl fr">Frenó</span>${esc(n.freno)}</p>`:''}${n.sigue?`<p><span class="cr-ntl sg">Sigue</span>${esc(n.sigue)}</p>`:''}${(n.fotos||[]).length?`<div class="cr-ft" data-fotog>${n.fotos.map(f=>`<button type="button" data-fotov="${esc(f.url)}" aria-label="Ver foto"><img src="${esc(f.url)}" alt="" loading="lazy"></button>`).join('')}</div>`:''}</article>`}
+function dbxLinea(){const D=window.DBX;if(!D)return '';const ok=D.conectado();
+  return ok?`<label class="btn sm" style="cursor:pointer;align-self:flex-start">+ Agregar fotos<input type="file" id="cr-nfotos" accept="image/*" multiple hidden></label><span class="sub">${D.nube()?`Se guardan en tu Dropbox${D.cuenta()?' ('+esc(D.cuenta())+')':''} · <button type="button" class="lnk" data-cr="dbx-off">desconectar</button>`:'En la demo las fotos quedan en este navegador; en tu web van a tu Dropbox.'}</span>`
+   :`<span class="sub">Para subir fotos, conectá tu Dropbox en este dispositivo (una sola vez).</span><button type="button" class="btn sm" data-cr="dbx-on" style="align-self:flex-start">Conectar Dropbox</button>`}
 function vNotas(C){const N=notasDe(C);const ed=!window.CLI;const e=CR.notaEd?N.find(x=>x.id===CR.notaEd)||{}:null;const ab=CR.notasAb;const vis=ab?N:N.slice(0,3);
-  const form=ed?`<form class="cr-nf" id="cr-nf">${e?`<b>Editando la nota del ${fdm(e.f)}</b>`:'<b>Nota de esta semana</b>'}
+  const form=ed?`<form class="cr-nf" id="cr-nf">${e?`<b>Editando la nota del ${fdm(e.f)}</b>`:'<b>Nota de hoy</b>'}
     <label>Fecha<input type="date" name="f" value="${e?e.f:nd(hoyN())}" required></label>
     <label>Qué se hizo<textarea name="hecho" rows="2" placeholder="Ej.: se terminó el encadenado inferior de los locales 1 a 3">${esc(e&&e.hecho||'')}</textarea></label>
     <label>Qué frenó <span class="sub">(opcional)</span><textarea name="freno" rows="2" placeholder="Ej.: 2 días de lluvia, demora del hierro">${esc(e&&e.freno||'')}</textarea></label>
     <label>Qué sigue<textarea name="sigue" rows="2" placeholder="Ej.: mampostería de elevación y columnas">${esc(e&&e.sigue||'')}</textarea></label>
-    <div class="bar"><button class="btn primary">${e?'Guardar cambios':'Publicar nota'}</button>${e?'<button type="button" class="btn ghost" data-cr="nota-cancel">Cancelar</button>':''}</div></form>`:'';
+    <div class="cr-fl"><span class="cr-flt">Fotos</span>
+      ${e&&(e.fotos||[]).length?`<div class="cr-ft">${e.fotos.map((f,i)=>`<span class="cr-fq"><img src="${esc(f.url)}" alt=""><button type="button" data-cr="nota-fq" data-i="${i}" aria-label="Quitar foto">✕</button></span>`).join('')}</div>`:''}
+      <div class="cr-ft" id="cr-fprev"></div>
+      ${dbxLinea()}</div>
+    <div class="bar"><button class="btn primary" id="cr-nfb">${e?'Guardar cambios':'Publicar nota'}</button>${e?'<button type="button" class="btn ghost" data-cr="nota-cancel">Cancelar</button>':''}</div></form>`:'';
   return `${form}${vis.map(n=>vNota(n,ed)).join('')||(ed?'':'<p class="sub" style="margin:0">Todavía no hay notas de obra.</p>')}${N.length>3?`<button class="btn sm ghost" data-cr="notas-ab" style="align-self:flex-start">${ab?'Ver solo las últimas':`Ver las ${N.length} notas`}</button>`:''}`}
 const planificado=C=>C&&Object.values(C.rubros||{}).some(r=>r.tramos&&r.tramos.length);
 
@@ -5097,7 +5182,7 @@ function html(){const X=ctx();if(!X)return '<p class="sub">Cargá primero el pre
    ${nll?`<div class="cr-ll"><b>Lluvia:</b> ${nll} día${nll>1?'s':''} anotado${nll>1?'s':''} en el libro de lluvias desde el inicio, <b>${nn(perd)} jornada${perd===1?'':'s'} perdida${perd===1?'':'s'}</b>. El cronograma se corre ese tiempo para comparar el avance real.</div>`:''}
    ${MR?secR:''}
    <div class="cr-dos"><section class="panel cr-box"><div class="cr-bh"><h3>Próximas 3 semanas</h3><span class="sub">según el cronograma${perd>0?', corrido por la lluvia':''}</span></div>${vProx(A,C)}</section>
-     <section class="panel cr-box"><div class="cr-bh"><h3>Notas de obra</h3><span class="sub">${window.CLI?'del director de obra':'el cliente las ve en el inicio de la obra'}</span></div>${vNotas(C)}</section></div>
+     <section class="panel cr-box"><div class="cr-bh"><h3>Diario de obra</h3><span class="sub">${window.CLI?'del director de obra':'el cliente las ve en el inicio de la obra'}</span></div>${vNotas(C)}</section></div>
    <section class="panel cr-box"><div class="cr-bh"><h3>Curva de avance</h3><span class="cr-ley">${perd>0?'<i class="lo"></i>Original sin lluvia':''}<i class="lp"></i>Cronograma${perd>0?' con lluvia':' estimado'} <i class="le"></i>Ejecutado <i class="lc"></i>Certificado al cliente</span></div>${curvaSVG(A,C)}</section>
    <section class="panel cr-box"><div class="cr-bh"><h3>Desembolso mes a mes</h3>${C.semanas?`<span class="pry-seg cr-seg"><button data-cr="mes" data-v="obra" aria-pressed="${CR.mes!=='cal'}">Mes de obra (4 sem.)</button><button data-cr="mes" data-v="cal" aria-pressed="${CR.mes==='cal'}">Mes calendario</button></span>`:''}<span class="cr-ley"><i class="lp"></i>Estimado <i class="le"></i>Ejecutado</span></div>${meses(A,C)}</section>
    ${C.semanas?semanas(A,C):''}
@@ -5226,8 +5311,11 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-cr]');if(!
   if(a==='metodo'){const C=JSON.parse(JSON.stringify(X.C));C.metodo=t.dataset.v;guardar(X,C);toast(t.dataset.v==='plata'?'El atraso se mide por plata':'El atraso se mide por el avance de cada rubro');return mount()}
   if(a==='rreal'){CR.rEd=t.dataset.k;return mount()}
   if(a==='notas-ab'){CR.notasAb=!CR.notasAb;return mount()}
+  if(a==='dbx-on'){return window.DBX&&window.DBX.conectar()}
+  if(a==='dbx-off'){window.DBX&&window.DBX.desconectar();toast('Dropbox desconectado en este dispositivo');return mount()}
+  if(a==='nota-fq'){const C=JSON.parse(JSON.stringify(X.C));const o=(C.notas||[]).find(x=>x.id===CR.notaEd);if(!o)return;const f=(o.fotos||[]).splice(+t.dataset.i,1)[0];if(f&&f.path&&window.DBX)window.DBX.borrar(f.path);guardar(X,C);toast('Foto quitada');return mount()}
   if(a==='nota-ed'){CR.notaEd=+t.dataset.id;CR.notaDel=null;mount();const f=document.getElementById('cr-nf');f&&f.scrollIntoView({block:'center'});return}
-  if(a==='nota-cancel'){CR.notaEd=null;return mount()}
+  if(a==='nota-cancel'){CR.notaEd=null;CR.fpend=[];return mount()}
   if(a==='nota-del'){const id=+t.dataset.id;if(CR.notaDel!==id){CR.notaDel=id;return mount()}const C=JSON.parse(JSON.stringify(X.C));C.notas=(C.notas||[]).filter(n=>n.id!==id);CR.notaDel=null;guardar(X,C);toast('Nota borrada');return mount()}
   if(a==='rcerrar'){CR.rEd=null;return mount()}
   if(a==='rauto'){const C=JSON.parse(JSON.stringify(X.C));if(C.real)delete C.real[CR.rEd];guardar(X,C);CR.rEd=null;toast('Fechas automáticas');return mount()}
@@ -5246,10 +5334,18 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-cr]');if(!
   if(a==='borrar'){CR.borr=true;return mount()}
   if(a==='borrarno'){CR.borr=false;return mount()}
   if(a==='borrarsi'){CR.borr=false;CR.edit=false;guardar(X,null);toast('Cronograma borrado');return mount()}});
-document.addEventListener('submit',e=>{if(e.target.id!=='cr-nf')return;e.preventDefault();const X=ctx();if(!X||!X.C)return;const fd=Object.fromEntries(new FormData(e.target));
-  const n={f:fd.f,hecho:(fd.hecho||'').trim(),freno:(fd.freno||'').trim(),sigue:(fd.sigue||'').trim()};if(!n.hecho&&!n.freno&&!n.sigue)return toast('Escribí al menos una línea');
-  const C=JSON.parse(JSON.stringify(X.C));C.notas=C.notas||[];if(CR.notaEd){const o=C.notas.find(x=>x.id===CR.notaEd);if(o)Object.assign(o,n)}else C.notas.push({id:Date.now(),...n});
-  const ed=!!CR.notaEd;CR.notaEd=null;guardar(X,C);toast(ed?'Nota actualizada':'Nota publicada');mount()});
+CR.fpend=[];
+function pintaPend(){const el=document.getElementById('cr-fprev');if(!el)return;el.innerHTML=CR.fpend.map((f,i)=>`<span class="cr-fq"><img src="${f.u}" alt=""><button type="button" data-fpq="${i}" aria-label="Quitar foto">✕</button></span>`).join('')}
+document.addEventListener('change',e=>{if(e.target.id!=='cr-nfotos')return;const fs=[...(e.target.files||[])];e.target.value='';CR.fpend.push(...fs.map(f=>({f,u:URL.createObjectURL(f)})));pintaPend()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-fpq]');if(!b)return;e.preventDefault();CR.fpend.splice(+b.dataset.fpq,1);pintaPend()});
+document.addEventListener('submit',async e=>{if(e.target.id!=='cr-nf')return;e.preventDefault();const X=ctx();if(!X||!X.C)return;const fd=Object.fromEntries(new FormData(e.target));
+  const n={f:fd.f,hecho:(fd.hecho||'').trim(),freno:(fd.freno||'').trim(),sigue:(fd.sigue||'').trim()};if(!n.hecho&&!n.freno&&!n.sigue&&!CR.fpend.length)return toast('Escribí al menos una línea o agregá fotos');
+  let nuevas=[];if(CR.fpend.length){const btn=document.getElementById('cr-nfb');if(btn)btn.disabled=true;
+    try{const o=window.ASIS_OBRA&&window.ASIS_OBRA();nuevas=await window.DBX.subirFotos(CR.fpend.map(x=>x.f),o&&o.nombre,n.f,(i,t)=>{if(btn)btn.textContent=`Subiendo foto ${i} de ${t}…`})}
+    catch(err){if(btn){btn.disabled=false;btn.textContent='Reintentar'}return toast('No se pudieron subir las fotos: '+err.message)}}
+  const X2=ctx()||X;const C=JSON.parse(JSON.stringify(X2.C));C.notas=C.notas||[];
+  if(CR.notaEd){const o=C.notas.find(x=>x.id===CR.notaEd);if(o){Object.assign(o,n);o.fotos=(o.fotos||[]).concat(nuevas)}}else C.notas.push({id:Date.now(),...n,fotos:nuevas});
+  const ed=!!CR.notaEd;CR.notaEd=null;CR.fpend=[];guardar(X2,C);toast((ed?'Nota actualizada':'Nota publicada')+(nuevas.length?` con ${nuevas.length} foto${nuevas.length>1?'s':''}`:''));mount()});
 document.addEventListener('change',async e=>{if(!document.getElementById('crono-root'))return;const t=e.target;
   if(t.dataset.crd!=null||t.dataset.crh!=null){const X=ctx();if(!X)return;const k=t.dataset.crd??t.dataset.crh;const C=JSON.parse(JSON.stringify(X.C||{inicio:null,origen:'manual',rubros:{}}));
     const row=t.closest('tr');const d=row.querySelector('[data-crd]').value,h=row.querySelector('[data-crh]').value;
@@ -5295,6 +5391,11 @@ const css=document.createElement('style');css.textContent=`
 .cr-nt{border-left:3px solid var(--line);padding:4px 0 4px 12px;display:flex;flex-direction:column;gap:4px}.cr-nt p{margin:0;font-size:14.5px;line-height:1.4}.cr-nth{display:flex;justify-content:space-between;align-items:center;gap:8px}.cr-nta{display:flex;gap:4px}
 .cr-ntl{display:inline-block;min-width:62px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ok);margin-right:6px}.cr-ntl.fr{color:var(--bad)}.cr-ntl.sg{color:#2f6fbf}
 .cr-fin{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:baseline;font-size:14px;padding:2px 2px}.cr-fin b{font-variant-numeric:tabular-nums}.cr-fp.mal b{color:var(--bad)}.cr-fp.ok b{color:var(--ok)}
+.cr-nf label.btn{flex-direction:row;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
+.cr-fl{display:flex;flex-direction:column;gap:6px}.cr-flt{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.cr-ft{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}.cr-ft:empty{display:none}.cr-ft>button{padding:0;border:0;background:none;cursor:zoom-in;border-radius:8px;overflow:hidden;aspect-ratio:1}.cr-ft img{width:100%;height:100%;object-fit:cover;display:block}
+.cr-fq{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden}.cr-fq button{position:absolute;top:3px;right:3px;width:24px;height:24px;border-radius:99px;border:0;background:rgb(0 0 0/.6);color:#fff;font-size:12px;cursor:pointer}
+.lnk{background:none;border:0;padding:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit}
 .cr-met{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .cr-rt td{vertical-align:middle}.cr-rt td.rn{white-space:normal!important;min-width:150px;max-width:260px}.cr-rt td:first-child b{font-size:13.5px}.cr-rt td.num{white-space:nowrap;font-size:13px}.cr-rt .cr-st{white-space:nowrap;display:inline-block}.cr-st.nada{color:var(--muted)}
 @media (max-width:760px){.cr-rt thead{display:none}.cr-rt,.cr-rt tbody{display:block}
