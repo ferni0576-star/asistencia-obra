@@ -4017,6 +4017,25 @@ function anillo(f1,f2,tam){const r1=44,r2=33,c1=2*Math.PI*r1,c2=2*Math.PI*r2;con
 /* cronograma de la obra (si está cargado): línea estimada y situación */
 function planCrono(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!A||!C||!window.CRONO||!window.CRONO.hay(C))return null;const s=window.CRONO.situacion(A,C);return{f:f=>window.CRONO.planFecha(A,C,f),ini:s.ini,fin:s.fin}}
 /* tarjeta de inicio: cómo va la obra según el cronograma (lo primero que ve el cliente) */
+/* etapas de la obra: cada rubro del cronograma contado en palabras de obra (terminado · en curso · desde tal fecha) */
+const fdmC=n=>{const d=new Date(n*864e5).toISOString().slice(0,10);return d.slice(8,10)+'/'+d.slice(5,7)};
+function etapas(RL,s,modo){const L=RL.filter(x=>x.est!=='excl');
+  const ter=L.filter(x=>x.est==='term').sort((a,b)=>(a.rf||'').localeCompare(b.rf||'')),cur=L.filter(x=>['mal','ok','bien'].includes(x.est)).sort((a,b)=>a.pi-b.pi),pen=L.filter(x=>x.est==='nada').sort((a,b)=>a.pi-b.pi);
+  const ico=t=>t==='ter'?'<span class="et-i ter" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"></path></svg></span>':t==='fin'?'<span class="et-i fin" aria-hidden="true"><i></i></span>':`<span class="et-i ${t}" aria-hidden="true"></span>`;
+  const der=x=>x.est==='term'?(x.atr>7?`<b class="et-d mal">terminó ${x.atr} d tarde</b>`:'<b class="et-d ok">Terminado</b>'):x.est==='mal'?`<b class="et-d mal">${x.atr} d tarde</b>`:x.est==='bien'?`<b class="et-d ok">${-x.atr} d antes</b>`:x.est==='nada'?`<span class="et-d">desde ${fdmC(x.pi+Math.round(s.perd||0))}</span>`:`<b class="et-d">${pct(x.real)}</b>`;
+  const tag=modo==='card'?'span':'button';const at=x=>modo==='card'?'':` type="button" data-rver="rubro" data-k="${esc(x.k)}"`;
+  const fila=x=>{const t=x.est==='term'?'ter':x.est==='nada'?'pen':'cur';
+    return `<${tag} class="et-r ${t}"${at(x)}>${ico(t)}<span class="et-n"><span class="et-t">${esc(cap(x.nombre))}</span>${t==='cur'?`<span class="et-b" title="Debería ir ${pct(x.deb)} · va ${pct(x.real)}"><i style="width:${Math.min(1,x.real)*100}%"></i><u style="left:${Math.min(1,x.deb)*100}%"></u></span>`:''}</span>${der(x)}</${tag}>`};
+  let h='';
+  if(modo==='card'){
+    if(ter.length)h+=`<span class="et-r ter">${ico('ter')}<span class="et-n"><span class="et-t">${ter.length} rubro${ter.length>1?'s':''} terminado${ter.length>1?'s':''}</span></span></span>`;
+    const c=cur.slice().sort((a,b)=>(b.est==='mal')-(a.est==='mal')||b.atr-a.atr).slice(0,4).sort((a,b)=>a.pi-b.pi);h+=c.map(fila).join('');
+    if(cur.length>c.length)h+=`<span class="et-mas">y ${cur.length-c.length} más en curso</span>`;
+    h+=pen.slice(0,2).map(fila).join('');
+  }else{h+=ter.map(fila).join('')+cur.map(fila).join('')+pen.slice(0,3).map(fila).join('');
+    if(pen.length>3)h+=`<details class="et-pe"><summary>${pen.length-3} rubro${pen.length-3>1?'s':''} más por empezar</summary>${pen.slice(3).map(fila).join('')}</details>`}
+  h+=`<span class="et-r fin">${ico('fin')}<span class="et-n"><span class="et-t">Entrega</span></span><b class="et-d">${fdma(s.finProy||s.fin)}</b></span>`;
+  return `<span class="et ${modo==='card'?'et-card':''}">${h}</span>`}
 function cronoCard(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!C||!window.CRONO||!window.CRONO.hay(C))return '';const s=window.CRONO.situacion(A,C);const t=A.tot||1;
   const est=Math.abs(s.atr)<=7?'ok':s.atr>0?'mal':'bien';const pp=Math.min(1,s.plan/t),pr=Math.min(1,s.ej/t);
   const tit=est==='ok'?'La obra va en tiempo':est==='mal'?`La obra va ${s.atr} días atrasada`:`La obra va ${-s.atr} días adelantada`;
@@ -4024,14 +4043,14 @@ function cronoCard(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!C||!win
   const mm=n=>'Gs '+mil(n);
   let tit2=tit;let c2=`<span class="rs-cr2"><span class="rs-crb"><span>Debería ir</span><span class="rs-crt"><i class="p" style="width:${pp*100}%"></i></span><b>${pct(pp)}</b></span>
       <span class="rs-crb"><span>Va</span><span class="rs-crt"><i class="r" style="width:${pr*100}%"></i></span><b>${pct(pr)}</b></span></span>`;
-  if(s.metodo==='rubros'){const R=s.rr;const L=R.atr.length?R.atr.slice(0,3):s.rub.filter(x=>x.est==='ok'||x.est==='bien').sort((a,b)=>b.deb-a.deb).slice(0,3);
+  {const RL=s.rub||window.CRONO.porRubro(A,C);const R=s.rr||window.CRONO.resRub(RL);
     if(est==='ok'&&R.atr.length)tit2=`En tiempo · ${R.atr.length} rubro${R.atr.length>1?'s':''} atrasado${R.atr.length>1?'s':''}`;
-    c2=L.length?`<span class="rs-cr2"><span class="sub">${R.atr.length?'Rubros más atrasados':'Rubros en marcha'}</span>${L.map(x=>`<span class="rs-crb rs-crr" title="Debería ir ${pct(x.deb)} · va ${pct(x.real)}"><span>${esc(x.nombre)}</span><span class="rs-crt"><i class="r" style="width:${Math.min(1,x.real)*100}%"></i><i class="m" style="left:${Math.min(1,x.deb)*100}%"></i></span><b class="${x.est==='mal'?'neg':''}">${x.est==='mal'?x.atr+' d':x.est==='bien'?'+'+(-x.atr)+' d':'al día'}</b></span>`).join('')}</span>`:`<span class="rs-cr2"><span class="sub">Todavía no hay rubros en marcha</span></span>`}
-  return `<button class="panel rs-cron ${est}" data-rver="curva" aria-label="Ver cronograma y curva de avance">
+    c2=`<span class="rs-cr2"><span class="sub">Etapas de la obra · ${pct(Math.min(1,s.ej/t))} del total</span>${etapas(RL,s,'card')}</span>`}
+  return `<button class="panel rs-cron ${est}" data-rver="avance" aria-label="Ver el avance de la obra por etapas">
     <span class="rs-cr1"><span class="rs-crd" aria-hidden="true"></span><span><span class="sub">Según el cronograma de obra</span><b>${tit2}</b><small>${s.finProy&&s.finProy!==(s.perd>0?s.finAj:s.fin)?`Fin estimado al ritmo actual ${fdma(s.finProy)} · plan ${fdma(s.fin)}`:`Fin previsto ${fdma(s.perd>0?s.finAj:s.fin)}${s.perd>0?' (corrido por lluvia)':''}`}</small>${ll?`<small class="rs-crll">${ll}</small>`:''}</span></span>
     ${c2}
     <span class="rs-cr3"><span class="sub">En ${s.mes.nombre}</span><span>Previsto <b>${mm(s.mes.plan)}</b></span><span>Ejecutado <b>${mm(s.mes.ej)}</b></span></span>
-    <span class="rs-go">Ver curva ›</span></button><div class="rs-crx rs-crx1"><section class="panel rs-crxp"><div class="rs-crxh"><b>Próximas 3 semanas</b></div>${window.CRONO.vProx(A,C,4)}</section></div>`}
+    <span class="rs-go">Ver etapas ›</span></button><div class="rs-crx rs-crx1"><section class="panel rs-crxp"><div class="rs-crxh"><b>Próximas 3 semanas</b></div>${window.CRONO.vProx(A,C,4)}</section></div>`}
 function sitCrono(A){const d=RS.D&&RS.D.doc;const C=d&&d.cronograma;if(!A||!C||!window.CRONO||!window.CRONO.hay(C))return '';const s=window.CRONO.situacion(A,C);const t=A.tot||1;
   const cl=Math.abs(s.atr)<=7?'ok':s.atr>0?'mal':'ok';const nn=window.CRONO.nn;return `<p class="rs-sit ${cl}"><b>${Math.abs(s.atr)<=7?'En tiempo según el cronograma'+(s.metodo==='rubros'&&s.rr.atr.length?` (${s.rr.atr.length} rubro${s.rr.atr.length>1?'s':''} atrasado${s.rr.atr.length>1?'s':''})`:''):s.atr>0?`${s.atr} días de atraso según el cronograma`:`${-s.atr} días adelantado según el cronograma`}</b> · ${s.metodo==='rubros'?`promedio de los rubros en marcha${s.rr.atr.length?' · el que más: '+esc(s.rr.atr[0].nombre)+' ('+s.rr.atr[0].atr+' días)':''}`:`hoy deberías llevar ${pct(s.plan/t)} y llevás ${pct(s.ej/t)}`}${s.perd>0?` · descontados ${nn(s.perd)} días de lluvia${cl!=='mal'&&s.atrO>7?` (sin la lluvia serían ${s.atrO} días de atraso)`:''}`:''}</p>`}
 function curvaSVG(C,tot,big,pl){
@@ -4081,10 +4100,9 @@ function ventana(){if(!RS.ver)return '';const D=RS.D,A=D.A;let t='',h='',ancho=f
         <span class="rs-crb"><span>Va</span><span class="rs-crt"><i class="r" style="width:${Math.min(1,s.ej/tt)*100}%"></i></span><b>${pct(Math.min(1,s.ej/tt))}</b></span></div></div>
       <div class="av-kpi"><div><b>${nMar}</b><span>rubros en marcha</span></div><div class="${nAtr?'mal':''}"><b>${nAtr}</b><span>atrasados</span></div><div><b>${nTer}</b><span>terminados</span></div><div><b>${vis.length-nMar-nTer}</b><span>por empezar</span></div></div>
       <div class="rs-leg"><span><i class="k1"></i>Avance de obra</span><span><i class="k3"></i>Cronograma</span></div><div class="rs-chart big">${curvaSVG(A.curva,A.tot,true,planCrono(A))}</div>
-      <h4 class="av-h">Rubro por rubro <span class="sub">tocá uno para ver sus ítems</span></h4>
-      <div class="av-rl">${(()=>{const fila=x=>{const c=chip(x);return `<button class="av-r" data-rver="rubro" data-k="${esc(x.k)}"><span class="av-rn">${esc(cap(x.nombre))}</span><span class="rs-crt" title="Debería ir ${pct(x.deb)} · va ${pct(x.real)}"><i class="r" style="width:${Math.min(1,x.real)*100}%"></i>${x.deb>0?`<i class="m" style="left:${Math.min(1,x.deb)*100}%"></i>`:''}</span><span class="av-rp">${pct(x.real)}</span><span class="cr-st ${c[0]}">${c[1]}</span></button>`};const ya=vis.filter(x=>x.est!=='nada'),pe=vis.filter(x=>x.est==='nada');
-        return ya.map(fila).join('')+(pe.length?`<details class="av-pe"><summary>${pe.length} rubro${pe.length>1?'s':''} todavía no empieza${pe.length>1?'n':''} <span class="sub">· ver</span></summary>${pe.map(fila).join('')}</details>`:'')})()}</div>
-      <p class="sub" style="margin:4px 0 0">Barra = lo hecho · rayita = dónde debería estar hoy según el cronograma.</p>
+      <h4 class="av-h">Etapas de la obra <span class="sub">tocá una para ver sus ítems</span></h4>
+      ${etapas(RL,s,'full')}
+      <p class="sub" style="margin:6px 0 0">En las etapas en curso, la barra es lo hecho y la rayita dónde debería estar hoy según el cronograma.</p>
       <section><h4 class="av-h">Próximas 3 semanas</h4>${CR.vProx(A,C)}</section>
       <div class="bar" style="margin-top:6px"><button class="btn sm" data-rver="curva">Semana a semana</button><button class="btn sm ghost" data-rver="rubros">Avance por rubro (solo %)</button></div>`}
   else if(RS.ver==='diario'){const C=RS.D.doc&&RS.D.doc.cronograma;const N=window.CRONO?window.CRONO.notasDe(C):[];t='Diario de obra';ancho=true;
@@ -4260,6 +4278,14 @@ const css=document.createElement('style');css.textContent=`
 .rs-cron.mal .rs-crd{background:var(--bad);box-shadow:0 0 0 5px var(--bad-bg)}.rs-cron.ok .rs-crd,.rs-cron.bien .rs-crd{background:var(--ok);box-shadow:0 0 0 5px var(--ok-bg)}
 .rs-cr2{display:flex;flex-direction:column;gap:8px;min-width:0}
 .rs-crb{display:grid;grid-template-columns:72px 1fr 56px;gap:8px;align-items:center;font-size:13.5px}.rs-crb b{text-align:right;font-variant-numeric:tabular-nums}
+.et{display:flex;flex-direction:column}.et-r{display:grid;grid-template-columns:22px minmax(0,1fr) minmax(92px,auto);gap:10px;align-items:center;padding:8px 2px;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;text-align:left;width:100%}
+button.et-r{cursor:pointer;min-height:44px}button.et-r:hover{background:color-mix(in srgb,var(--ink) 4%,transparent)}.et-r:last-child{border-bottom:0}
+.et-i{width:20px;height:20px;border-radius:99px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}.et-i.ter{background:var(--ok);color:#fff}.et-i.cur{border:2px solid var(--ch-ej,var(--accent))}.et-i.pen{border:2px solid color-mix(in srgb,var(--muted) 60%,transparent)}.et-i.fin{border:2px solid color-mix(in srgb,var(--muted) 60%,transparent)}.et-i.fin i{width:8px;height:8px;border-radius:2px;background:var(--muted)}
+.et-n{display:flex;flex-direction:column;gap:5px;min-width:0}.et-t{font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.et-r.pen .et-t,.et-r.fin .et-t{color:var(--muted);font-weight:500}
+.et-b{position:relative;height:6px;border-radius:99px;background:color-mix(in srgb,var(--muted) 22%,transparent)}.et-b i{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--ch-ej,var(--accent))}.et-b u{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--ink);opacity:.75;text-decoration:none}
+.et-d{text-align:right;font-size:12.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}b.et-d{color:var(--ink)}.et-d.mal{color:var(--bad)}.et-d.ok{color:var(--ok)}
+.et-mas{font-size:12.5px;color:var(--muted);padding:4px 0 4px 32px}.et-pe summary{cursor:pointer;padding:10px 2px 10px 32px;font-size:13.5px;color:var(--muted)}
+.rs-cron .et-card .et-r{padding:6px 0}.rs-cron .et-t{font-size:13.5px}
 .av-top{display:grid;grid-template-columns:1.2fr 1fr;gap:16px;align-items:center;padding:14px 16px;border-radius:14px;border-left:6px solid var(--line);background:color-mix(in srgb,var(--chip) 55%,transparent)}
 .av-top.mal{border-left-color:var(--bad)}.av-top.ok,.av-top.bien{border-left-color:var(--ok)}.av-est{display:flex;flex-direction:column;gap:3px}.av-est>b{font-family:var(--f-display);font-size:26px;line-height:1.05;text-transform:uppercase}
 .av-top.mal .av-est>b{color:var(--bad)}.av-top.ok .av-est>b,.av-top.bien .av-est>b{color:var(--ok)}.av-bars{display:flex;flex-direction:column;gap:8px}
