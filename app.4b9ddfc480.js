@@ -5202,10 +5202,15 @@ const esc2=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 const aviso=m=>{try{toast(m)}catch(e){}};
 
 /* achica en el celular antes de subir: foto ~1600 px y miniatura ~400 px */
-async function achicar(file,max,q){let im=null;try{im=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){try{im=await createImageBitmap(file)}catch(e2){}}
+async function achicar(file,max,q){try{return await achicar0(file,max,q)}catch(e){
+  /* si el navegador no puede abrir la foto (p. ej. HEIC), se sube tal cual cuando es JPG/PNG/WEBP liviana */
+  if(/^image\/(jpeg|png|webp)$/.test(file.type)&&file.size<=3e6)return{b:file,w:0,h:0};
+  throw new Error(/heic|heif/i.test(file.type+file.name)?'La foto está en formato HEIC. En la cámara del celular elegí formato JPG (o “Más compatible”) y volvé a intentar.':'El navegador no pudo abrir la foto '+(file.name||''))}}
+async function achicar0(file,max,q){let im=null;try{im=await createImageBitmap(file,{imageOrientation:'from-image'})}catch(e){try{im=await createImageBitmap(file)}catch(e2){}}
   if(!im){im=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('No se pudo leer la foto'));i.src=URL.createObjectURL(file)})}
   const w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;const k=Math.min(1,max/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
-  c.getContext('2d').drawImage(im,0,0,c.width,c.height);const b=await new Promise(ok=>c.toBlob(ok,'image/jpeg',q));return{b,w:c.width,h:c.height}}
+  if(!c.width||!c.height)throw new Error('foto vacía');c.getContext('2d').drawImage(im,0,0,c.width,c.height);try{im.close&&im.close()}catch(e){}
+  const b=await new Promise(ok=>c.toBlob(ok,'image/jpeg',q));if(!b)throw new Error('No se pudo comprimir la foto');return{b,w:c.width,h:c.height}}
 const aURL=b=>new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.readAsDataURL(b)});
 
 /* ---------- datos ---------- */
@@ -5217,11 +5222,13 @@ async function listar(oid){if(!nube())return demoGet().filter(f=>f.obra_id===oid
 async function firmar(paths){const falta=paths.filter(p=>p&&!FO.url[p]);if(!falta.length||!nube())return;
   for(let i=0;i<falta.length;i+=100){const{data,error}=await SB.storage.from('fotos').createSignedUrls(falta.slice(i,i+100),3600*6);if(!error)(data||[]).forEach(x=>{if(x.signedUrl)FO.url[x.path]=x.signedUrl})}}
 const src=(f,full)=>nube()?FO.url[full?f.path:f.thumb]||'':(full?f.full:f.th);
-async function subir(oid,files,fecha,nota,prog){const hechos=[];let i=0;
+const plazo=(pr,ms,m)=>Promise.race([pr,new Promise((_,no)=>setTimeout(()=>no(new Error(m)),ms))]);
+async function subir(oid,files,fecha,nota,prog){if(nube()){const{data}=await SB.auth.getSession();if(!data||!data.session)throw new Error('Tu sesión se cerró. Volvé a entrar y probá de nuevo.')}const hechos=[];let i=0;
   for(const file of files){i++;prog&&prog(i,files.length);
     const g=await achicar(file,1600,0.8),t=await achicar(file,420,0.7);const id=uidF();const base=`${oid}/${fecha}/${id}`;
     if(!nube()){const L=demoGet();const r={id,obra_id:oid,fecha,nota:nota||null,path:base+'.jpg',thumb:base+'_t.jpg',w:g.w,h:g.h,tam:g.b.size,creado:new Date().toISOString(),full:await aURL(await achicar(file,900,0.7).then(x=>x.b)),th:await aURL(t.b)};L.push(r);demoSet(L);hechos.push(r);continue}
-    let r=await SB.storage.from('fotos').upload(base+'.jpg',g.b,{contentType:'image/jpeg',upsert:false});if(r.error)throw r.error;
+    const T='La conexión está muy lenta: no terminó de subir. Probá con menos fotos o con wifi.';
+    let r=await plazo(SB.storage.from('fotos').upload(base+'.jpg',g.b,{contentType:'image/jpeg',upsert:false}),90e3,T);if(r.error)throw r.error;
     r=await SB.storage.from('fotos').upload(base+'_t.jpg',t.b,{contentType:'image/jpeg',upsert:false});if(r.error){await SB.storage.from('fotos').remove([base+'.jpg']);throw r.error}
     const row={id,obra_id:oid,fecha,nota:nota||null,path:base+'.jpg',thumb:base+'_t.jpg',w:g.w,h:g.h,tam:g.b.size,autor:(window.USR&&window.USR.email&&window.USR.email())||null};
     const q=await SB.from('fotos').insert(row).select().single();if(q.error){await SB.storage.from('fotos').remove([row.path,row.thumb]);throw q.error}hechos.push(q.data)}
@@ -5236,10 +5243,10 @@ function grilla(fs,max,borr){const v=max?fs.slice(0,max):fs;
   return `<div class="fo-g" data-fotog>${v.map(f=>`<span class="fo-c">${borr?`<button type="button" class="fo-x" data-fo="del" data-id="${f.id}" aria-label="Borrar foto">${FO.borrar===f.id?'¿Borrar?':'✕'}</button>`:''}<button type="button" class="fo-t" data-fotov="${esc2(src(f,true)||src(f))}" data-fo-full="${esc2(f.path)}" aria-label="Ver foto del ${esc2(f.fecha)}"><img src="${esc2(src(f))}" alt="" loading="lazy"></button></span>`).join('')}${max&&fs.length>max?`<button type="button" class="fo-mas" data-fo="ver">+${fs.length-max}</button>`:''}</div>`}
 function notas(fs){const n=[...new Set(fs.map(f=>f.nota).filter(Boolean))];return n.length?`<p class="fo-n">${n.map(esc2).join(' · ')}</p>`:''}
 function vCard(){const L=FO.lista;const dias=porDia(L);const d0=dias[0];
-  const sube=puedeSubir()?`<label class="btn sm primary fo-up">+ Subir fotos<input type="file" id="fo-file" accept="image/*" multiple hidden></label>`:'';
+  const sube=puedeSubir()?`<label class="btn sm primary fo-up">+ Subir fotos<input type="file" id="fo-file" class="fo-in" accept="image/*" multiple></label><label class="btn sm fo-up fo-cam" title="Sacar una foto ahora">📷<input type="file" id="fo-cam" class="fo-in" accept="image/*" capture="environment"></label>`:'';
   return `<section class="panel fo-card"><div class="fo-h"><div><b>Fotos de la obra</b><span class="sub">${L.length?`${L.length} foto${L.length>1?'s':''} · ${dias.length} día${dias.length>1?'s':''}`:FO.cargando?'Cargando…':'Todavía no hay fotos'}</span></div><div class="fo-ha">${L.length?'<button class="btn sm ghost" data-fo="ver">Ver todas</button>':''}${sube}</div></div>
     ${d0?`<div class="fo-dia"><span class="fo-dt">${fdia(d0[0])}</span>${notas(d0[1])}${grilla(d0[1],8,false)}</div>`:puedeSubir()&&!FO.cargando?'<p class="sub" style="margin:0">Subí las fotos del día y el cliente ve cómo avanza su obra.</p>':''}
-    ${vSub()}</section>`}
+    ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo subir</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}${vSub()}</section>`}
 function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
     <div class="fo-sf"><label>Fecha<input type="date" id="fo-fecha" value="${s.fecha}" max="${hoyF()}"></label><label class="fo-wide">Qué se ve (opcional)<input type="text" id="fo-nota" value="${esc2(s.nota||'')}" placeholder="Ej.: hormigonado de vigas del bloque 2" maxlength="160"></label></div>
@@ -5258,8 +5265,15 @@ async function cargar(oid,forzar){if(FO.oid===oid&&!forzar&&!FO.cargando){pintar
   FO.cargando=false;pintar()}
 window.FOTOS={html:()=>'<div id="fo-root"></div>',montar:()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();if(!o)return;setTimeout(()=>cargar(o.id),0)},cargar};
 
-document.addEventListener('change',async e=>{if(e.target.id!=='fo-file')return;const fs=[...(e.target.files||[])].filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|heic|webp)$/i.test(f.name));e.target.value='';if(!fs.length)return;
-  const prev=FO.sub?FO.sub.prev:[],files=FO.sub?FO.sub.files:[];FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:hoyF(),nota:FO.sub?FO.sub.nota:''};pintar()});
+document.addEventListener('change',e=>{const t=e.target;if(!t||(t.id!=='fo-file'&&t.id!=='fo-cam'))return;
+  try{const todos=[...(t.files||[])];
+    /* algunos celulares mandan la foto sin tipo ni extensión: se acepta y se revisa al achicarla */
+    const fs=todos.filter(f=>/^image\//.test(f.type)||!f.type||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));t.value='';
+    if(!fs.length){if(todos.length)aviso('Eso no parece una foto');return}
+    FO.err=null;const prev=FO.sub?FO.sub.prev:[],files=FO.sub?FO.sub.files:[];
+    FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:hoyF(),nota:FO.sub?FO.sub.nota:''};pintar();
+    const el=document.querySelector('#fo-root .fo-sub');el&&el.scrollIntoView({block:'nearest',behavior:'smooth'})}
+  catch(err){FO.err='No se pudo leer la foto: '+(err.message||err);pintar()}});
 document.addEventListener('input',e=>{if(!FO.sub)return;if(e.target.id==='fo-nota')FO.sub.nota=e.target.value;if(e.target.id==='fo-fecha')FO.sub.fecha=e.target.value});
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-fo]');if(!t)return;const a=t.dataset.fo;
@@ -5271,7 +5285,10 @@ document.addEventListener('click',async e=>{
   if(a==='subir'){const s=FO.sub;if(!s||s.subiendo)return;const n=document.getElementById('fo-nota'),f=document.getElementById('fo-fecha');s.nota=n?n.value.trim():'';s.fecha=(f&&f.value)||hoyF();
     try{s.subiendo='Preparando…';pintar();const L=await subir(FO.oid,s.files,s.fecha,s.nota,(i,k)=>{s.subiendo=`Subiendo ${i} de ${k}…`;pintar()});
       FO.sub=null;aviso(`${L.length} foto${L.length>1?'s':''} subida${L.length>1?'s':''}`);await cargar(FO.oid,true)}
-    catch(err){s.subiendo=null;pintar();aviso('No se pudo subir: '+(err.message||err))}return}
+    catch(err){s.subiendo=null;const m=String(err&&(err.message||err.error||err)||'error');console.error('fotos',err);
+      FO.err=/row-level|policy|Unauthorized|403/i.test(m)?'Tu usuario no tiene permiso para subir fotos en esta obra.':/exceeded|too large|413|size/i.test(m)?'La foto es demasiado pesada.':/fetch|network|Failed/i.test(m)?'Sin conexión con el servidor. Revisá internet y probá de nuevo.':m;
+      pintar()}return}
+  if(a==='okerr'){FO.err=null;return pintar()}
   if(a==='del'){const id=t.dataset.id;if(FO.borrar!==id){FO.borrar=id;return pintar()}const f=FO.lista.find(x=>x.id===id);if(!f)return;
     try{await borrar(f);FO.lista=FO.lista.filter(x=>x.id!==id);FO.borrar=null;aviso('Foto borrada');pintar()}catch(err){aviso('No se pudo borrar')}}
 });
@@ -5280,7 +5297,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FO.ver&&!document.q
 const css=document.createElement('style');css.textContent=`
 .fo-card{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .fo-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fo-h>div:first-child{display:flex;flex-direction:column}.fo-h b{font-size:16px}.fo-ha{display:flex;gap:8px;align-items:center}
-.fo-up{cursor:pointer}
+.fo-up{cursor:pointer;position:relative;overflow:hidden}.fo-in{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}.fo-cam{padding-inline:10px}@media(hover:hover) and (pointer:fine){.fo-cam{display:none}}.fo-err{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bad-soft,#fde8e4);color:var(--ink);border:1px solid var(--bad,#c0392b)}.fo-err .btn{align-self:flex-start}
 .fo-dia{display:flex;flex-direction:column;gap:6px}.fo-dt{font-weight:700;font-size:14px}.fo-n{margin:0;font-size:13.5px;color:var(--muted)}
 .fo-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
 .fo-c{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:color-mix(in srgb,var(--muted) 18%,transparent)}
