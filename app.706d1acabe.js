@@ -4885,7 +4885,10 @@ function proximas(A,C,dias){dias=dias||21;const H=hoyN();const sh=Math.round(per
     const nom=String(r.nombre).replace(/^\d+[.)]?\s*/,'');const real=r.tot?r.ej/r.tot:0;
     if(pi>H&&pi<=H+dias&&real<=0)L.push({n:pi,t:'arranca',nom});if(pf>=H&&pf<=H+dias&&real<0.999)L.push({n:pf,t:'termina',nom,real})}
   return L.sort((a,b)=>a.n-b.n)}
-const notasDe=C=>((C&&C.notas)||[]).slice().sort((a,b)=>a.f<b.f?1:a.f>b.f?-1:(b.id||0)-(a.id||0));
+const notasDe=C=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();const L=o&&window.DIARIO&&window.DIARIO.lista(o.id);
+  if(L)return L.map(n=>({id:n.id,f:n.fecha,hecho:n.hecho,freno:n.freno,sigue:n.sigue,c:n.creado||''})).sort((a,b)=>a.f<b.f?1:a.f>b.f?-1:a.c<b.c?1:-1);
+  if(o&&window.DIARIO)window.DIARIO.asegurar(o.id,()=>{if(document.getElementById('crono-root'))mount()});
+  return ((C&&C.notas)||[]).slice().sort((a,b)=>a.f<b.f?1:a.f>b.f?-1:(b.id||0)-(a.id||0))};
 function vProx(A,C,max){const L=proximas(A,C);const v=max?L.slice(0,max):L;
   return v.length?`<ul class="cr-px">${v.map(x=>`<li><span class="cr-pxd">${fds(x.n)}</span><span class="cr-pxt ${x.t}">${x.t==='arranca'?'Arranca':'Termina'}</span><span class="cr-pxn">${esc(x.nom)}${x.t==='termina'&&x.real!=null?` <span class="sub">(va ${pct(x.real)})</span>`:''}</span></li>`).join('')}${max&&L.length>max?`<li class="sub">y ${L.length-max} más</li>`:''}</ul>`:'<p class="sub" style="margin:0">Ningún rubro arranca ni termina en las próximas 3 semanas.</p>'}
 function vNota(n,ed){return `<article class="cr-nt"><div class="cr-nth"><b>${fds(dn(n.f))}</b>${ed?`<span class="cr-nta"><button class="btn sm ghost" data-cr="nota-ed" data-id="${n.id}">Editar</button><button class="btn sm ghost" data-cr="nota-del" data-id="${n.id}" ${CR.notaDel===n.id?'style="color:var(--bad)"':''}>${CR.notaDel===n.id?'¿Borrar? Tocá otra vez':'Borrar'}</button></span>`:''}</div>
@@ -4893,7 +4896,9 @@ function vNota(n,ed){return `<article class="cr-nt"><div class="cr-nth"><b>${fds
 function dbxLinea(){const D=window.DBX;if(!D)return '';const ok=D.conectado();
   return ok?`<label class="btn sm" style="cursor:pointer;align-self:flex-start">+ Agregar fotos<input type="file" id="cr-nfotos" accept="image/*" multiple hidden></label><span class="sub">${D.nube()?`Se guardan en tu Dropbox${D.cuenta()?' ('+esc(D.cuenta())+')':''} · <button type="button" class="lnk" data-cr="dbx-off">desconectar</button>`:'En la demo las fotos quedan en este navegador; en tu web van a tu Dropbox.'}</span>`
    :`<span class="sub">Para subir fotos, conectá tu Dropbox en este dispositivo (una sola vez).</span><button type="button" class="btn sm" data-cr="dbx-on" style="align-self:flex-start">Conectar Dropbox</button>`}
-function vNotas(C){const N=notasDe(C);const ed=!window.CLI;const e=CR.notaEd?N.find(x=>x.id===CR.notaEd)||{}:null;const ab=CR.notasAb;const vis=ab?N:N.slice(0,3);
+function vNotas(C){if(window.DIARIO){const N=notasDe(C);const vis=CR.notasAb?N:N.slice(0,3);
+    return `${window.CLI?'':'<p class="sub" style="margin:0">El diario ahora se escribe en el inicio de la obra, en <b>Día a día</b>, al lado de las fotos de cada día. <button type="button" class="lnk" data-tab="obra">Ir a escribir</button></p>'}${vis.map(n=>vNota(n,false)).join('')||'<p class="sub" style="margin:0">Todavía no hay notas de obra.</p>'}${N.length>3?`<button class="btn sm ghost" data-cr="notas-ab" style="align-self:flex-start">${CR.notasAb?'Ver solo las últimas':`Ver las ${N.length} notas`}</button>`:''}`}
+  const N=notasDe(C);const ed=!window.CLI;const e=CR.notaEd?N.find(x=>x.id===CR.notaEd)||{}:null;const ab=CR.notasAb;const vis=ab?N:N.slice(0,3);
   const form=ed?`<form class="cr-nf" id="cr-nf">${e?`<b>Editando la nota del ${fdm(e.f)}</b>`:'<b>Nota de hoy</b>'}
     <label>Fecha<input type="date" name="f" value="${e?e.f:nd(hoyN())}" required></label>
     <label>Qué se hizo<textarea name="hecho" rows="2" placeholder="Ej.: se terminó el encadenado inferior de los locales 1 a 3">${esc(e&&e.hecho||'')}</textarea></label>
@@ -5197,7 +5202,7 @@ const css=document.createElement('style');css.textContent=`
 /* ============ Fotos de obra: avance día a día que ve el cliente ============
    Web real: Supabase Storage, bucket privado "fotos", ruta <obra>/<fecha>/<id>.jpg (+ _t.jpg miniatura).
    Cada cliente solo ve las fotos de su obra (reglas en la base). Demo: quedan en este navegador. */
-const FO={oid:null,lista:[],cargando:false,url:{},ver:null,limite:40,borrar:null,sub:null};
+const FO={oid:null,lista:[],notas:[],notasOk:false,dia:null,edN:null,delN:null,cargando:false,url:{},ver:null,limite:40,borrar:null,sub:null};
 const hoyF=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
 const DS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const fdia=f=>{const d=new Date(f+'T12:00:00');const h=hoyF();const ay=new Date(Date.now()-864e5);const ays=new Date(ay.getTime()-ay.getTimezoneOffset()*6e4).toISOString().slice(0,10);
@@ -5242,34 +5247,76 @@ async function subir(oid,files,fecha,nota,prog){if(nube()){const{data}=await SB.
 async function borrar(f){if(!nube()){demoSet(demoGet().filter(x=>x.id!==f.id));return}
   await SB.storage.from('fotos').remove([f.path,f.thumb]);const{error}=await SB.from('fotos').delete().eq('id',f.id);if(error)throw error}
 
+/* ---------- diario de obra (una o más notas por día) ---------- */
+const dGet=()=>{try{return JSON.parse(localStorage.getItem('diario_demo')||'null')}catch(e){return null}};
+const dSet=L=>{try{localStorage.setItem('diario_demo',JSON.stringify(L))}catch(e){}};
+const diasAtras=n=>{const d=new Date(Date.now()-n*864e5);return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+async function listarN(oid){if(!nube()){let L=dGet();if(!L)L=[];if(!L.some(n=>n.obra_id===oid)&&!(L.sembradas||[]).includes(oid)){
+      L.push({id:uidF(),obra_id:oid,fecha:diasAtras(1),hecho:'Se terminó el encadenado inferior del bloque 1 y se arrancó con la mampostería de elevación.',freno:'',sigue:'Columnas del bloque 1 y encofrado de la viga de fachada.',creado:new Date().toISOString()},
+        {id:uidF(),obra_id:oid,fecha:diasAtras(3),hecho:'Desencofrado del bloque 2 y replanteo de la mampostería de aislación.',freno:'Lluvia al mediodía: se paró 3 horas.',sigue:'Carga del contrapiso.',creado:new Date().toISOString()});dSet(L)}
+    return L.filter(n=>n.obra_id===oid)}
+  const{data,error}=await SB.from('diario').select('*').eq('obra_id',oid).order('fecha',{ascending:false}).order('creado',{ascending:true}).limit(1000);
+  if(error){if(/diario/.test(error.message||''))return[];throw error}return data||[]}
+async function guardarN(oid,fecha,v,id){const row={hecho:v.hecho||null,freno:v.freno||null,sigue:v.sigue||null,fecha};
+  if(!nube()){const L=dGet()||[];let r=id&&L.find(n=>n.id===id);if(r)Object.assign(r,row);else{r={id:uidF(),obra_id:oid,creado:new Date().toISOString(),...row};L.push(r)}dSet(L);return r}
+  const q=id?await SB.from('diario').update({...row,actualizado:new Date().toISOString()}).eq('id',id).select().single()
+    :await SB.from('diario').insert({...row,obra_id:oid,autor:(window.USR&&window.USR.email&&window.USR.email())||null}).select().single();
+  if(q.error)throw q.error;return q.data}
+async function borrarN(id){if(!nube()){dSet((dGet()||[]).filter(n=>n.id!==id));return}const{error}=await SB.from('diario').delete().eq('id',id);if(error)throw error}
+
 /* ---------- vistas ---------- */
 const porDia=L=>{const m=new Map();L.forEach(f=>{if(!m.has(f.fecha))m.set(f.fecha,[]);m.get(f.fecha).push(f)});return[...m.entries()]};
 const puedeSubir=()=>!window.CLI;
+const DSC=['dom','lun','mar','mié','jue','vie','sáb'];
+function dias(){const s=new Set([...FO.lista.map(f=>f.fecha),...FO.notas.map(n=>n.fecha)]);if(puedeSubir())s.add(hoyF());return[...s].sort().reverse()}
+const fotosDe=d=>FO.lista.filter(f=>f.fecha===d);
+const notasDia=d=>FO.notas.filter(n=>n.fecha===d).sort((a,b)=>(a.creado||'')<(b.creado||'')?-1:1);
 function grilla(fs,max,borr){const v=max?fs.slice(0,max):fs;
-  return `<div class="fo-g" data-fotog>${v.map(f=>`<span class="fo-c">${borr?`<button type="button" class="fo-x" data-fo="del" data-id="${f.id}" aria-label="Borrar foto">${FO.borrar===f.id?'¿Borrar?':'✕'}</button>`:''}<button type="button" class="fo-t" data-fotov="${esc2(src(f,true)||src(f))}" data-fo-full="${esc2(f.path)}" aria-label="Ver foto del ${esc2(f.fecha)}"><img src="${esc2(src(f))}" alt="" loading="lazy"></button></span>`).join('')}${max&&fs.length>max?`<button type="button" class="fo-mas" data-fo="ver">+${fs.length-max}</button>`:''}</div>`}
-function notas(fs){const n=[...new Set(fs.map(f=>f.nota).filter(Boolean))];return n.length?`<p class="fo-n">${n.map(esc2).join(' · ')}</p>`:''}
-function vCard(){const L=FO.lista;const dias=porDia(L);const d0=dias[0];
-  const sube=puedeSubir()?`<label class="btn sm primary fo-up">+ Subir fotos<input type="file" id="fo-file" class="fo-in" accept="image/*" multiple></label><label class="btn sm fo-up fo-cam" title="Sacar una foto ahora">📷<input type="file" id="fo-cam" class="fo-in" accept="image/*" capture="environment"></label>`:'';
-  return `<section class="panel fo-card"><div class="fo-h"><div><b>Fotos de la obra</b><span class="sub">${L.length?`${L.length} foto${L.length>1?'s':''} · ${dias.length} día${dias.length>1?'s':''}`:FO.cargando?'Cargando…':'Todavía no hay fotos'}</span></div><div class="fo-ha">${L.length?'<button class="btn sm ghost" data-fo="ver">Ver todas</button>':''}${sube}</div></div>
-    ${d0?`<div class="fo-dia"><span class="fo-dt">${fdia(d0[0])}</span>${notas(d0[1])}${grilla(d0[1],8,false)}</div>`:puedeSubir()&&!FO.cargando?'<p class="sub" style="margin:0">Subí las fotos del día y el cliente ve cómo avanza su obra.</p>':''}
-    ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo subir</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}${vSub()}</section>`}
+  return `<div class="fo-g" data-fotog>${v.map(f=>`<span class="fo-c">${borr?`<button type="button" class="fo-x" data-fo="del" data-id="${f.id}" aria-label="Borrar foto">${FO.borrar===f.id?'¿Borrar?':'✕'}</button>`:''}<button type="button" class="fo-t" data-fotov="${esc2(src(f,true)||src(f))}" data-fo-full="${esc2(f.path)}" aria-label="Ver foto del ${esc2(f.fecha)}"><img src="${esc2(src(f))}" alt="" loading="lazy"></button></span>`).join('')}${max&&fs.length>max?`<button type="button" class="fo-mas" data-fo="ver" aria-label="Ver todas las fotos">+${fs.length-max}</button>`:''}</div>`}
+function leyendas(fs){const n=[...new Set(fs.map(f=>f.nota).filter(Boolean))];return n.length?`<p class="fo-n">${n.map(esc2).join(' · ')}</p>`:''}
+function vNotaTxt(n){return `${n.hecho?`<p><span class="fo-l">Se hizo</span>${esc2(n.hecho)}</p>`:''}${n.freno?`<p><span class="fo-l fr">Frenó</span>${esc2(n.freno)}</p>`:''}${n.sigue?`<p><span class="fo-l sg">Sigue</span>${esc2(n.sigue)}</p>`:''}`}
+function vNotaDia(d){const N=notasDia(d);const ed=puedeSubir();const e=FO.edN!=null?(FO.edN==='nueva'?{}:N.find(n=>n.id===FO.edN)):(!N.length&&ed?{}:null);
+  if(e)return `<form class="fo-nf" id="fo-nf"><label>Qué se hizo<textarea id="fo-h" rows="3" placeholder="Ej.: se terminó el encadenado inferior de los locales 1 a 3">${esc2(e.hecho||'')}</textarea></label>
+    <label>Qué frenó <span>(opcional)</span><textarea id="fo-fr" rows="2" placeholder="Ej.: lluvia al mediodía, demora del hierro">${esc2(e.freno||'')}</textarea></label>
+    <label>Qué sigue<textarea id="fo-sg" rows="2" placeholder="Ej.: mampostería de elevación y columnas">${esc2(e.sigue||'')}</textarea></label>
+    <div class="bar"><button class="btn primary" data-fo="nguardar" ${FO.guardando?'disabled':''}>${FO.guardando?'Guardando…':e.id?'Guardar cambios':'Publicar nota del día'}</button>${FO.edN!=null?'<button type="button" class="btn ghost" data-fo="ncancel">Cancelar</button>':''}</div></form>`;
+  if(!N.length)return '<p class="sub" style="margin:0">Sin nota escrita este día.</p>';
+  return N.map(n=>`<article class="fo-nt">${vNotaTxt(n)}${ed?`<div class="fo-nta"><button type="button" class="btn sm ghost" data-fo="ned" data-id="${n.id}">Editar</button><button type="button" class="btn sm ghost" data-fo="ndel" data-id="${n.id}" ${FO.delN===n.id?'style="color:var(--bad)"':''}>${FO.delN===n.id?'¿Borrar? Tocá otra vez':'Borrar'}</button></div>`:''}</article>`).join('')
+    +(ed?'<button type="button" class="btn sm ghost" data-fo="nnueva" style="align-self:flex-start">+ Otra nota este día</button>':'')}
+function vCard(){const D=dias();if(!FO.dia||!D.includes(FO.dia))FO.dia=D[0]||hoyF();const d=FO.dia;const i=D.indexOf(d);const fs=fotosDe(d);const sube=puedeSubir();
+  const btnF=sube?`<label class="btn sm primary fo-up">+ Fotos<input type="file" id="fo-file" class="fo-in" accept="image/*" multiple></label><label class="btn sm fo-up fo-cam" aria-label="Sacar una foto ahora">Cámara<input type="file" id="fo-cam" class="fo-in" accept="image/*" capture="environment"></label>`:'';
+  const chips=D.slice(0,30).map(x=>{const dd=new Date(x+'T12:00:00');const nf=fotosDe(x).length,nn=notasDia(x).length;
+    return `<button type="button" class="fo-ch" data-fo="dia" data-d="${x}" aria-pressed="${x===d}" aria-label="${fdia(x)}"><span>${x===hoyF()?'Hoy':DSC[dd.getDay()]}</span><b>${x.slice(8,10)}/${x.slice(5,7)}</b><i>${nn?'<em class="n"></em>':''}${nf?'<em class="f"></em>':''}</i></button>`}).join('');
+  return `<section class="panel fo-card"><div class="fo-h"><div><b>Día a día</b><span class="sub">${sube?'Diario y fotos de la obra · el cliente lo ve':'Lo que se hizo en tu obra, con fotos'}</span></div>${FO.lista.length?'<button class="btn sm ghost" data-fo="ver">Ver todo</button>':''}</div>
+    ${FO.cargando&&!D.length?'<p class="sub" style="margin:0">Cargando…</p>':`
+    <div class="fo-nav"><button type="button" class="fo-ar" data-fo="dia" data-d="${D[i+1]||''}" ${D[i+1]?'':'disabled'} aria-label="Día anterior">‹</button>
+      <div class="fo-dh"><b>${fdia(d)}</b><span class="sub">${fs.length?fs.length+' foto'+(fs.length>1?'s':''):'sin fotos'}${notasDia(d).length?' · con nota':''}</span></div>
+      <button type="button" class="fo-ar" data-fo="dia" data-d="${D[i-1]||''}" ${i>0?'':'disabled'} aria-label="Día siguiente">›</button></div>
+    ${D.length>1?`<div class="fo-chs" role="group" aria-label="Elegir día">${chips}</div>`:''}
+    <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vNotaDia(d)}</div>
+      <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,false):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
+    ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo guardar</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}</section>`}
 function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
     <div class="fo-sf"><label>Fecha<input type="date" id="fo-fecha" value="${s.fecha}" max="${hoyF()}"></label><label class="fo-wide">Qué se ve (opcional)<input type="text" id="fo-nota" value="${esc2(s.nota||'')}" placeholder="Ej.: hormigonado de vigas del bloque 2" maxlength="160"></label></div>
     <div class="bar"><button class="btn primary" data-fo="subir" ${s.subiendo?'disabled':''}>${s.subiendo?esc2(s.subiendo):`Subir ${s.files.length} foto${s.files.length>1?'s':''}`}</button><button class="btn ghost" data-fo="cancelar" ${s.subiendo?'disabled':''}>Cancelar</button></div></div>`}
-function vGaleria(){const dias=porDia(FO.lista);let n=0;const vis=[];for(const d of dias){if(n>=FO.limite)break;vis.push(d);n+=d[1].length}
-  return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Fotos de la obra"><div class="rs-wh"><b>Fotos de la obra</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
-   <div class="rs-wc">${vis.map(([f,fs])=>`<div class="fo-dia"><span class="fo-dt">${fdia(f)} <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span></span>${notas(fs)}${grilla(fs,0,puedeSubir())}</div>`).join('')||'<p class="sub">Todavía no hay fotos.</p>'}
-   ${dias.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver días anteriores</button>':''}</div></div>`}
+function vGaleria(){const D=dias().filter(x=>fotosDe(x).length||notasDia(x).length);let n=0;const vis=[];for(const d of D){if(n>=FO.limite)break;vis.push(d);n+=Math.max(1,fotosDe(d).length)}
+  return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Día a día de la obra"><div class="rs-wh"><b>Día a día de la obra</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
+   <div class="rs-wc">${vis.map(d=>{const fs=fotosDe(d);const N=notasDia(d);return `<div class="fo-dia"><span class="fo-dt">${fdia(d)}${fs.length?` <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span>`:''}</span>${N.map(x=>`<div class="fo-nt">${vNotaTxt(x)}</div>`).join('')}${leyendas(fs)}${fs.length?grilla(fs,0,puedeSubir()):''}</div>`}).join('')||'<p class="sub">Todavía no hay nada cargado.</p>'}
+   ${D.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver días anteriores</button>':''}</div></div>`}
 
 /* ---------- montaje: la tarjeta va en el inicio de la obra (debajo del cronograma) ---------- */
-function pintar(){const el=document.getElementById('fo-root');if(!el)return;el.innerHTML=vCard();
-  let g=document.getElementById('fo-gal');if(FO.ver){if(!g){g=document.createElement('div');g.id='fo-gal';document.body.appendChild(g)}g.innerHTML=vGaleria()}else if(g)g.remove()}
+function pintar(){const el=document.getElementById('fo-root');if(el){const ch=el.querySelector('.fo-chs');const sx=ch?ch.scrollLeft:0;el.innerHTML=vCard();const c2=el.querySelector('.fo-chs');if(c2){c2.scrollLeft=sx;const on=c2.querySelector('[aria-pressed="true"]');if(on&&(on.offsetLeft<c2.scrollLeft||on.offsetLeft+on.offsetWidth>c2.scrollLeft+c2.clientWidth))c2.scrollLeft=on.offsetLeft-12}}
+  let g=document.getElementById('fo-gal');if(FO.ver){if(!g){g=document.createElement('div');g.id='fo-gal';document.body.appendChild(g)}g.innerHTML=vGaleria()}else if(g)g.remove();
+  (FO.avisar||[]).forEach(f=>{try{f()}catch(e){}})}
 async function cargar(oid,forzar){if(FO.oid===oid&&!forzar&&!FO.cargando){pintar();return}
-  FO.oid=oid;FO.cargando=true;FO.lista=[];pintar();
-  try{const L=await listar(oid);if(FO.oid!==oid)return;FO.lista=L;await firmar(L.slice(0,60).flatMap(f=>[f.thumb,f.path]))}catch(e){aviso('No se pudieron cargar las fotos')}
+  if(FO.oid!==oid){FO.dia=null;FO.edN=null;FO.sub=null;FO.notasOk=false}
+  FO.oid=oid;FO.cargando=true;if(!forzar){FO.lista=[];FO.notas=[]}pintar();
+  try{const[L,N]=await Promise.all([listar(oid),listarN(oid).catch(()=>[])]);if(FO.oid!==oid)return;FO.lista=L;FO.notas=N;FO.notasOk=true;await firmar(L.slice(0,60).flatMap(f=>[f.thumb,f.path]))}catch(e){aviso('No se pudo cargar el día a día')}
   FO.cargando=false;pintar()}
 window.FOTOS={html:()=>'<div id="fo-root"></div>',montar:()=>{const o=window.ASIS_OBRA&&window.ASIS_OBRA();if(!o)return;setTimeout(()=>cargar(o.id),0)},cargar};
+/* el cronograma y la ventana de avance leen el mismo diario */
+window.DIARIO={lista:oid=>FO.oid===oid&&FO.notasOk?FO.notas:null,asegurar:(oid,cb)=>{if(FO.oid===oid&&FO.notasOk)return;FO.avisar=[cb];cargar(oid)}};
 
 document.addEventListener('change',e=>{const t=e.target;if(!t||(t.id!=='fo-file'&&t.id!=='fo-cam'))return;
   try{const todos=[...(t.files||[])];
@@ -5277,12 +5324,14 @@ document.addEventListener('change',e=>{const t=e.target;if(!t||(t.id!=='fo-file'
     const fs=todos.filter(f=>/^image\//.test(f.type)||!f.type||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));t.value='';
     if(!fs.length){if(todos.length)aviso('Eso no parece una foto');return}
     FO.err=null;const prev=FO.sub?FO.sub.prev:[],files=FO.sub?FO.sub.files:[];
-    FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:hoyF(),nota:FO.sub?FO.sub.nota:''};pintar();
+    FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:(FO.dia||hoyF()),nota:FO.sub?FO.sub.nota:''};pintar();
     const el=document.querySelector('#fo-root .fo-sub');el&&el.scrollIntoView({block:'nearest',behavior:'smooth'})}
   catch(err){FO.err='No se pudo leer la foto: '+(err.message||err);pintar()}});
 document.addEventListener('input',e=>{if(!FO.sub)return;if(e.target.id==='fo-nota')FO.sub.nota=e.target.value;if(e.target.id==='fo-fecha')FO.sub.fecha=e.target.value});
+const msgErr=err=>{const m=String(err&&(err.message||err.error||err)||'error');return /row-level|policy|Unauthorized|403/i.test(m)?'Tu usuario no tiene permiso en esta obra.':/exceeded|too large|413|size/i.test(m)?'La foto es demasiado pesada.':/fetch|network|Failed/i.test(m)?'Sin conexión con el servidor. Revisá internet y probá de nuevo.':m};
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-fo]');if(!t)return;const a=t.dataset.fo;
+  if(a==='dia'){if(!t.dataset.d)return;FO.dia=t.dataset.d;FO.edN=null;FO.delN=null;FO.borrar=null;return pintar()}
   if(a==='ver'){FO.ver=true;FO.limite=40;await firmar(FO.lista.slice(0,60).flatMap(f=>[f.thumb,f.path]));return pintar()}
   if(a==='cerrar'){FO.ver=false;FO.borrar=null;return pintar()}
   if(a==='masdias'){FO.limite+=40;await firmar(FO.lista.slice(0,FO.limite+40).flatMap(f=>[f.thumb,f.path]));return pintar()}
@@ -5290,20 +5339,45 @@ document.addEventListener('click',async e=>{
   if(a==='qp'){const i=+t.dataset.i;FO.sub.files.splice(i,1);FO.sub.prev.splice(i,1);if(!FO.sub.files.length)FO.sub=null;return pintar()}
   if(a==='subir'){const s=FO.sub;if(!s||s.subiendo)return;const n=document.getElementById('fo-nota'),f=document.getElementById('fo-fecha');s.nota=n?n.value.trim():'';s.fecha=(f&&f.value)||hoyF();
     try{s.subiendo='Preparando…';pintar();const L=await subir(FO.oid,s.files,s.fecha,s.nota,(i,k)=>{s.subiendo=`Subiendo ${i} de ${k}…`;pintar()});
-      FO.sub=null;aviso(`${L.length} foto${L.length>1?'s':''} subida${L.length>1?'s':''}`);await cargar(FO.oid,true)}
-    catch(err){s.subiendo=null;const m=String(err&&(err.message||err.error||err)||'error');console.error('fotos',err);
-      FO.err=/row-level|policy|Unauthorized|403/i.test(m)?'Tu usuario no tiene permiso para subir fotos en esta obra.':/exceeded|too large|413|size/i.test(m)?'La foto es demasiado pesada.':/fetch|network|Failed/i.test(m)?'Sin conexión con el servidor. Revisá internet y probá de nuevo.':m;
-      pintar()}return}
+      FO.sub=null;FO.dia=s.fecha;aviso(`${L.length} foto${L.length>1?'s':''} subida${L.length>1?'s':''}`);await cargar(FO.oid,true)}
+    catch(err){s.subiendo=null;console.error('fotos',err);FO.err=msgErr(err);pintar()}return}
   if(a==='okerr'){FO.err=null;return pintar()}
+  if(a==='ned'){FO.edN=t.dataset.id;FO.delN=null;pintar();const x=document.getElementById('fo-h');x&&x.focus();return}
+  if(a==='nnueva'){FO.edN='nueva';pintar();const x=document.getElementById('fo-h');x&&x.focus();return}
+  if(a==='ncancel'){FO.edN=null;return pintar()}
+  if(a==='nguardar'){e.preventDefault();if(FO.guardando)return;const v={hecho:(document.getElementById('fo-h')||{}).value||'',freno:(document.getElementById('fo-fr')||{}).value||'',sigue:(document.getElementById('fo-sg')||{}).value||''};
+    Object.keys(v).forEach(k=>v[k]=v[k].trim());if(!v.hecho&&!v.freno&&!v.sigue)return aviso('Escribí al menos una línea');
+    const id=FO.edN&&FO.edN!=='nueva'?FO.edN:null;FO.guardando=true;pintar();
+    try{const r=await guardarN(FO.oid,FO.dia,v,id);if(id)FO.notas=FO.notas.map(n=>n.id===id?r:n);else FO.notas.push(r);FO.edN=null;aviso(id?'Nota actualizada':'Nota publicada')}
+    catch(err){FO.err=msgErr(err)}FO.guardando=false;return pintar()}
+  if(a==='ndel'){const id=t.dataset.id;if(FO.delN!==id){FO.delN=id;return pintar()}try{await borrarN(id);FO.notas=FO.notas.filter(n=>n.id!==id);FO.delN=null;aviso('Nota borrada')}catch(err){FO.err=msgErr(err)}return pintar()}
   if(a==='del'){const id=t.dataset.id;if(FO.borrar!==id){FO.borrar=id;return pintar()}const f=FO.lista.find(x=>x.id===id);if(!f)return;
     try{await borrar(f);FO.lista=FO.lista.filter(x=>x.id!==id);FO.borrar=null;aviso('Foto borrada');pintar()}catch(err){aviso('No se pudo borrar')}}
 });
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FO.ver&&!document.querySelector('.fv-ov')){FO.ver=false;pintar()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&FO.ver&&!document.querySelector('.fv-ov')){FO.ver=false;pintar()}
+  if(!FO.ver&&(e.key==='ArrowLeft'||e.key==='ArrowRight')&&document.activeElement&&document.activeElement.closest&&document.activeElement.closest('.fo-nav,.fo-chs')){const D=dias();const i=D.indexOf(FO.dia);const j=e.key==='ArrowLeft'?i+1:i-1;if(D[j]){FO.dia=D[j];FO.edN=null;pintar();const b=document.querySelector(`.fo-ch[data-d="${D[j]}"]`);b&&b.focus()}}});
 
 const css=document.createElement('style');css.textContent=`
 .fo-card{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
-.fo-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fo-h>div:first-child{display:flex;flex-direction:column}.fo-h b{font-size:16px}.fo-ha{display:flex;gap:8px;align-items:center}
-.fo-up{cursor:pointer;position:relative;overflow:hidden}.fo-in{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}.fo-cam{padding-inline:10px}@media(hover:hover) and (pointer:fine){.fo-cam{display:none}}.fo-err{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bad-soft,#fde8e4);color:var(--ink);border:1px solid var(--bad,#c0392b)}.fo-err .btn{align-self:flex-start}
+.fo-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.fo-h>div:first-child{display:flex;flex-direction:column}.fo-h b{font-size:16px}.fo-ha{display:flex;gap:6px;align-items:center}
+.fo-up{cursor:pointer;position:relative;overflow:hidden}.fo-in{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:0}@media(hover:hover) and (pointer:fine){.fo-cam{display:none}}
+.fo-err{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;background:var(--bad-soft,#fde8e4);color:var(--ink);border:1px solid var(--bad,#c0392b)}.fo-err .btn{align-self:flex-start}
+.fo-nav{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;align-items:center;gap:8px}
+.fo-ar{height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:700 22px/1 inherit;cursor:pointer}.fo-ar[disabled]{opacity:.3;cursor:default}
+.fo-dh{display:flex;flex-direction:column;align-items:center;text-align:center}.fo-dh b{font-size:17px}
+.fo-chs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin;scroll-snap-type:x proximity}
+.fo-ch{flex:none;scroll-snap-align:start;min-width:56px;padding:6px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
+.fo-ch span{font-size:11.5px;color:var(--muted);text-transform:capitalize}.fo-ch b{font-size:14px}.fo-ch i{display:flex;gap:3px;height:6px}.fo-ch em{width:6px;height:6px;border-radius:99px;display:block}.fo-ch em.n{background:var(--ok,#1f7a5a)}.fo-ch em.f{background:var(--accent,#f2b705)}
+.fo-ch[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}.fo-ch[aria-pressed="true"] span{color:inherit;opacity:.8}
+.fo-dd{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;align-items:start}
+@media (max-width:760px){.fo-dd{grid-template-columns:minmax(0,1fr)}}
+.fo-col{display:flex;flex-direction:column;gap:8px;min-width:0}.fo-ct{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}.fo-ct2{display:flex;justify-content:space-between;align-items:center;gap:8px;min-height:32px}
+.fo-cn{background:var(--chip);border-radius:12px;padding:12px}
+.fo-nt{display:flex;flex-direction:column;gap:4px}.fo-nt+.fo-nt{border-top:1px solid var(--line);padding-top:8px}.fo-nt p,.fo-dia .fo-nt p{margin:0;font-size:14.5px;line-height:1.4}
+.fo-l{display:inline-block;min-width:62px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ok,#1f7a5a);margin-right:6px}.fo-l.fr{color:var(--bad,#c0392b)}.fo-l.sg{color:var(--muted)}
+.fo-nta{display:flex;gap:6px}
+.fo-nf{display:flex;flex-direction:column;gap:8px}.fo-nf label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}.fo-nf label span{text-transform:none;font-weight:400}
+.fo-nf textarea{font:inherit;font-size:15px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;resize:vertical;text-transform:none;letter-spacing:0}
 .fo-dia{display:flex;flex-direction:column;gap:6px}.fo-dt{font-weight:700;font-size:14px}.fo-n{margin:0;font-size:13.5px;color:var(--muted)}
 .fo-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px}
 .fo-c{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:color-mix(in srgb,var(--muted) 18%,transparent)}
