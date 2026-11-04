@@ -5483,23 +5483,37 @@ const ACTIVOS=['aprobado','terminado','pausa'];
 function filtrados(){const q=P.q.trim().toLowerCase();return(P.lista||[]).filter(p=>(P.filtro==='todos'||p.estado===P.filtro)&&(!P.colab||colegas(p).length)&&
   (!q||[p.nombre,p.cliente,p.tipo,p.pedido,nombres(p)].join(' ').toLowerCase().includes(q)))}
 /* las tres respuestas de arriba: me deben, es mío, debo pasar */
-function resumen(){const L=(P.lista||[]).filter(p=>ACTIVOS.includes(p.estado));const R={Gs:{a:0,b:0,c:0},USD:{a:0,b:0,c:0}};
-  L.forEach(p=>{const c=cuentas(p);const r=R[p.moneda==='USD'?'USD':'Gs'];r.a+=c.falta;r.b+=c.miFalta;r.c+=c.debo});
-  const v=k=>`<b class="num">${corto(R.Gs[k],'Gs')}</b>${R.USD[k]?`<small class="num">+ ${corto(R.USD[k],'USD')}</small>`:''}`;
-  return `<div class="pry-r3"><div class="w"><span class="sub">Te deben tus clientes</span>${v('a')}<small>de trabajos aprobados</small></div>
-    <div class="o"><span class="sub">Es tuyo de eso</span>${v('b')}<small>lo que te queda después de colegas</small></div>
-    <div class="w"><span class="sub">Tenés que pasar a colegas</span>${v('c')}<small>de lo que ya cobraste</small></div></div>`}
+function resumen(){const L=(P.lista||[]).filter(p=>ACTIVOS.includes(p.estado));const Z=()=>({parte:0,cob:0,falta:0,debo:0,cli:0});const R={Gs:Z(),USD:Z()};
+  L.forEach(p=>{const c=cuentas(p);const r=R[p.moneda==='USD'?'USD':'Gs'];r.parte+=c.miParte;r.cob+=c.miCobrado;r.falta+=c.miFalta;r.debo+=c.debo;r.cli+=c.falta});
+  const v=(k,cl)=>`<b class="num ${cl||''}">${corto(R.Gs[k],'Gs')}</b>${R.USD[k]?`<small class="num">+ ${corto(R.USD[k],'USD')}</small>`:''}`;
+  const pc=R.Gs.parte?Math.round(R.Gs.cob/R.Gs.parte*100):0;
+  return `<div class="panel pry-mio"><div class="pry-mh"><b>Lo tuyo</b><span class="sub">en ${L.length} trabajo${L.length===1?'':'s'} aprobado${L.length===1?'':'s'}, ya sin la parte de colegas</span></div>
+    <div class="pry-m3"><div><span class="sub">Te toca en total</span>${v('parte')}</div><div><span class="sub">Ya cobraste</span>${v('cob','o')}</div><div><span class="sub">Te falta cobrar</span>${v('falta','w')}</div></div>
+    <div class="pry-bar"><i style="width:${pc}%"></i></div>
+    ${R.Gs.debo>0.5||R.USD.debo>0.5?`<div class="pry-alert"><b>Ojo:</b> de lo que ya cobraste, <b>${corto(R.Gs.debo,'Gs')}${R.USD.debo?' + '+corto(R.USD.debo,'USD'):''}</b> no es tuyo: es de colegas y todavía no se lo pasaste.</div>`:''}
+    <p class="sub" style="margin:0">Los clientes todavía deben ${corto(R.Gs.cli,'Gs')}${R.USD.cli?' + '+corto(R.USD.cli,'USD'):''} en total (tuyo y de colegas).</p></div>`}
+/* ---------- reparto de un proyecto: cuánto es de cada uno, en una tabla simple ---------- */
+function reparto(p,c,m){if(!c.total)return '';const G=colegas(p);
+  const filas=[{id:'yo',n:'Vos',toca:c.miParte,cob:c.miCobrado,falta:c.miFalta,pas:null,debo:0}].concat(c.cg.map(x=>({id:x.g.id,n:corta(x.g.nombre),toca:x.parte,cob:x.cobrado,falta:x.falta,pas:x.transferido,debo:x.debo})));
+  const seg=filas.filter(f=>f.toca>0).map(f=>`<i style="width:${f.toca/c.total*100}%;background:${colorDe(p,f.id)}" title="${esc(f.n)}"></i>`).join('');
+  return `<div class="pmx-rep"><div class="pry-rh"><div><span class="sub">Tu parte</span><b class="num">${corto(c.miParte,m)}</b><span class="sub" style="font-size:12px">${c.mio}% de ${corto(c.total,m)}</span></div>
+      <div><span class="sub">Ya cobraste</span><b class="num o">${corto(c.miCobrado,m)}</b></div><div><span class="sub">Te falta cobrar</span><b class="num w">${corto(c.miFalta,m)}</b></div></div>
+    ${G.length?`<div class="pry-seg2">${seg}</div>
+    <table class="pry-rt2"><thead><tr><th>Quién</th><th>Le toca</th><th>Ya cobrado</th><th>Falta</th></tr></thead><tbody>${filas.map(f=>`<tr><td><span class="pry-dt" style="background:${colorDe(p,f.id)}"></span>${esc(f.n)}</td><td class="num">${corto(f.toca,m)}</td><td class="num">${corto(f.cob,m)}</td><td class="num">${corto(f.falta,m)}</td></tr>`).join('')}</tbody></table>
+    ${c.debo>0.5?`<div class="pry-alert">Tenés en mano <b>${corto(c.debo,m)}</b> que son de ${esc(c.cg.filter(x=>x.debo>0.5).map(x=>corta(x.g.nombre)+' ('+corto(x.debo,m)+')').join(' y '))}. Cuando se los pases, registralo en la pestaña <b>Colegas</b>.</div>`:''}
+    <p class="sub" style="margin:0;font-size:12.5px">Cada pago del cliente se reparte en la misma proporción que el presupuesto.</p>`:''}</div>`}
 function chipEstado(e){return `<span class="pry-es e-${e}">${ES(e)[1]}</span>`}
 function barra(c,m){return `<div class="pry-bar" title="Cobrado ${c.pct}%"><i style="width:${c.pct}%"></i></div><div class="pry-bl"><span>Cobrado ${corto(c.cobrado,m)}</span><span>${c.falta?'Falta '+corto(c.falta,m):'Todo cobrado'}</span></div>`}
 function frase(p,c){const m=p.moneda;
   if(p.estado==='rechazado')return 'El cliente no siguió con el proyecto.';
   if(p.estado==='presupuestar')return p.envio?`Le mandaste un presupuesto de ${corto(c.total,m)} ${hace(p.envio)}. Esperando respuesta.`:c.total?`Presupuesto de ${corto(c.total,m)} listo. Falta enviarlo.`:`Pedido ${hace(p.fecha)}. Falta preparar el presupuesto.`;
   if(!c.total)return 'Aprobado sin presupuesto cargado. Cargá los ítems para seguir los cobros.';
-  return (c.falta?`Te faltan cobrar <span class="w">${corto(c.falta,m)}</span> de ${corto(c.total,m)}`:`Cobrado completo: ${corto(c.total,m)}`)+(c.col?` · con ${esc(nombres(p))}`:'')+(c.debo>0.5?` · <span class="w">tenés que pasarles ${corto(c.debo,m)}</span>`:'')+'.'}
+  if(!c.col)return c.falta?`Te falta cobrar <span class="w">${corto(c.falta,m)}</span> de ${corto(c.total,m)} · todo es tuyo.`:`Cobrado completo: ${corto(c.total,m)}.`;
+  return `Lo tuyo: <b>${corto(c.miParte,m)}</b> de ${corto(c.total,m)} · ${c.miFalta>0.5?`te falta cobrar <span class="w">${corto(c.miFalta,m)}</span>`:'ya lo cobraste todo'}`+(c.debo>0.5?` · <span class="w">tenés que pasar ${corto(c.debo,m)} a ${esc(nombres(p))}</span>`:` · con ${esc(nombres(p))}`)+'.'}
 function cartera(L){if(!L.length)return `<div class="panel pry-vacio2">No hay proyectos con ese filtro.</div>`;
   return `<div class="pry-rows">${L.map(p=>{const c=cuentas(p);const m=p.moneda;const act=ACTIVOS.includes(p.estado)&&c.total;
     return `<button type="button" class="pry-row" data-pa="abrir" data-id="${esc(p.id)}"><div class="pry-rt"><b>${esc(p.nombre||'Sin nombre')}</b>${chipEstado(p.estado)}<p class="pry-say">${frase(p,c)}</p><span class="sub">${esc(p.cliente||'')}${p.tipo?' · '+esc(p.tipo):''}</span></div>
-      <div class="pry-rm">${act?`<span>Cobrado ${c.pct}%</span><div class="pry-bar"><i style="width:${c.pct}%"></i></div>`:'<span>Sin cobros todavía</span><div class="pry-bar"></div>'}<span>${c.col&&c.total?`Tuyo: ${corto(c.miParte,m)} de ${corto(c.total,m)}`:c.total?'Todo tuyo':''}</span></div></button>`}).join('')}</div>`}
+      <div class="pry-rm">${act?`<span>Cobrado ${c.pct}%</span><div class="pry-bar"><i style="width:${c.pct}%"></i></div>`:'<span>Sin cobros todavía</span><div class="pry-bar"></div>'}<span>${c.col&&c.total?`${c.mio}% es tuyo`:c.total?'100% tuyo':''}</span></div></button>`}).join('')}</div>`}
 function tarjeta(p){const c=cuentas(p);let pie='';
   if(p.estado==='presupuestar')pie=p.envio?`<span class="pry-env">Presupuesto enviado ${hace(p.envio)}${c.total?' · '+corto(c.total,p.moneda):''}</span>`:`<span class="sub">Pedido ${hace(p.fecha)} · falta presupuestar</span>`;
   else if(['aprobado','terminado'].includes(p.estado)&&c.total)pie=barra(c,p.moneda);
@@ -5559,7 +5573,7 @@ function vDetalle(){const p=P.edit;const c=cuentas(p);const m=p.moneda||'Gs';con
   return `<div class="rs-ov" data-pa="cerrar"></div><div class="rs-win ancho pry-win" role="dialog" aria-modal="true" aria-label="${esc(p.nombre)}">
   <div class="rs-wh"><div style="min-width:0"><b>${esc(p.nombre||'Proyecto')}</b><div class="sub">${esc(p.cliente||'')} · <span id="pry-g">${esc(P.estadoG||'Los cambios se guardan solos')}</span></div></div><button class="rs-x" data-pa="cerrar" aria-label="Cerrar">✕</button></div>
   <div class="pry-top"><div class="pry-steps" role="group" aria-label="Estado">${ESTADOS.map(([k,t],i)=>`<button type="button" data-pa="estado" data-e="${k}" class="e-${k} ${p.estado===k?'on':''} ${i<pe&&pe<3&&i<2?'hecho':''}" aria-pressed="${p.estado===k}">${t}</button>`).join('')}</div>
-    <p class="pry-say" style="margin:0">${frase(p,c)}</p></div>
+    ${ACTIVOS.includes(p.estado)&&c.total?reparto(p,c,m):`<p class="pry-say" style="margin:0">${frase(p,c)}</p>`}</div>
   <div class="pry-pasos" role="tablist" aria-label="Pasos del proyecto">${PASOS.map(([k,t],i)=>`<button type="button" role="tab" data-pa="paso" data-p="${k}" aria-selected="${paso===k}"><i>${i+1}</i>${t}${badge[k]?`<small class="${k==='cuentas'?'w':''}">${badge[k]}</small>`:''}</button>`).join('')}</div>
   <div class="rs-wc" id="pry-wc">${paso==='pedido'?vPedido(p):paso==='cobros'?vCobros(p,c,m):paso==='cuentas'?vCuentas(p,c,m):paso==='historial'?vHist(p):vPres(p,c,m)}</div></div>`}
 /* ---------- "¿Qué te pidió?": se lee ordenado (párrafos, listas, casillas) y se edita en grande ---------- */
@@ -5876,6 +5890,15 @@ const css=document.createElement('style');css.textContent=`
 .pry-cg{border:1px solid var(--line);border-left:4px solid var(--cg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:9px}
 .pry-cgh{display:flex;gap:10px;align-items:flex-start}.pry-cgn{flex:none;width:26px;height:26px;border-radius:99px;background:var(--cg);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;margin-top:22px}
 .pry-cgq{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}.pry-cgadd{align-self:flex-start}
+.pry-mio{padding:14px 16px;display:flex;flex-direction:column;gap:8px}.pry-mh{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}.pry-mh b{font-size:17px}
+.pry-m3,.pry-rh{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.pry-m3>div,.pry-rh>div{display:flex;flex-direction:column;min-width:0}
+.pry-m3 b{font-family:var(--f-display);font-size:28px;line-height:1.05}.pry-m3 small{color:var(--muted);font-size:12px}.pry-m3 b.o,.pry-rh b.o{color:var(--ok)}.pry-m3 b.w,.pry-rh b.w{color:var(--warn)}
+.pry-alert{background:var(--warn-soft,#fff4d6);border-left:4px solid var(--warn);border-radius:8px;padding:8px 10px;font-size:13.5px}
+.pmx-rep{display:flex;flex-direction:column;gap:8px;margin-top:4px}.pry-rh b{font-family:var(--f-display);font-size:22px;line-height:1.1}.pry-rh>div:first-child b{font-size:26px}
+.pry-seg2{display:flex;gap:2px;height:10px;border-radius:99px;overflow:hidden;background:var(--line)}.pry-seg2 i{display:block;height:100%}
+.pry-rt2{width:100%;border-collapse:collapse;font-size:13.5px}.pry-rt2 th{text-align:right;font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 4px}.pry-rt2 th:first-child,.pry-rt2 td:first-child{text-align:left}.pry-rt2 td{text-align:right;padding:5px 4px;border-top:1px solid var(--line);white-space:nowrap}.pry-rt2 tr:first-child td{font-weight:700}
+.pry-dt{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:middle}
+@media (max-width:560px){.pry-m3 b{font-size:21px}.pry-rh b,.pry-rh>div:first-child b{font-size:19px}.pry-rt2{font-size:12.5px}}
 .pry-r3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .pry-r3>div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;display:flex;flex-direction:column;gap:1px;min-width:0}
 .pry-r3 b{font-family:var(--f-display);font-size:30px;line-height:1.05}.pry-r3 small{color:var(--muted);font-size:12.5px}.pry-r3 .w b{color:var(--warn)}.pry-r3 .o b{color:var(--ok)}
