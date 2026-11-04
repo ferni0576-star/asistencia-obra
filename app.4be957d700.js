@@ -2203,6 +2203,7 @@ function vAvance(){
       <div class="kpi"><small>Ya certificado al cliente</small><b>${ml(tAnt)}</b><em>${ult?'certificados N°1 a N°'+ult:'todavía ninguno'}${baseCobrada()?' + planilla':''}</em></div>
       <div class="kpi"><small>Este certificado</small><b>${ml(tP)}</b><em>${!tP&&ultHasta()?'nada nuevo: lo de los contratistas hasta el '+dm(ultHasta())+' ya está certificado':tP+1<tEj-tAnt?'menos de lo pendiente (lo editaste)':'todo lo pendiente de certificar'}</em></div>
     </div>
+    ${Object.keys(ES.doc.base||{}).length&&(ES.doc.certs||[]).length&&!baseCobrada()?(()=>{let mb=0;for(const i of ES.doc.items)mb+=Math.min(i.cant,(ES.doc.base||{})[i.id]||0)*precio(i);return `<div class="alerta" style="border:1px solid var(--line);border-radius:8px"><i class="dot verde"></i><div><b>Tu planilla hasta el ${dm(ES.doc.baseHasta||'')} (${gs(mb)} Gs) ya entró en el certificado N°1</b><div class="sub">No se vuelve a cobrar: los certificados siguientes solo toman lo nuevo de los contratistas.</div></div></div>`})():''}
     ${Object.keys(ES.doc.base||{}).length&&!(ES.doc.certs||[]).length?(()=>{let mb=0;for(const i of ES.doc.items)mb+=Math.min(i.cant,(ES.doc.base||{})[i.id]||0)*precio(i);
       return `<div class="alerta" style="border:1px solid var(--line);border-radius:8px"><i class="dot ${baseCobrada()?'verde':'amarillo'}"></i><div><b>Avance de tu planilla hasta el ${dm(ES.doc.baseHasta||'')}: ${gs(mb)} Gs</b>
         <div class="sub">¿Ya se lo certificaste al cliente?</div>
