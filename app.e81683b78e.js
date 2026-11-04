@@ -1029,6 +1029,7 @@ const SEMILLA_PRES=null;
 const SEMILLA_CONTRATISTAS=[];
 window.ASIS_FIN=a=>addD(a,6);
 window.ASIS_SEMANA_PAGO=f=>periodo(addD(f,-1)).a;
+window.ASIS_LLUV_REG=()=>({oid:S.obra,L:S.lluv||[]});
 window.ASIS_LLUVIAS=()=>(S.lluv||[]).map(r=>({f:r.fecha,p:perdido(r),af:r.afectacion}));
 window.ASIS_LLUVIA=()=>{const m={};(S.lluv||[]).forEach(r=>{const a=periodo(r.fecha).a;m[a]=(m[a]||0)+perdido(r)});return m};
 window.ASIS_MO=async()=>{
@@ -5281,41 +5282,51 @@ async function borrarN(id){if(!nube()){dSet((dGet()||[]).filter(n=>n.id!==id));r
 const porDia=L=>{const m=new Map();L.forEach(f=>{if(!m.has(f.fecha))m.set(f.fecha,[]);m.get(f.fecha).push(f)});return[...m.entries()]};
 const puedeSubir=()=>!window.CLI;
 const DSC=['dom','lun','mar','mié','jue','vie','sáb'];
-function dias(){const s=new Set([...FO.lista.map(f=>f.fecha),...FO.notas.map(n=>n.fecha)]);if(puedeSubir())s.add(hoyF());return[...s].sort().reverse()}
+/* lluvias cargadas en el libro de lluvias de esta obra */
+function lluvias(){const x=window.ASIS_LLUV_REG&&window.ASIS_LLUV_REG();return x&&x.oid===FO.oid?x.L:[]}
+const lluviaDe=d=>lluvias().find(r=>r.fecha===d);
+const num1=v=>String(Math.round(Number(v)*10)/10).replace('.',',');
+function vLluvia(r){if(!r)return '';const t=r.afectacion==='total'?'Obra parada por lluvia: no se trabajó':r.afectacion==='parcial'?`Lluvia: se perdieron ${num1(r.horas||0)} h de trabajo`:'Llovió, sin afectar los trabajos';
+  const acts=(r.actividades||[]).filter(Boolean);
+  return `<div class="fo-ll ${esc2(r.afectacion||'')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15a4 4 0 1 1 .9-7.9A5 5 0 0 1 17.5 9 3.5 3.5 0 0 1 17 16H7z"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
+    <div><b>${t}${r.mm?` · ${num1(r.mm)} mm`:''}</b>${acts.length?`<p>Trabajos afectados: ${acts.map(esc2).join(', ')}</p>`:''}${r.observaciones?`<p>${esc2(r.observaciones)}</p>`:''}
+    ${puedeSubir()?'<button type="button" class="lnk" data-tab="lluvias">Ver en el libro de lluvias</button>':''}</div></div>`}
+function dias(){const s=new Set([...FO.lista.map(f=>f.fecha),...FO.notas.map(n=>n.fecha),...lluvias().map(r=>r.fecha)]);if(puedeSubir())s.add(hoyF());return[...s].sort().reverse()}
 const fotosDe=d=>FO.lista.filter(f=>f.fecha===d);
 const notasDia=d=>FO.notas.filter(n=>n.fecha===d).sort((a,b)=>(a.creado||'')<(b.creado||'')?-1:1);
 function grilla(fs,max,borr){const v=max?fs.slice(0,max):fs;
   return `<div class="fo-g" data-fotog>${v.map(f=>`<span class="fo-c">${borr?`<button type="button" class="fo-x" data-fo="del" data-id="${f.id}" aria-label="Borrar foto">${FO.borrar===f.id?'¿Borrar?':'✕'}</button>`:''}<button type="button" class="fo-t" data-fotov="${esc2(src(f,true)||src(f))}" data-fo-full="${esc2(f.path)}" aria-label="Ver foto del ${esc2(f.fecha)}"><img src="${esc2(src(f))}" alt="" loading="lazy"></button></span>`).join('')}${max&&fs.length>max?`<button type="button" class="fo-mas" data-fo="ver" aria-label="Ver todas las fotos">+${fs.length-max}</button>`:''}</div>`}
 function leyendas(fs){const n=[...new Set(fs.map(f=>f.nota).filter(Boolean))];return n.length?`<p class="fo-n">${n.map(esc2).join(' · ')}</p>`:''}
 function vNotaTxt(n){return `${n.hecho?`<p><span class="fo-l">Se hizo</span>${esc2(n.hecho)}</p>`:''}${n.freno?`<p><span class="fo-l fr">Frenó</span>${esc2(n.freno)}</p>`:''}${n.sigue?`<p><span class="fo-l sg">Sigue</span>${esc2(n.sigue)}</p>`:''}`}
-function vNotaDia(d){const N=notasDia(d);const ed=puedeSubir();const e=FO.edN!=null?(FO.edN==='nueva'?{}:N.find(n=>n.id===FO.edN)):(!N.length&&ed?{}:null);
+function vNotaDia(d){const N=notasDia(d);const ed=puedeSubir();const ll=lluviaDe(d);const pre=ll&&ll.afectacion!=='sin'?{freno:'Lluvia'+(ll.observaciones?': '+ll.observaciones:'')}:{};
+  const e=FO.edN!=null?(FO.edN==='nueva'?pre:N.find(n=>n.id===FO.edN)):(!N.length&&ed&&!(ll&&ll.afectacion==='total')?pre:null);
   if(e)return `<form class="fo-nf" id="fo-nf"><label>Qué se hizo<textarea id="fo-h" rows="3" placeholder="Ej.: se terminó el encadenado inferior de los locales 1 a 3">${esc2(e.hecho||'')}</textarea></label>
     <label>Qué frenó <span>(opcional)</span><textarea id="fo-fr" rows="2" placeholder="Ej.: lluvia al mediodía, demora del hierro">${esc2(e.freno||'')}</textarea></label>
     <label>Qué sigue<textarea id="fo-sg" rows="2" placeholder="Ej.: mampostería de elevación y columnas">${esc2(e.sigue||'')}</textarea></label>
     <div class="bar"><button class="btn primary" data-fo="nguardar" ${FO.guardando?'disabled':''}>${FO.guardando?'Guardando…':e.id?'Guardar cambios':'Publicar nota del día'}</button>${FO.edN!=null?'<button type="button" class="btn ghost" data-fo="ncancel">Cancelar</button>':''}</div></form>`;
-  if(!N.length)return '<p class="sub" style="margin:0">Sin nota escrita este día.</p>';
+  if(!N.length)return ll&&ll.afectacion==='total'?(ed?'<button type="button" class="btn sm ghost" data-fo="nnueva" style="align-self:flex-start">+ Agregar una nota igual</button>':''):'<p class="sub" style="margin:0">Sin nota escrita este día.</p>';
   return N.map(n=>`<article class="fo-nt">${vNotaTxt(n)}${ed?`<div class="fo-nta"><button type="button" class="btn sm ghost" data-fo="ned" data-id="${n.id}">Editar</button><button type="button" class="btn sm ghost" data-fo="ndel" data-id="${n.id}" ${FO.delN===n.id?'style="color:var(--bad)"':''}>${FO.delN===n.id?'¿Borrar? Tocá otra vez':'Borrar'}</button></div>`:''}</article>`).join('')
     +(ed?'<button type="button" class="btn sm ghost" data-fo="nnueva" style="align-self:flex-start">+ Otra nota este día</button>':'')}
 function vCard(){const D=dias();if(!FO.dia||!D.includes(FO.dia))FO.dia=D[0]||hoyF();const d=FO.dia;const i=D.indexOf(d);const fs=fotosDe(d);const sube=puedeSubir();
   const btnF=sube?`<label class="btn sm primary fo-up">+ Fotos<input type="file" id="fo-file" class="fo-in" accept="image/*" multiple></label><label class="btn sm fo-up fo-cam" aria-label="Sacar una foto ahora">Cámara<input type="file" id="fo-cam" class="fo-in" accept="image/*" capture="environment"></label>`:'';
   const chips=D.slice(0,30).map(x=>{const dd=new Date(x+'T12:00:00');const nf=fotosDe(x).length,nn=notasDia(x).length;
-    return `<button type="button" class="fo-ch" data-fo="dia" data-d="${x}" aria-pressed="${x===d}" aria-label="${fdia(x)}"><span>${x===hoyF()?'Hoy':DSC[dd.getDay()]}</span><b>${x.slice(8,10)}/${x.slice(5,7)}</b><i>${nn?'<em class="n"></em>':''}${nf?'<em class="f"></em>':''}</i></button>`}).join('');
+    return `<button type="button" class="fo-ch" data-fo="dia" data-d="${x}" aria-pressed="${x===d}" aria-label="${fdia(x)}"><span>${x===hoyF()?'Hoy':DSC[dd.getDay()]}</span><b>${x.slice(8,10)}/${x.slice(5,7)}</b><i>${nn?'<em class="n"></em>':''}${nf?'<em class="f"></em>':''}${lluviaDe(x)?'<em class="l"></em>':''}</i></button>`}).join('');
   return `<section class="panel fo-card"><div class="fo-h"><div><b>Día a día</b><span class="sub">${sube?'Diario y fotos de la obra · el cliente lo ve':'Lo que se hizo en tu obra, con fotos'}</span></div>${FO.lista.length?'<button class="btn sm ghost" data-fo="ver">Ver todo</button>':''}</div>
     ${FO.cargando&&!D.length?'<p class="sub" style="margin:0">Cargando…</p>':`
     <div class="fo-nav"><button type="button" class="fo-ar" data-fo="dia" data-d="${D[i+1]||''}" ${D[i+1]?'':'disabled'} aria-label="Día anterior">‹</button>
-      <div class="fo-dh"><b>${fdia(d)}</b><span class="sub">${fs.length?fs.length+' foto'+(fs.length>1?'s':''):'sin fotos'}${notasDia(d).length?' · con nota':''}</span></div>
+      <div class="fo-dh"><b>${fdia(d)}</b><span class="sub">${fs.length?fs.length+' foto'+(fs.length>1?'s':''):'sin fotos'}${notasDia(d).length?' · con nota':''}${lluviaDe(d)?' · lluvia':''}</span></div>
       <button type="button" class="fo-ar" data-fo="dia" data-d="${D[i-1]||''}" ${i>0?'':'disabled'} aria-label="Día siguiente">›</button></div>
     ${D.length>1?`<div class="fo-chs" role="group" aria-label="Elegir día">${chips}</div>`:''}
-    <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vNotaDia(d)}</div>
+    <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vLluvia(lluviaDe(d))}${vNotaDia(d)}</div>
       <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,sube):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
     ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo guardar</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}</section>`}
 function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
     <div class="fo-sf"><label>Fecha<input type="date" id="fo-fecha" value="${s.fecha}" max="${hoyF()}"></label><label class="fo-wide">Qué se ve (opcional)<input type="text" id="fo-nota" value="${esc2(s.nota||'')}" placeholder="Ej.: hormigonado de vigas del bloque 2" maxlength="160"></label></div>
     <div class="bar"><button class="btn primary" data-fo="subir" ${s.subiendo?'disabled':''}>${s.subiendo?esc2(s.subiendo):`Subir ${s.files.length} foto${s.files.length>1?'s':''}`}</button><button class="btn ghost" data-fo="cancelar" ${s.subiendo?'disabled':''}>Cancelar</button></div></div>`}
-function vGaleria(){const D=dias().filter(x=>fotosDe(x).length||notasDia(x).length);let n=0;const vis=[];for(const d of D){if(n>=FO.limite)break;vis.push(d);n+=Math.max(1,fotosDe(d).length)}
+function vGaleria(){const D=dias().filter(x=>fotosDe(x).length||notasDia(x).length||lluviaDe(x));let n=0;const vis=[];for(const d of D){if(n>=FO.limite)break;vis.push(d);n+=Math.max(1,fotosDe(d).length)}
   return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Día a día de la obra"><div class="rs-wh"><b>Día a día de la obra</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
-   <div class="rs-wc">${vis.map(d=>{const fs=fotosDe(d);const N=notasDia(d);return `<div class="fo-dia"><span class="fo-dt">${fdia(d)}${fs.length?` <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span>`:''}</span>${N.map(x=>`<div class="fo-nt">${vNotaTxt(x)}</div>`).join('')}${leyendas(fs)}${fs.length?grilla(fs,0,puedeSubir()):''}</div>`}).join('')||'<p class="sub">Todavía no hay nada cargado.</p>'}
+   <div class="rs-wc">${vis.map(d=>{const fs=fotosDe(d);const N=notasDia(d);return `<div class="fo-dia"><span class="fo-dt">${fdia(d)}${fs.length?` <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span>`:''}</span>${vLluvia(lluviaDe(d))}${N.map(x=>`<div class="fo-nt">${vNotaTxt(x)}</div>`).join('')}${leyendas(fs)}${fs.length?grilla(fs,0,puedeSubir()):''}</div>`}).join('')||'<p class="sub">Todavía no hay nada cargado.</p>'}
    ${D.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver días anteriores</button>':''}</div></div>`}
 
 /* ---------- montaje: la tarjeta va en el inicio de la obra (debajo del cronograma) ---------- */
@@ -5380,7 +5391,9 @@ const css=document.createElement('style');css.textContent=`
 .fo-dh{display:flex;flex-direction:column;align-items:center;text-align:center}.fo-dh b{font-size:17px}
 .fo-chs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin;scroll-snap-type:x proximity}
 .fo-ch{flex:none;scroll-snap-align:start;min-width:56px;padding:6px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
-.fo-ch span{font-size:11.5px;color:var(--muted);text-transform:capitalize}.fo-ch b{font-size:14px}.fo-ch i{display:flex;gap:3px;height:6px}.fo-ch em{width:6px;height:6px;border-radius:99px;display:block}.fo-ch em.n{background:var(--ok,#1f7a5a)}.fo-ch em.f{background:var(--accent,#f2b705)}
+.fo-ch span{font-size:11.5px;color:var(--muted);text-transform:capitalize}.fo-ch b{font-size:14px}.fo-ch i{display:flex;gap:3px;height:6px}.fo-ch em{width:6px;height:6px;border-radius:99px;display:block}.fo-ch em.n{background:var(--ok,#1f7a5a)}.fo-ch em.f{background:var(--accent,#f2b705)}.fo-ch em.l{background:var(--ll,#1f5f96)}
+.fo-ll{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:var(--ll-soft,#d6e5f2);color:var(--ink);font-size:14px}.fo-ll svg{flex:none;color:var(--ll,#1f5f96);margin-top:1px}.fo-ll>div{display:flex;flex-direction:column;gap:3px;min-width:0}.fo-ll p{margin:0;font-size:13.5px}.fo-ll .lnk{align-self:flex-start;font-size:13px}
+.fo-ll.total{background:var(--ll,#1f5f96);color:var(--ll-ink,#fff)}.fo-ll.total svg{color:inherit}.fo-ll.total .lnk{color:inherit}
 .fo-ch[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}.fo-ch[aria-pressed="true"] span{color:inherit;opacity:.8}
 .fo-dd{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px;align-items:start}
 @media (max-width:760px){.fo-dd{grid-template-columns:minmax(0,1fr)}}
