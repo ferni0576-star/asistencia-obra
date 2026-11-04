@@ -5236,6 +5236,14 @@ async function achicar0(file,max,q){let im=null;try{im=await createImageBitmap(f
   const w=im.width||im.naturalWidth,h=im.height||im.naturalHeight;const k=Math.min(1,max/Math.max(w,h));const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
   if(!c.width||!c.height)throw new Error('foto vacía');c.getContext('2d').drawImage(im,0,0,c.width,c.height);try{im.close&&im.close()}catch(e){}
   const b=await new Promise(ok=>c.toBlob(ok,'image/jpeg',q));if(!b)throw new Error('No se pudo comprimir la foto');return{b,w:c.width,h:c.height}}
+/* fotos HEIC (Samsung con "ahorro de espacio", iPhone): el navegador no las abre, se pasan a JPG en el celular, como hace WhatsApp */
+let heicP=null;
+const cargarHeic=()=>heicP||(heicP=new Promise((ok,no)=>{if(window.heic2any)return ok(window.heic2any);const sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+  sc.onload=()=>window.heic2any?ok(window.heic2any):no(new Error('conversor'));sc.onerror=()=>{heicP=null;sc.remove();no(new Error('No se pudo cargar el conversor de fotos HEIC. Revisá la conexión y probá de nuevo.'))};document.head.appendChild(sc)}));
+async function esHeic(f){if(/hei[cf]/i.test(f.type||'')||/\.hei[cf]$/i.test(f.name||''))return true;if(/^image\/(jpeg|png|webp|gif)$/.test(f.type||''))return false;
+  try{const b=new Uint8Array(await f.slice(0,16).arrayBuffer());const t=String.fromCharCode(...b.slice(4,12));return t.slice(0,4)==='ftyp'&&/^(heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1)$/.test(t.slice(4))}catch(e){return false}}
+async function aJpeg(f){const h=await cargarHeic();let b=await h({blob:f,toType:'image/jpeg',quality:0.88});if(Array.isArray(b))b=b[0];
+  return new File([b],String(f.name||'foto').replace(/\.[a-z0-9]+$/i,'')+'.jpg',{type:'image/jpeg',lastModified:f.lastModified||Date.now()})}
 const aURL=b=>new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(r.result);r.readAsDataURL(b)});
 
 /* ---------- datos ---------- */
@@ -5317,7 +5325,7 @@ function vCard(){const D=dias();if(!FO.dia||!D.includes(FO.dia))FO.dia=D[0]||hoy
       <div class="fo-dh">${sube?`<label class="fo-dp"><b>${fdia(d)}</b><span class="fo-dpi" aria-hidden="true">▾</span><input type="date" id="fo-dsel" value="${d}" max="${hoyF()}" aria-label="Elegir otro día"></label>`:`<b>${fdia(d)}</b>`}<span class="sub">${fs.length?fs.length+' foto'+(fs.length>1?'s':''):'sin fotos'}${notasDia(d).length?' · con nota':''}${lluviaDe(d)?' · lluvia':''}</span></div>
       <button type="button" class="fo-ar" data-fo="dia" data-d="${sig}" ${sig?'':'disabled'} aria-label="Día siguiente">›</button></div>
     <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vLluvia(lluviaDe(d))}${vNotaDia(d)}</div>
-      <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,sube):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
+      <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,sube):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${FO.prep?`<p class="fo-prep" role="status">${esc2(FO.prep)}</p>`:''}${vSub()}</div></div>`}
     ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo guardar</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}</section>`}
 function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
@@ -5349,11 +5357,16 @@ window.FOTOS={html:()=>'<div id="fo-root"></div>',montar:()=>{const o=window.ASI
 /* el cronograma y la ventana de avance leen el mismo diario */
 window.DIARIO={lista:oid=>FO.oid===oid&&FO.notasOk?FO.notas:null,asegurar:(oid,cb)=>{if(FO.oid===oid&&FO.notasOk)return;FO.avisar=[cb];cargar(oid)}};
 
-document.addEventListener('change',e=>{const t=e.target;if(!t||(t.id!=='fo-file'&&t.id!=='fo-cam'))return;
+document.addEventListener('change',async e=>{const t=e.target;if(!t||(t.id!=='fo-file'&&t.id!=='fo-cam'))return;
   try{const todos=[...(t.files||[])];
     /* algunos celulares mandan la foto sin tipo ni extensión: se acepta y se revisa al achicarla */
-    const fs=todos.filter(f=>/^image\//.test(f.type)||!f.type||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));t.value='';
+    let fs=todos.filter(f=>/^image\//.test(f.type)||!f.type||f.type==='application/octet-stream'||/\.(jpe?g|png|heic|heif|webp)$/i.test(f.name));t.value='';
     if(!fs.length){if(todos.length)aviso('Eso no parece una foto');return}
+    const hz=await Promise.all(fs.map(esHeic));const nh=hz.filter(Boolean).length;
+    if(nh){FO.err=null;const out=[];let k=0;
+      for(let i=0;i<fs.length;i++){if(!hz[i]){out.push(fs[i]);continue}k++;FO.prep=`Preparando foto ${k} de ${nh}…`;pintar();
+        try{out.push(await aJpeg(fs[i]))}catch(err){FO.prep=null;FO.err=err&&/conversor|conexión/.test(err.message||'')?err.message:'No se pudo convertir una de las fotos ('+(fs[i].name||'foto')+').';pintar();return}}
+      FO.prep=null;fs=out}
     FO.err=null;const prev=FO.sub?FO.sub.prev:[],files=FO.sub?FO.sub.files:[];
     FO.sub={files:files.concat(fs),prev:prev.concat(fs.map(f=>URL.createObjectURL(f))),fecha:FO.sub?FO.sub.fecha:(FO.dia||hoyF()),nota:FO.sub?FO.sub.nota:''};pintar();
     const el=document.querySelector('#fo-root .fo-sub');el&&el.scrollIntoView({block:'nearest',behavior:'smooth'})}
@@ -5421,6 +5434,7 @@ const css=document.createElement('style');css.textContent=`
 .fo-t{padding:0;border:0;background:none;width:100%;height:100%;cursor:zoom-in;display:block}
 .fo-x{position:absolute;top:4px;right:4px;z-index:1;min-width:26px;height:26px;padding:0 7px;border-radius:99px;border:0;background:rgb(0 0 0/.62);color:#fff;font-size:12px;font-weight:700;cursor:pointer}
 .fo-mas{aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--panel);font:700 18px/1 inherit;color:var(--ink);cursor:pointer}
+.fo-prep{margin:0;padding:10px 12px;border-radius:10px;background:var(--chip);font-weight:600;font-size:14px}
 .fo-sub{border:1px dashed var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
 .fo-sf{display:grid;grid-template-columns:150px 1fr;gap:10px}.fo-sf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .fo-sf input{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:9px 10px}
