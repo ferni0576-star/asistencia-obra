@@ -2384,6 +2384,7 @@ function infoCli(n){const c=(ES.doc.certs||[]).find(x=>x.n===n);if(!c)return nul
   return{titulo:`Avance al cliente N°${n}`,detalle:c.desde?`Período ${c.desde.split('-').reverse().join('/')} al ${(c.hasta||'').split('-').reverse().join('/')}`:'',monto:m}}
 function apbCli(n){const i=infoCli(n);if(i&&window.APROB)window.APROB.pedir(ES.oid,'cert_cliente',String(n),i.titulo,i.detalle,i.monto)}
 window.PRES={mount:()=>{ES.refrescar=true;render()}};
+window.PRES.pdfCert=(doc,con,n)=>{const sd=ES.doc,sc=ES.con;ES.doc=doc;ES.con=con||[];try{pdfAvance(n,'ejec')}finally{ES.doc=sd;ES.con=sc}};
 window.PRES_DOC=()=>ES.doc?{doc:ES.doc,con:ES.con||[],guardar}:null;
 /* análisis para el resumen de obra (vista del cliente): avance físico, certificado y curva en el tiempo */
 window.PRES.analizar=(doc,con)=>{const sd=ES.doc,sc=ES.con;ES.doc=doc;ES.con=con||[];
@@ -4131,8 +4132,18 @@ function ventana(){if(!RS.ver)return '';const D=RS.D,A=D.A;let t='',h='',ancho=f
     <div class="rs-stack"><i style="width:${A.tot?A.ce/A.tot*100:0}%"></i></div>
     <div class="tw"><table><thead><tr><th>N°</th><th>Período</th><th class="n">Monto</th><th class="n">Acumulado</th></tr></thead><tbody>
     ${A.base?`<tr><td>—</td><td>Avance anterior a la app</td><td class="n">${gs(A.base)}</td><td class="n">${gs(A.base)}</td></tr>`:''}
-    ${c.map(x=>{ac+=x.monto;return `<tr><td class="num">${x.n}</td><td>${x.desde?fdma(x.desde)+' al ':''}${fdma(x.hasta)}</td><td class="n">${gs(x.monto)}</td><td class="n">${gs(ac)} <span class="sub">${pct(A.tot?ac/A.tot:0)}</span></td></tr>`}).join('')||'<tr><td colspan="4" class="sub">Todavía no se emitió ningún certificado.</td></tr>'}</tbody></table></div>
-    <p class="sub">Los PDF de cada certificado están en Presupuesto → Avance al cliente.</p>`}
+    ${c.map(x=>{ac+=x.monto;return `<tr class="rs-trc" data-rver="cert" data-k="${x.n}"><td class="num">${x.n}</td><td><button type="button" class="rs-lk" data-rver="cert" data-k="${x.n}">${x.desde?fdma(x.desde)+' al ':''}${fdma(x.hasta)} <span aria-hidden="true">›</span></button></td><td class="n">${gs(x.monto)}</td><td class="n">${gs(ac)} <span class="sub">${pct(A.tot?ac/A.tot:0)}</span></td></tr>`}).join('')||'<tr><td colspan="4" class="sub">Todavía no se emitió ningún certificado.</td></tr>'}</tbody></table></div>
+    <p class="sub">Tocá un certificado para ver qué se certificó y bajar su PDF.</p>`}
+  else if(RS.ver==='cert'&&A&&D.doc){const n=Number(RS.arg);const x=A.certs.find(y=>y.n===n);const cd=(D.doc.certs||[]).find(y=>y.n===n);
+    if(!x||!cd){RS.ver='pagos';return ventana()}
+    t=`Certificado N°${n}`;let ac=A.base;for(const y of A.certs){ac+=y.monto;if(y.n===n)break}
+    const pu=i=>((Number(i.mat)||0)+(Number(i.mo)||0))*(D.doc.indice||1);const G=[];let lr=null;
+    for(const i of D.doc.items||[]){const q=Number((cd.pres||{})[i.id]||0);if(!q)continue;if(i.rubro!==lr){G.push({r:i.rubro,its:[],tot:0});lr=i.rubro}const g=G[G.length-1];const m=q*pu(i);g.its.push({i,q,m});g.tot+=m}
+    const q2=v=>(Math.round(v*100)/100).toString().replace('.',',');
+    h=`<p class="sub" style="margin-top:0"><button class="lnk" data-rver="pagos">‹ Volver a los certificados</button></p>
+    <div class="rs-kv"><div><small>Período</small><b style="font-size:15px">${x.desde?fdma(x.desde)+' al ':''}${fdma(x.hasta)}</b></div><div><small>Monto de este certificado</small><b>${mil(x.monto)}</b></div><div><small>Acumulado</small><b>${mil(ac)} <span class="sub" style="font-size:13px">${pct(A.tot?ac/A.tot:0)}</span></b></div></div>
+    <div class="bar"><button type="button" class="btn primary" data-rpdf="${n}">Descargar PDF del certificado</button></div>
+    ${G.length?G.map(g=>`<section class="rs-cg"><div class="rs-cgh"><b>${esc(cap(g.r))}</b><span class="num">${gs(g.tot)}</span></div><ul class="rs-cl">${g.its.map(({i,q,m})=>`<li><span>${esc(i.desc||'')}</span><span class="rs-clq"><span class="sub">${q2(q)} ${esc(i.unidad||'')}</span><b class="num">${gs(m)}</b></span></li>`).join('')}</ul></section>`).join(''):'<p class="sub">Este certificado no tiene ítems cargados.</p>'}`}
   else if(RS.ver==='planos'){t='Planos';const L=D.pla.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));const cats=[...new Set(L.map(p=>p.categoria||'Otros'))];
     h=L.length?cats.map(c=>`<div class="rs-sec">${esc(c)}</div>${L.filter(p=>(p.categoria||'Otros')===c).map(p=>`<button class="rs-row" data-rplano="${p.id}"><span class="rs-ico">PDF</span><span><b>${esc(p.nombre)}</b><span class="sub">${p.revision?'Rev. '+esc(p.revision)+' · ':''}subido ${fdma((p.creado||'').slice(0,10))}</span></span><span class="rs-go">Abrir ›</span></button>`).join('')}`).join(''):'<p>Todavía no hay planos cargados.</p>'}
   else if(RS.ver==='materiales'){t='Pedidos de materiales';const P=D.ped.slice().sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.numero||0)-(a.numero||0));
@@ -4235,6 +4246,7 @@ const dentro=e=>{const r=document.getElementById('rs-root');return r&&r.contains
 let ultimoFoco=null;
 document.addEventListener('click',e=>{if(!dentro(e))return;
   const v=e.target.closest('[data-rver]');if(v){if(!RS.ver)ultimoFoco=v;RS.ver=v.dataset.rver;RS.arg=v.dataset.k||null;render();const w=document.querySelector('.rs-win .rs-x');if(w)w.focus();return}
+  const pb=e.target.closest('[data-rpdf]');if(pb){if(window.PRES&&window.PRES.pdfCert&&RS.D&&RS.D.doc)window.PRES.pdfCert(RS.D.doc,RS.D.con,Number(pb.dataset.rpdf));return}
   if(e.target.closest('[data-rcerrar]')){RS.ver=null;render();if(ultimoFoco&&document.body.contains(ultimoFoco))ultimoFoco.focus();return}
   if(e.target.closest('[data-rsinfoto]')){fotoObra(null);return}
   if(e.target.closest('[data-rmas]')){RS.todas=!RS.todas;return render()}
@@ -4397,6 +4409,7 @@ body.rs-modal{overflow:hidden}
   .rs-win,.rs-win.ancho{top:auto;bottom:0;left:0;right:0;transform:none;width:100%;max-height:88%;border-radius:16px 16px 0 0;animation:rsb .2s}
   @keyframes rsb{from{transform:translateY(30%);opacity:0}}
   .rs-kv{grid-template-columns:1fr}.rs-rh{flex-direction:column;align-items:flex-start}}
+.rs-trc{cursor:pointer}.rs-trc:hover td{background:var(--chip)}.rs-lk{all:unset;cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:3px}.rs-lk:focus-visible{outline:2px solid var(--accent);border-radius:3px}.rs-cg{display:flex;flex-direction:column;gap:4px;margin-top:10px}.rs-cgh{display:flex;justify-content:space-between;gap:10px;font-size:14.5px;padding-bottom:4px;border-bottom:2px solid var(--line)}.rs-cl{list-style:none;margin:0;padding:0}.rs-cl li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}.rs-cl li>span:first-child{min-width:0}.rs-clq{display:flex;flex-direction:column;align-items:flex-end;flex:none;text-align:right}
 `;document.head.appendChild(css);
 })();
 
