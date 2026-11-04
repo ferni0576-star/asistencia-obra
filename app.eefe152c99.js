@@ -2013,7 +2013,7 @@ function mapa(){
     if(V[key]){M[key]=V[key]==='-'?null:V[key];continue}
     let m=byDesc[rnum(it.rubro)+'|'+nz(it.desc)];
     if(m&&m.length>1)m=m.filter(x=>Math.abs(x.cant-it.cant)<1e-6);
-    if((!m||m.length!==1)&&it.n){const mn=ES.doc.items.filter(x=>rnum(x.rubro)===rnum(it.rubro)&&String(x.n).trim()===String(it.n).trim()&&nu(x.unidad)===nu(it.unidad));if(mn.length===1)m=mn}
+    if((!m||m.length!==1)&&it.n){const mn=ES.doc.items.filter(x=>rnum(x.rubro)===rnum(it.rubro)&&String(x.n).trim()===String(it.n).trim()&&nu(x.unidad)===nu(it.unidad));if(mn.length===1&&[...pal(mn[0].desc)].some(w=>pal(it.desc).has(w)))m=mn}
     if(!m||m.length!==1)m=byCant[rnum(it.rubro)+'|'+nu(it.unidad)+'|'+it.cant];
     M[key]=m&&m.length===1?m[0].id:undefined;
   }
