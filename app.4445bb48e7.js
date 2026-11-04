@@ -2003,17 +2003,18 @@ const guardar=()=>{if(ES.doc&&window.PDB)window.PDB.save(ES.doc).catch(()=>toast
 
 /* ---------- vínculo contratistas → presupuesto ---------- */
 const nz=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const nu=u=>{const t=nz(u).replace(/\s+/g,'');return /^(u|un|und|unid|unidad|unidades|uni|pza|pieza)$/.test(t)?'u':/^(ml|mlineal|metrolineal|mts|mt|m)$/.test(t)?'ml':/^(m2|mt2|mts2|metro2)$/.test(t)?'m2':/^(m3|mt3|mts3|metro3)$/.test(t)?'m3':/^(gl|glb|global)$/.test(t)?'gl':t};
 function mapa(){
   const byDesc={},byCant={};
-  for(const i of ES.doc.items){const k=rnum(i.rubro)+'|'+nz(i.desc);(byDesc[k]=byDesc[k]||[]).push(i);const k2=rnum(i.rubro)+'|'+nz(i.unidad)+'|'+i.cant;(byCant[k2]=byCant[k2]||[]).push(i)}
+  for(const i of ES.doc.items){const k=rnum(i.rubro)+'|'+nz(i.desc);(byDesc[k]=byDesc[k]||[]).push(i);const k2=rnum(i.rubro)+'|'+nu(i.unidad)+'|'+i.cant;(byCant[k2]=byCant[k2]||[]).push(i)}
   const V=ES.doc.vinculos||{};const M={};
   for(const c of ES.con)for(const it of c.items||[]){
     if(it.sec!=='ORIG')continue;const key=c.id+'|'+it.id;
     if(V[key]){M[key]=V[key]==='-'?null:V[key];continue}
     let m=byDesc[rnum(it.rubro)+'|'+nz(it.desc)];
     if(m&&m.length>1)m=m.filter(x=>Math.abs(x.cant-it.cant)<1e-6);
-    if((!m||m.length!==1)&&it.n){const mn=ES.doc.items.filter(x=>rnum(x.rubro)===rnum(it.rubro)&&String(x.n).trim()===String(it.n).trim()&&nz(x.unidad)===nz(it.unidad));if(mn.length===1)m=mn}
-    if(!m||m.length!==1)m=byCant[rnum(it.rubro)+'|'+nz(it.unidad)+'|'+it.cant];
+    if((!m||m.length!==1)&&it.n){const mn=ES.doc.items.filter(x=>rnum(x.rubro)===rnum(it.rubro)&&String(x.n).trim()===String(it.n).trim()&&nu(x.unidad)===nu(it.unidad));if(mn.length===1)m=mn}
+    if(!m||m.length!==1)m=byCant[rnum(it.rubro)+'|'+nu(it.unidad)+'|'+it.cant];
     M[key]=m&&m.length===1?m[0].id:undefined;
   }
   return M;
@@ -2200,9 +2201,9 @@ function vAvance(){
     <div class="kpis">
       <div class="kpi"><small>Ejecutado en obra</small><b>${ml(tEj)}</b><em>acumulado al ${dm(ES.corte)}${Object.keys(ES.doc.base||{}).length?' · incluye tu planilla':''}</em></div>
       <div class="kpi"><small>Ya certificado al cliente</small><b>${ml(tAnt)}</b><em>${ult?'certificados N°1 a N°'+ult:'todavía ninguno'}${baseCobrada()?' + planilla':''}</em></div>
-      <div class="kpi"><small>Este certificado</small><b>${ml(tP)}</b><em>${tP+1<tEj-tAnt?'menos de lo pendiente (lo editaste)':'todo lo pendiente de certificar'}</em></div>
+      <div class="kpi"><small>Este certificado</small><b>${ml(tP)}</b><em>${!tP&&ultHasta()?'nada nuevo: lo de los contratistas hasta el '+dm(ultHasta())+' ya está certificado':tP+1<tEj-tAnt?'menos de lo pendiente (lo editaste)':'todo lo pendiente de certificar'}</em></div>
     </div>
-    ${Object.keys(ES.doc.base||{}).length?(()=>{let mb=0;for(const i of ES.doc.items)mb+=Math.min(i.cant,(ES.doc.base||{})[i.id]||0)*precio(i);
+    ${Object.keys(ES.doc.base||{}).length&&!(ES.doc.certs||[]).length?(()=>{let mb=0;for(const i of ES.doc.items)mb+=Math.min(i.cant,(ES.doc.base||{})[i.id]||0)*precio(i);
       return `<div class="alerta" style="border:1px solid var(--line);border-radius:8px"><i class="dot ${baseCobrada()?'verde':'amarillo'}"></i><div><b>Avance de tu planilla hasta el ${dm(ES.doc.baseHasta||'')}: ${gs(mb)} Gs</b>
         <div class="sub">¿Ya se lo certificaste al cliente?</div>
         <div class="subnav-p" style="margin-top:6px"><button class="chip-p" data-pact="basecob" data-v="no" aria-pressed="${!baseCobrada()}">No, incluirlo en este certificado</button><button class="chip-p" data-pact="basecob" data-v="si" aria-pressed="${baseCobrada()}">Sí, ya está cobrado</button></div></div></div>`})():''}
@@ -2225,17 +2226,26 @@ function vAvance(){
   </div>`;
 }
 
+const pal=t=>new Set(nz(t).split(' ').filter(w=>w.length>3));
+function parecido(a,b){const A=pal(a.desc),B=pal(b.desc);let n=0;A.forEach(w=>{if(B.has(w))n++});if(nu(a.unidad)===nu(b.unidad))n+=1;if(Math.abs((+a.cant||0)-(+b.cant||0))<1e-6)n+=2;return n}
+/* estado de cada contratista: hasta qué semana certificó y si eso ya pasó al cliente */
+function estadoContr(){const bh=ES.doc.baseHasta||'';const h=[ultHasta(),bh].sort().pop();const C=ES.doc.certs||[];
+  return ES.con.map(c=>{const cs=(c.certs||[]).filter(x=>cierreDe(x)).sort((a,b)=>cierreDe(a)<cierreDe(b)?-1:1);const u=cs[cs.length-1];const pend=cs.filter(x=>cierreDe(x)>h);
+    const en=u?C.find(k=>k.hasta&&k.hasta>=cierreDe(u)):null;
+    const est=!u?['am','Todavía no cargaste certificados de este contratista']:pend.length?['am',`${pend.length} semana${pend.length>1?'s':''} sin pasar al cliente`]:['ok',en?'Ya incluido en el certificado N°'+en.n:bh&&cierreDe(u)<=bh?'Dentro de tu planilla hasta el '+dm(bh):'Al día'];
+    return `<li><span class="ct-n"><b>${esc(c.nombre.split(' (')[0])}</b><span class="sub">${esc((c.tipo||'').replace('Mano de obra · ',''))}${u?` · último N°${u.n}, semana ${u.desde?dm(u.desde)+'–':''}${dm(cierreDe(u))}`:''}</span></span><span class="ct-e ${est[0]}">${est[1]}</span></li>`}).join('')}
 function panelContratistas(E){
   const sem=E.lista;const tot=sem.reduce((s,x)=>s+x.monto,0);const sin=E.sin;
   const its=ES.doc.items.filter(i=>sin.some(x=>rnum(x.it.rubro)===rnum(i.rubro)));
-  return `<div class="panel"><details><summary style="padding:12px 14px;cursor:pointer"><b>Certificados de contratistas considerados</b> <span class="sub">· ${sem.length} certificado${sem.length===1?'':'s'} · ${gs(tot)} Gs pagados a contratistas${ES.doc.baseHasta?' · desde el '+dm(addD(ES.doc.baseHasta,1)):''}</span></summary>
+  return `<div class="panel ct-est"><div class="ct-h"><b>Contratistas vinculados a este avance</b><span class="sub">Cada certificado semanal que emitís a un contratista suma solo acá</span></div><ul>${estadoContr()}</ul></div>
+  <div class="panel"><details><summary style="padding:12px 14px;cursor:pointer"><b>Certificados de contratistas considerados</b> <span class="sub">· ${sem.length} certificado${sem.length===1?'':'s'} · ${gs(tot)} Gs pagados a contratistas${ES.doc.baseHasta?' · desde el '+dm(addD(ES.doc.baseHasta,1)):''}</span></summary>
     ${sem.length?`<div class="tw"><table><thead><tr><th>Contratista</th><th>Certificado</th><th>Semana</th><th class="n">Monto</th><th>Pago</th></tr></thead><tbody>
       ${sem.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])} <span class="sub">${esc((x.c.tipo||'').replace('Mano de obra · ',''))}</span></td><td>N°${x.x.n}</td><td class="num">${x.x.desde?dm(x.x.desde)+' – ':''}${dm(cierreDe(x.x))}</td><td class="n">${gs(x.monto)}</td><td>${x.pago?'pagado el '+ddm(x.pago.fecha):'<span class="sub">pendiente</span>'}</td></tr>`).join('')}</tbody>
       <tfoot><tr><td>Total</td><td></td><td></td><td class="n">${gs(tot)}</td><td></td></tr></tfoot></table></div>`
     :`<p class="sub" style="padding:0 14px 12px">No hay certificados de contratistas hasta esta fecha.</p>`}</details>
     ${sin.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>${sin.length} ítem${sin.length>1?'s':''} de contratistas sin vincular al presupuesto</b><div class="sub">Elegí a qué ítem del presupuesto corresponde cada uno. Queda guardado.</div>
       <div class="tw"><table><tbody>${sin.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])}</td><td class="desc">${esc(x.it.n+' '+x.it.desc)} <span class="sub">(${q2(x.q)} ${esc(x.it.unidad)})</span></td>
-        <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${its.filter(i=>rnum(i.rubro)===rnum(x.it.rubro)).map(i=>`<option value="${i.id}">${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
+        <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${(()=>{const L=its.filter(i=>rnum(i.rubro)===rnum(x.it.rubro)).map(i=>({i,p:parecido(x.it,i)})).sort((a,b)=>b.p-a.p);return L.map(({i,p},k)=>`<option value="${i.id}">${k===0&&p>=2?'Sugerido: ':''}${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')})()}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
   </div>`;
 }
 
@@ -2471,7 +2481,7 @@ document.addEventListener('submit',e=>{
     ES.itEd=null;ES.itBorrar=false;ES.cargado=null;ES.raw={};guardar();return render()}
   if(f.id==='p-datos'){ES.doc.m2=Number(fd.m2)||0;ES.doc.usd=Number(fd.usd)||0;ES.doc.indice=Number(fd.indice)||1;guardar();render();toast('Datos guardados')}
 },true);
-const cssIt=document.createElement('style');cssIt.textContent=`.it-row{cursor:pointer}.it-row:hover td{background:var(--chip)}
+const cssIt=document.createElement('style');cssIt.textContent=`.ct-est{padding:12px 14px;display:flex;flex-direction:column;gap:8px}.ct-h{display:flex;flex-direction:column}.ct-est ul{list-style:none;margin:0;padding:0}.ct-est li{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line)}.ct-n{display:flex;flex-direction:column;min-width:0}.ct-e{font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}.ct-e.ok{background:var(--ok-soft,#dcefe5);color:var(--ok)}.ct-e.am{background:var(--warn-soft,#fff4d6);color:var(--warn)}.it-row{cursor:pointer}.it-row:hover td{background:var(--chip)}
 .it-res{display:flex;flex-wrap:wrap;gap:6px 18px;background:var(--chip);border-radius:10px;padding:10px 12px;font-size:14px}.it-res b{font-variant-numeric:tabular-nums}.it-res b.w{color:var(--warn)}
 .it-del{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px}.it-delb{align-self:flex-start;color:var(--bad)!important}
 #it-f textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit;resize:vertical;box-sizing:border-box}`;document.head.appendChild(cssIt);
