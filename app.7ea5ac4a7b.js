@@ -5294,7 +5294,7 @@ function vCard(){const D=dias();if(!FO.dia||!D.includes(FO.dia))FO.dia=D[0]||hoy
       <button type="button" class="fo-ar" data-fo="dia" data-d="${D[i-1]||''}" ${i>0?'':'disabled'} aria-label="Día siguiente">›</button></div>
     ${D.length>1?`<div class="fo-chs" role="group" aria-label="Elegir día">${chips}</div>`:''}
     <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vNotaDia(d)}</div>
-      <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,false):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
+      <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,sube):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
     ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo guardar</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}</section>`}
 function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
