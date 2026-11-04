@@ -5309,14 +5309,11 @@ function vNotaDia(d){const N=notasDia(d);const ed=puedeSubir();const ll=lluviaDe
     +(ed?'<button type="button" class="btn sm ghost" data-fo="nnueva" style="align-self:flex-start">+ Otra nota este día</button>':'')}
 function vCard(){const D=dias();if(!FO.dia||!D.includes(FO.dia))FO.dia=D[0]||hoyF();const d=FO.dia;const i=D.indexOf(d);const fs=fotosDe(d);const sube=puedeSubir();
   const btnF=sube?`<label class="btn sm primary fo-up">+ Fotos<input type="file" id="fo-file" class="fo-in" accept="image/*" multiple></label><label class="btn sm fo-up fo-cam" aria-label="Sacar una foto ahora">Cámara<input type="file" id="fo-cam" class="fo-in" accept="image/*" capture="environment"></label>`:'';
-  const chips=D.slice(0,30).map(x=>{const dd=new Date(x+'T12:00:00');const nf=fotosDe(x).length,nn=notasDia(x).length;
-    return `<button type="button" class="fo-ch" data-fo="dia" data-d="${x}" aria-pressed="${x===d}" aria-label="${fdia(x)}"><span>${x===hoyF()?'Hoy':DSC[dd.getDay()]}</span><b>${x.slice(8,10)}/${x.slice(5,7)}</b><i>${nn?'<em class="n"></em>':''}${nf?'<em class="f"></em>':''}${lluviaDe(x)?'<em class="l"></em>':''}</i></button>`}).join('');
-  return `<section class="panel fo-card"><div class="fo-h"><div><b>Día a día</b><span class="sub">${sube?'Diario y fotos de la obra · el cliente lo ve':'Lo que se hizo en tu obra, con fotos'}</span></div>${FO.lista.length?'<button class="btn sm ghost" data-fo="ver">Ver todo</button>':''}</div>
+  return `<section class="panel fo-card"><div class="fo-h"><div><b>Día a día</b><span class="sub">${sube?'Diario y fotos de la obra · el cliente lo ve':'Lo que se hizo en tu obra, con fotos'}</span></div>${D.length>1?'<button class="btn sm ghost" data-fo="ver">Más días</button>':''}</div>
     ${FO.cargando&&!D.length?'<p class="sub" style="margin:0">Cargando…</p>':`
     <div class="fo-nav"><button type="button" class="fo-ar" data-fo="dia" data-d="${D[i+1]||''}" ${D[i+1]?'':'disabled'} aria-label="Día anterior">‹</button>
       <div class="fo-dh"><b>${fdia(d)}</b><span class="sub">${fs.length?fs.length+' foto'+(fs.length>1?'s':''):'sin fotos'}${notasDia(d).length?' · con nota':''}${lluviaDe(d)?' · lluvia':''}</span></div>
       <button type="button" class="fo-ar" data-fo="dia" data-d="${D[i-1]||''}" ${i>0?'':'disabled'} aria-label="Día siguiente">›</button></div>
-    ${D.length>1?`<div class="fo-chs" role="group" aria-label="Elegir día">${chips}</div>`:''}
     <div class="fo-dd"><div class="fo-col fo-cn"><span class="fo-ct">Diario</span>${vLluvia(lluviaDe(d))}${vNotaDia(d)}</div>
       <div class="fo-col fo-cf"><div class="fo-ct2"><span class="fo-ct">Fotos</span><span class="fo-ha">${btnF}</span></div>${fs.length?leyendas(fs)+grilla(fs,9,sube):`<p class="sub" style="margin:0">${sube?'Todavía no subiste fotos de este día.':'Sin fotos este día.'}</p>`}${vSub()}</div></div>`}
     ${FO.err?`<div class="fo-err" role="alert"><b>No se pudo guardar</b><span>${esc2(FO.err)}</span><button type="button" class="btn sm ghost" data-fo="okerr">Entendido</button></div>`:''}</section>`}
@@ -5324,10 +5321,18 @@ function vSub(){if(!FO.sub)return '';const s=FO.sub;
   return `<div class="fo-sub"><div class="fo-g">${s.prev.map((u,i)=>`<span class="fo-c"><img src="${u}" alt=""><button type="button" class="fo-x" data-fo="qp" data-i="${i}" aria-label="Quitar">✕</button></span>`).join('')}</div>
     <div class="fo-sf"><label>Fecha<input type="date" id="fo-fecha" value="${s.fecha}" max="${hoyF()}"></label><label class="fo-wide">Qué se ve (opcional)<input type="text" id="fo-nota" value="${esc2(s.nota||'')}" placeholder="Ej.: hormigonado de vigas del bloque 2" maxlength="160"></label></div>
     <div class="bar"><button class="btn primary" data-fo="subir" ${s.subiendo?'disabled':''}>${s.subiendo?esc2(s.subiendo):`Subir ${s.files.length} foto${s.files.length>1?'s':''}`}</button><button class="btn ghost" data-fo="cancelar" ${s.subiendo?'disabled':''}>Cancelar</button></div></div>`}
-function vGaleria(){const D=dias().filter(x=>fotosDe(x).length||notasDia(x).length||lluviaDe(x));let n=0;const vis=[];for(const d of D){if(n>=FO.limite)break;vis.push(d);n+=Math.max(1,fotosDe(d).length)}
-  return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Día a día de la obra"><div class="rs-wh"><b>Día a día de la obra</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
-   <div class="rs-wc">${vis.map(d=>{const fs=fotosDe(d);const N=notasDia(d);return `<div class="fo-dia"><span class="fo-dt">${fdia(d)}${fs.length?` <span class="sub">· ${fs.length} foto${fs.length>1?'s':''}</span>`:''}</span>${vLluvia(lluviaDe(d))}${N.map(x=>`<div class="fo-nt">${vNotaTxt(x)}</div>`).join('')}${leyendas(fs)}${fs.length?grilla(fs,0,puedeSubir()):''}</div>`}).join('')||'<p class="sub">Todavía no hay nada cargado.</p>'}
-   ${D.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver días anteriores</button>':''}</div></div>`}
+const lunes=d=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()-((x.getDay()+6)%7));return x.toISOString().slice(0,10)};
+const sum=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const dm2=d=>d.slice(8,10)+'/'+d.slice(5,7);
+function vGaleria(){const D=dias().filter(x=>fotosDe(x).length||notasDia(x).length||lluviaDe(x));const W=new Map();D.forEach(d=>{const k=lunes(d);if(!W.has(k))W.set(k,[]);W.get(k).push(d)});
+  const sem=[...W.entries()];const vis=sem.slice(0,FO.limite);
+  const fila=d=>{const fs=fotosDe(d),N=notasDia(d),ll=lluviaDe(d);const txt=N.map(n=>n.hecho||n.freno||n.sigue).filter(Boolean)[0]||'';
+    return `<button type="button" class="fo-wr" data-fo="ir" data-d="${d}"><span class="fo-wd"><b>${fdia(d).replace(/^(Hoy|Ayer) · /,'$1 · ')}</b>${ll?`<span class="fo-wl ${esc2(ll.afectacion||'')}">${ll.afectacion==='total'?'Obra parada por lluvia':ll.afectacion==='parcial'?'Lluvia · '+num1(ll.horas||0)+' h perdidas':'Llovió sin afectar'}</span>`:''}</span>
+      ${txt?`<span class="fo-wt">${esc2(txt)}</span>`:''}${fs.length?`<span class="fo-wf">${fs.slice(0,4).map(f=>`<img src="${esc2(src(f))}" alt="" loading="lazy">`).join('')}${fs.length>4?`<i>+${fs.length-4}</i>`:''}</span>`:''}</button>`};
+  return `<div class="rs-ov" data-fo="cerrar"></div><div class="rs-win ancho fo-win" role="dialog" aria-modal="true" aria-label="Día a día por semana"><div class="rs-wh"><b>Día a día por semana</b><button class="rs-x" data-fo="cerrar" aria-label="Cerrar">✕</button></div>
+   <div class="rs-wc">${vis.map(([k,ds])=>{const nf=ds.reduce((a,d)=>a+fotosDe(d).length,0),nl=ds.filter(d=>lluviaDe(d)&&lluviaDe(d).afectacion!=='sin').length,nn=ds.filter(d=>notasDia(d).length).length;
+     return `<section class="fo-wk"><div class="fo-wh"><b>Semana del ${dm2(k)} al ${dm2(sum(k,6))}</b><span class="sub">${[nn?nn+' día'+(nn>1?'s':'')+' con nota':'',nf?nf+' foto'+(nf>1?'s':''):'',nl?nl+' con lluvia':''].filter(Boolean).join(' · ')}</span></div>${ds.map(fila).join('')}</section>`}).join('')||'<p class="sub">Todavía no hay nada cargado.</p>'}
+   ${sem.length>vis.length?'<button class="btn" data-fo="masdias" style="align-self:center">Ver semanas anteriores</button>':''}</div></div>`}
 
 /* ---------- montaje: la tarjeta va en el inicio de la obra (debajo del cronograma) ---------- */
 function pintar(){const el=document.getElementById('fo-root');if(el){const ch=el.querySelector('.fo-chs');const sx=ch?ch.scrollLeft:0;el.innerHTML=vCard();const c2=el.querySelector('.fo-chs');if(c2){c2.scrollLeft=sx;const on=c2.querySelector('[aria-pressed="true"]');if(on&&(on.offsetLeft<c2.scrollLeft||on.offsetLeft+on.offsetWidth>c2.scrollLeft+c2.clientWidth))c2.scrollLeft=on.offsetLeft-12}}
@@ -5356,9 +5361,10 @@ const msgErr=err=>{const m=String(err&&(err.message||err.error||err)||'error');r
 document.addEventListener('click',async e=>{
   const t=e.target.closest('[data-fo]');if(!t)return;const a=t.dataset.fo;
   if(a==='dia'){if(!t.dataset.d)return;FO.dia=t.dataset.d;FO.edN=null;FO.delN=null;FO.borrar=null;return pintar()}
-  if(a==='ver'){FO.ver=true;FO.limite=40;await firmar(FO.lista.slice(0,60).flatMap(f=>[f.thumb,f.path]));return pintar()}
+  if(a==='ir'){FO.dia=t.dataset.d;FO.ver=false;FO.edN=null;await firmar(fotosDe(FO.dia).flatMap(f=>[f.thumb,f.path]));pintar();const c=document.querySelector('#fo-root .fo-card');c&&c.scrollIntoView({block:'start',behavior:'smooth'});return}
+  if(a==='ver'){FO.ver=true;FO.limite=4;await firmar(FO.lista.slice(0,60).flatMap(f=>[f.thumb,f.path]));return pintar()}
   if(a==='cerrar'){FO.ver=false;FO.borrar=null;return pintar()}
-  if(a==='masdias'){FO.limite+=40;await firmar(FO.lista.slice(0,FO.limite+40).flatMap(f=>[f.thumb,f.path]));return pintar()}
+  if(a==='masdias'){FO.limite+=4;await firmar(FO.lista.slice(0,200).flatMap(f=>[f.thumb]));return pintar()}
   if(a==='cancelar'){FO.sub=null;return pintar()}
   if(a==='qp'){const i=+t.dataset.i;FO.sub.files.splice(i,1);FO.sub.prev.splice(i,1);if(!FO.sub.files.length)FO.sub=null;return pintar()}
   if(a==='subir'){const s=FO.sub;if(!s||s.subiendo)return;const n=document.getElementById('fo-nota'),f=document.getElementById('fo-fecha');s.nota=n?n.value.trim():'';s.fecha=(f&&f.value)||hoyF();
@@ -5415,7 +5421,12 @@ const css=document.createElement('style');css.textContent=`
 .fo-sf{display:grid;grid-template-columns:150px 1fr;gap:10px}.fo-sf label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .fo-sf input{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:9px;padding:9px 10px}
 @media (max-width:560px){.fo-sf{grid-template-columns:1fr}}
-.fo-win .rs-wc{display:flex;flex-direction:column;gap:18px}`;
+.fo-win .rs-wc{display:flex;flex-direction:column;gap:18px}
+.fo-wk{display:flex;flex-direction:column}.fo-wh{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding-bottom:6px;border-bottom:2px solid var(--line)}.fo-wh b{font-size:15px}
+.fo-wr{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:5px;padding:10px 4px;border-bottom:1px solid var(--line);width:100%}.fo-wr:hover{background:var(--chip)}.fo-wr:focus-visible{outline:2px solid var(--accent,#f2b705);border-radius:6px}
+.fo-wd{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}.fo-wd b{font-size:14.5px}.fo-wl{font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--ll-soft,#d6e5f2);color:var(--ink)}.fo-wl.total{background:var(--ll,#1f5f96);color:var(--ll-ink,#fff)}
+.fo-wt{font-size:14px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.fo-wf{display:flex;gap:4px;align-items:center}.fo-wf img{width:52px;height:52px;object-fit:cover;border-radius:7px;display:block}.fo-wf i{font-style:normal;font-size:13px;font-weight:700;color:var(--muted);padding-left:4px}`;
 document.head.appendChild(css);
 })();
 
