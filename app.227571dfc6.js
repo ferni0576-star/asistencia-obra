@@ -120,6 +120,9 @@ function backendLocal(){
     async saveArchPry(a){try{localStorage.setItem('pry_arch_'+a.id,a.data)}catch(e){throw new Error('En la prueba no entra un archivo tan grande')}},
     async archPry(id){try{return localStorage.getItem('pry_arch_'+id)}catch(e){return null}},
     async delArchPry(id){try{localStorage.removeItem('pry_arch_'+id)}catch(e){}},
+    async gastos(oid){return JSON.parse(JSON.stringify((d.gastos||[]).filter(g=>g.obra_id===oid)))},
+    async saveGasto(g){d.gastos=d.gastos||[];const v=JSON.parse(JSON.stringify(g));if(!v.id){v.id='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);v.creado=new Date().toISOString()}const i=d.gastos.findIndex(x=>x.id===v.id);if(i>=0)d.gastos[i]={...d.gastos[i],...v};else d.gastos.push(v);save();return JSON.parse(JSON.stringify(d.gastos.find(x=>x.id===v.id)))},
+    async delGasto(id){d.gastos=(d.gastos||[]).filter(x=>x.id!==id);save()},
     async docSubir(path,file){const u=await new Promise((ok,no)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>no(new Error('No se pudo leer el archivo'));r.readAsDataURL(file)});try{localStorage.setItem('pry_doc_'+path,u)}catch(e){throw new Error('En la prueba no entra un archivo tan grande (en la app real sí)')}},
     async docUrl(path){try{return localStorage.getItem('pry_doc_'+path)}catch(e){return null}},
     async docBorrar(path){try{localStorage.removeItem('pry_doc_'+path)}catch(e){}},
@@ -207,9 +210,15 @@ function backendNube(sb){
     async saveArchPry(a){ok(await sb.from('proyecto_archivos').insert({id:a.id,proyecto_id:a.proyecto_id,nombre:a.nombre,tipo:a.tipo,tam:a.tam,data:a.data}))},
     async archPry(id){const r=ok(await sb.from('proyecto_archivos').select('data').eq('id',id));return r[0]?r[0].data:null},
     async delArchPry(id){ok(await sb.from('proyecto_archivos').delete().eq('id',id))},
+    async gastos(oid){if(!oid)return[];return ok(await sb.from('gastos').select('*').eq('obra_id',oid).order('fecha',{ascending:false}))},
+    async saveGasto(g){const v={...g};if(!v.id)delete v.id;else delete v.creado;if(!v.id)v.autor=S.email||null;const r=v.id?await sb.from('gastos').update(v).eq('id',v.id).select().single():await sb.from('gastos').insert(v).select().single();return ok(r)},
+    async delGasto(id){ok(await sb.from('gastos').delete().eq('id',id))},
     async docSubir(path,file){const r=await sb.storage.from('proyectos').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});if(r.error)throw r.error},
     async docUrl(path,nombre){const r=await sb.storage.from('proyectos').createSignedUrl(path,900,nombre?{download:nombre}:undefined);if(r.error)throw r.error;return r.data.signedUrl},
     async docBorrar(path){const r=await sb.storage.from('proyectos').remove([path]);if(r.error)throw r.error},
+    async archSubir(b,path,file){const r=await sb.storage.from(b).upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});if(r.error)throw r.error},
+    async archUrl(b,path){const r=await sb.storage.from(b).createSignedUrl(path,900);if(r.error)throw r.error;return r.data.signedUrl},
+    async archBorrar(b,path){const r=await sb.storage.from(b).remove([path]);if(r.error)throw r.error},
     async saveContratista(c){ok(await sb.from('contratistas').upsert({id:c.id,obra_id:c.obra_id,nombre:c.nombre,tipo:c.tipo,cuadrilla:!!c.cuadrilla,items:c.items,certs:c.certs,des:c.des}))},
     async presupuesto(oid){if(!oid)return null;const r=ok(await sb.from('presupuestos').select('*').eq('obra_id',oid).limit(1));const p=r[0];if(!p)return null;
       return{...p,m2:Number(p.m2)||0,usd:Number(p.usd)||0,indice:Number(p.indice)||1,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},baseHasta:p.base_hasta||'',cronograma:p.cronograma||null}},
@@ -796,18 +805,18 @@ function vLogin(err=''){
 }
 
 const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['ot','OT'],['personal','Personal'],['ajustes','Ajustes']];
-const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['tareas','Tareas']];
-const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='obra'&&t!=='proyectos';
+const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['gastos','Gastos'],['tareas','Tareas']];
+const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='gastos'&&t!=='obra'&&t!=='proyectos';
 function render(){
   if((window.CLI||window.COL)&&S.tab==='proyectos')S.tab='inicio';
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
   if(window.COL&&!['inicio','obra'].includes(S.tab)&&(S.tab==='ajustes'||!window.COL.mods.includes(esP(S.tab)?'personal':S.tab)))S.tab='obra';
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',gastos:()=>'<div id="gas-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
     ${S.tab==='inicio'||S.tab==='proyectos'?'':S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
+    ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',gastos:'Gastos',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}${S.edit&&(S.tab==='personal'||S.tab==='cargar')?vEditPer():''}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
@@ -821,6 +830,7 @@ function render(){
   if(window.LATERAL)window.LATERAL();
   if(S.tab==='ot'&&window.OT)window.OT.mount();
   if(S.tab==='tareas'&&window.TAREAS)window.TAREAS.mount();
+  if(S.tab==='gastos'&&window.GASTOS)window.GASTOS.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
 }
 
@@ -982,6 +992,7 @@ function exportarExcel(){
 /* ---------- puentes con el módulo de contratistas ---------- */
 window.ASIS_OBRA=()=>obraAct();
 window.PRYB={list:()=>DB.proyectos(),save:p=>DB.saveProyecto(p),del:id=>DB.delProyecto(id),arch:{save:a=>DB.saveArchPry(a),get:id=>DB.archPry(id),del:id=>DB.delArchPry(id)},doc:{subir:(pa,f)=>DB.docSubir(pa,f),url:(pa,n)=>DB.docUrl(pa,n),borrar:pa=>DB.docBorrar(pa)}};
+window.GDB={list:oid=>DB.gastos(oid),save:g=>DB.saveGasto(g),del:id=>DB.delGasto(id),subir:(pa,f)=>NUBE?DB.archSubir('gastos',pa,f):DB.docSubir('g_'+pa,f),url:pa=>NUBE?DB.archUrl('gastos',pa):DB.docUrl('g_'+pa),borrarArch:pa=>NUBE?DB.archBorrar('gastos',pa):DB.docBorrar('g_'+pa)};
 const SEMILLA_PRY=[];
 window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
@@ -4018,6 +4029,150 @@ body:has(.tk-dr){overflow:hidden}
 })();
 
 (function(){
+/* ============ Gastos de obra: compras con ítem, fecha, proveedor, factura y precio ============ */
+const CAT=[['materiales','Materiales'],['herramientas','Herramientas y equipos'],['fletes','Fletes y transporte'],['mano','Mano de obra extra'],['servicios','Servicios'],['otros','Otros']];
+const CATN=Object.fromEntries(CAT);
+const UNI=['unid','m3','m2','ml','kg','bolsa','barra','litro','gl','viaje','carga'];
+const G={oid:undefined,lista:[],cargando:false,form:null,mes:'todos',cat:'todas',q:'',del:null,guardando:false,err:null};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hoyG=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const mil=n=>Math.round(Number(n)||0).toLocaleString('es-PY');
+const corto=n=>{n=Number(n)||0;return Math.abs(n)>=1e6?(n/1e6).toLocaleString('es-PY',{maximumFractionDigits:1})+' M':mil(n)};
+const num=v=>{if(v==null||v==='')return null;const s=String(v).trim().replace(/\s/g,'');const t=/,\d{1,2}$/.test(s)||(s.includes(',')&&!s.includes('.'))?s.replace(/\./g,'').replace(',','.'):s.replace(/\.(?=\d{3}(\D|$))/g,'').replace(/,/g,'');const n=Number(t);return isFinite(n)?n:null};
+const q2=v=>v==null?'':String(Math.round(v*100)/100).replace('.',',');
+const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const fch=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(2,4):'';
+const mesDe=s=>(s||'').slice(0,7);const mesTxt=m=>m?MES[+m.slice(5,7)-1]+' '+m.slice(0,4):'';
+const aviso=m=>window.toast?window.toast(m):null;
+const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA();
+
+async function cargar(oid){G.oid=oid;G.cargando=true;pintar();try{G.lista=await window.GDB.list(oid)}catch(e){G.lista=[];G.err='No se pudieron cargar los gastos: '+(e.message||e)}G.cargando=false;pintar()}
+
+function filtrados(){const q=G.q.trim().toLowerCase();return G.lista.filter(g=>(G.mes==='todos'||mesDe(g.fecha)===G.mes)&&(G.cat==='todas'||g.categoria===G.cat)&&(!q||[g.item,g.proveedor,g.factura,g.notas].join(' ').toLowerCase().includes(q)))
+  .sort((a,b)=>a.fecha<b.fecha?1:a.fecha>b.fecha?-1:(a.creado||'')<(b.creado||'')?1:-1)}
+const suma=L=>L.reduce((s,g)=>s+(Number(g.total)||0),0);
+
+function vForm(){const f=G.form;if(!f)return '';const items=[...new Set(G.lista.map(g=>g.item).filter(Boolean))].slice(0,80);const provs=[...new Set(G.lista.map(g=>g.proveedor).filter(Boolean))];
+  const t=f.total!=null&&f.total!==''?f.total:(num(f.cantidad)!=null&&num(f.precio)!=null?num(f.cantidad)*num(f.precio):'');
+  return `<form class="panel gs-f" id="gs-form" autocomplete="off"><div class="gs-fh"><b>${f.id?'Editar gasto':'Nuevo gasto'}</b><button type="button" class="rs-x" data-gs="cerrar" aria-label="Cerrar">✕</button></div>
+   <div class="gs-g">
+    <label class="gs-w2">Ítem / qué se compró<input id="gs-item" list="gs-li" value="${esc(f.item||'')}" placeholder="Ej.: arena lavada, ladrillo común, cemento" required></label>
+    <label>Fecha<input type="date" id="gs-fecha" value="${esc(f.fecha||hoyG())}" max="${hoyG()}"></label>
+    <label>Tipo de gasto<select id="gs-cat">${CAT.map(([k,v])=>`<option value="${k}" ${k===(f.categoria||'materiales')?'selected':''}>${v}</option>`).join('')}</select></label>
+    <label>Proveedor<input id="gs-prov" list="gs-lp" value="${esc(f.proveedor||'')}" placeholder="Ej.: Ferretería Itapúa"></label>
+    <label>N° de factura<input id="gs-fac" value="${esc(f.factura||'')}" placeholder="001-001-0001234" inputmode="text"></label>
+    <label>Cantidad<input id="gs-cant" value="${esc(q2(num(f.cantidad)))}" inputmode="decimal" placeholder="6"></label>
+    <label>Unidad<input id="gs-uni" list="gs-lu" value="${esc(f.unidad||'')}" placeholder="m3"></label>
+    <label>Precio unitario (Gs)<input id="gs-pu" value="${f.precio!=null&&f.precio!==''?mil(num(f.precio)):''}" inputmode="numeric" placeholder="180.000"></label>
+    <label>Total (Gs)<input id="gs-tot" value="${t!==''?mil(t):''}" inputmode="numeric" placeholder="se calcula solo"></label>
+    <label class="gs-w2">Nota (opcional)<input id="gs-nota" value="${esc(f.notas||'')}" placeholder="Ej.: para contrapiso del bloque 2"></label>
+    <div class="gs-w2 gs-cp">${f.comprobante?`<span>Comprobante cargado</span><button type="button" class="btn sm ghost" data-gs="vercomp" data-path="${esc(f.comprobante)}">Ver</button><button type="button" class="btn sm ghost" data-gs="quitacomp">Quitar</button>`:f.archivo?`<span>${esc(f.archivo.name)}</span><button type="button" class="btn sm ghost" data-gs="quitacomp">Quitar</button>`:`<label class="btn sm gs-up">Foto o PDF de la factura (opcional)<input type="file" id="gs-file" accept="image/*,application/pdf"></label>`}</div>
+   </div>
+   <datalist id="gs-li">${items.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="gs-lp">${provs.map(x=>`<option value="${esc(x)}">`).join('')}</datalist><datalist id="gs-lu">${UNI.map(x=>`<option value="${x}">`).join('')}</datalist>
+   <div class="bar"><button class="btn primary" data-gs="guardar" ${G.guardando?'disabled':''}>${G.guardando?'Guardando…':f.id?'Guardar cambios':'Guardar gasto'}</button>${f.id?'':'<button class="btn ghost" data-gs="guardarotro" '+(G.guardando?'disabled':'')+'>Guardar y cargar otro</button>'}<button type="button" class="btn ghost" data-gs="cerrar">Cancelar</button></div></form>`}
+
+function vista(){const o=OB();if(!o)return '<div class="panel" style="padding:16px">Elegí una obra.</div>';
+  const L=filtrados();const tot=suma(G.lista);const mesAct=hoyG().slice(0,7);const tMes=suma(G.lista.filter(g=>mesDe(g.fecha)===mesAct));
+  const meses=[...new Set(G.lista.map(g=>mesDe(g.fecha)))].sort().reverse();
+  const porCat=CAT.map(([k,v])=>[k,v,suma(G.lista.filter(g=>g.categoria===k))]).filter(x=>x[2]>0).sort((a,b)=>b[2]-a[2]);const mx=porCat.length?porCat[0][2]:1;
+  return `<div class="gs">
+   <div class="gs-hd"><div><h2 style="margin:0">Gastos de obra</h2><span class="sub">${esc(o.nombre)} · solo lo ve la dirección</span></div>
+    <div class="bar" style="margin:0"><button class="btn primary" data-gs="nuevo">+ Nuevo gasto</button>${G.lista.length?'<button class="btn ghost" data-gs="excel">Excel</button><button class="btn ghost" data-gs="pdf">PDF</button>':''}</div></div>
+   ${G.err?`<div class="fo-err" role="alert"><b>Algo falló</b><span>${esc(G.err)}</span><button type="button" class="btn sm ghost" data-gs="okerr">Entendido</button></div>`:''}
+   ${vForm()}
+   <div class="gs-k"><div class="panel"><span class="sub">Gastado en total</span><b class="num">Gs ${mil(tot)}</b><span class="sub">${G.lista.length} compra${G.lista.length===1?'':'s'}</span></div>
+     <div class="panel"><span class="sub">Este mes (${MES[+mesAct.slice(5)-1]})</span><b class="num">Gs ${mil(tMes)}</b></div>
+     <div class="panel gs-cats"><span class="sub">Por tipo de gasto</span>${porCat.length?porCat.map(([k,v,m])=>`<div class="gs-cr"><span>${v}</span><i><em style="width:${m/mx*100}%"></em></i><b class="num">${corto(m)}</b></div>`).join(''):'<span class="sub">Todavía sin gastos</span>'}</div></div>
+   ${G.lista.length?`<div class="gs-fl"><label class="gs-lb">Mes<select id="gs-mes"><option value="todos">Todos</option>${meses.map(m=>`<option value="${m}" ${G.mes===m?'selected':''}>${mesTxt(m)}</option>`).join('')}</select></label>
+     <label class="gs-lb">Tipo<select id="gs-fcat"><option value="todas">Todos</option>${CAT.map(([k,v])=>`<option value="${k}" ${G.cat===k?'selected':''}>${v}</option>`).join('')}</select></label>
+     <label class="gs-lb gs-qw">Buscar<input type="search" id="gs-q" value="${esc(G.q)}" placeholder="ítem, proveedor o factura"></label></div>`:''}
+   ${G.cargando&&!G.lista.length?'<p class="sub">Cargando…</p>':!G.lista.length?`<div class="panel" style="padding:18px;display:flex;flex-direction:column;gap:8px;align-items:flex-start"><b>Todavía no cargaste gastos en esta obra</b><span class="sub">Cargá cada compra con el ítem, la fecha, el proveedor, el número de factura y el precio. Después ves cuánto va gastado por mes y por tipo, y lo bajás en Excel.</span><button class="btn primary" data-gs="nuevo">+ Cargar el primer gasto</button></div>`:
+   `<div class="panel gs-tw"><table class="gs-t"><thead><tr><th>Fecha</th><th>Ítem</th><th>Proveedor</th><th>Factura</th><th class="n">Cant.</th><th class="n">P. unit.</th><th class="n">Total</th><th></th></tr></thead><tbody>
+     ${L.map(g=>`<tr><td class="nw">${fch(g.fecha)}</td><td><b>${esc(g.item)}</b><span class="sub gs-c">${esc(CATN[g.categoria]||g.categoria)}${g.notas?' · '+esc(g.notas):''}</span></td><td>${esc(g.proveedor||'—')}</td><td class="nw">${esc(g.factura||'—')}${g.comprobante?` <button type="button" class="lnk" data-gs="vercomp" data-path="${esc(g.comprobante)}" aria-label="Ver comprobante">ver</button>`:''}</td>
+       <td class="n nw">${g.cantidad!=null?q2(Number(g.cantidad))+' '+esc(g.unidad||''):''}</td><td class="n nw">${g.precio!=null?mil(g.precio):''}</td><td class="n nw"><b>${mil(g.total)}</b></td>
+       <td class="nw gs-ac">${G.del===g.id?`<button class="btn sm" style="background:var(--bad);color:#fff" data-gs="delsi" data-id="${g.id}">Borrar</button><button class="btn sm ghost" data-gs="delno">No</button>`:`<button class="btn sm ghost" data-gs="editar" data-id="${g.id}">Editar</button><button class="pry-q" data-gs="del" data-id="${g.id}" aria-label="Borrar ${esc(g.item)}">✕</button>`}</td></tr>`).join('')||'<tr><td colspan="8" class="sub">Nada con ese filtro.</td></tr>'}</tbody>
+     <tfoot><tr><td colspan="6">${G.mes!=='todos'||G.cat!=='todas'||G.q?'Total filtrado':'Total'} · ${L.length} compra${L.length===1?'':'s'}</td><td class="n nw"><b>${mil(suma(L))}</b></td><td></td></tr></tfoot></table></div>`}
+  </div>`}
+
+function pintar(){const r=document.getElementById('gas-root');if(!r)return;const a=document.activeElement;const id=a&&a.id;const pos=a&&a.selectionStart;r.innerHTML=vista();
+  if(id){const e=document.getElementById(id);if(e){e.focus();try{if(pos!=null)e.setSelectionRange(pos,pos)}catch(x){}}}}
+function leerForm(){const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''};const f=G.form;
+  Object.assign(f,{item:v('gs-item'),fecha:v('gs-fecha')||hoyG(),categoria:v('gs-cat')||'materiales',proveedor:v('gs-prov'),factura:v('gs-fac'),cantidad:num(v('gs-cant')),unidad:v('gs-uni'),precio:num(v('gs-pu')),total:num(v('gs-tot')),notas:v('gs-nota')});return f}
+async function guardar(otro){const f=leerForm();if(!f.item)return aviso('Escribí qué se compró');
+  let tot=f.total;if(tot==null&&f.cantidad!=null&&f.precio!=null)tot=f.cantidad*f.precio;if(tot==null)return aviso('Poné el total o la cantidad y el precio');
+  if(f.precio==null&&f.cantidad)f.precio=tot/f.cantidad;
+  G.guardando=true;pintar();
+  try{let comp=f.comprobante||null;if(f.archivo){comp=`${G.oid}/${Date.now().toString(36)}-${String(f.archivo.name||'factura').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^\w.\-]+/g,'_').slice(-60)}`;await window.GDB.subir(comp,f.archivo)}
+    const row={id:f.id,obra_id:G.oid,fecha:f.fecha,item:f.item,categoria:f.categoria,proveedor:f.proveedor||null,factura:f.factura||null,cantidad:f.cantidad,unidad:f.unidad||null,precio:f.precio!=null?Math.round(f.precio*100)/100:null,total:Math.round(tot),notas:f.notas||null,comprobante:comp};
+    const g=await window.GDB.save(row);const i=G.lista.findIndex(x=>x.id===g.id);if(i>=0)G.lista[i]=g;else G.lista.push(g);
+    aviso(f.id?'Gasto actualizado':'Gasto guardado');G.form=otro?{fecha:f.fecha,categoria:f.categoria,proveedor:f.proveedor,factura:f.factura}:null}
+  catch(e){G.err=/row-level|policy|403/i.test(e.message||'')?'Tu usuario no puede cargar gastos en esta obra.':/gastos/.test(e.message||'')&&/exist|relation/.test(e.message||'')?'Falta activar la tabla de gastos en Supabase.':'No se pudo guardar: '+(e.message||e)}
+  G.guardando=false;pintar();if(G.form){const x=document.getElementById('gs-item');x&&x.focus()}}
+
+/* ---------- exportar ---------- */
+async function excel(){await window.LIBS.cargar();const L=filtrados().slice().reverse();const o=OB();
+  const rows=[['Fecha','Ítem','Tipo','Proveedor','N° factura','Cantidad','Unidad','Precio unit. (Gs)','Total (Gs)','Nota']].concat(L.map(g=>[g.fecha,g.item,CATN[g.categoria]||g.categoria,g.proveedor||'',g.factura||'',g.cantidad!=null?Number(g.cantidad):'',g.unidad||'',g.precio!=null?Number(g.precio):'',Number(g.total)||0,g.notas||'']));
+  rows.push([]);rows.push(['','','','','','','','TOTAL',suma(L)]);
+  const ws=XLSX.utils.aoa_to_sheet(rows);ws['!cols']=[{wch:11},{wch:34},{wch:20},{wch:24},{wch:18},{wch:9},{wch:8},{wch:15},{wch:15},{wch:30}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Gastos');XLSX.writeFile(wb,['Gastos',o?o.nombre:'',G.mes==='todos'?'':mesTxt(G.mes)].filter(Boolean).join(' ')+'.xlsx')}
+async function pdf(){await window.LIBS.cargar();const K=window.PDFK;if(!K.ok())return;const L=filtrados().slice().reverse();const o=OB()||{};
+  const doc=K.nuevo('landscape');doc.__etq=o;
+  const y=K.titulo(doc,'GASTOS DE OBRA',[['Obra:',o.nombre||''],['Período:',G.mes==='todos'?'todos los meses':mesTxt(G.mes)],['Tipo:',G.cat==='todas'?'':CATN[G.cat]],['Emitido:',fch(hoyG())]]);
+  K.tabla(doc,{startY:y,head:[['Fecha','Ítem','Tipo','Proveedor','N° factura','Cantidad','P. unitario','Total Gs']],
+    body:L.map(g=>[fch(g.fecha),g.item+(g.notas?' ('+g.notas+')':''),CATN[g.categoria]||'',g.proveedor||'',g.factura||'',g.cantidad!=null?q2(Number(g.cantidad))+' '+(g.unidad||''):'',g.precio!=null?mil(g.precio):'',mil(g.total)]),
+    foot:[[{content:'TOTAL · '+L.length+' compras',colSpan:7,styles:{halign:'right'}},mil(suma(L))]],
+    columnStyles:{0:{cellWidth:18},5:{halign:'right',cellWidth:24},6:{halign:'right',cellWidth:26},7:{halign:'right',cellWidth:28}}});
+  K.cerrar(doc,`Gastos ${o.nombre||''}`)}
+
+document.addEventListener('click',async e=>{const t=e.target.closest('[data-gs]');if(!t||!document.getElementById('gas-root'))return;const a=t.dataset.gs;
+  if(a==='nuevo'){G.form={fecha:hoyG(),categoria:'materiales'};G.err=null;pintar();const x=document.getElementById('gs-item');x&&x.focus();return}
+  if(a==='cerrar'){G.form=null;return pintar()}
+  if(a==='okerr'){G.err=null;return pintar()}
+  if(a==='guardar'||a==='guardarotro'){e.preventDefault();return guardar(a==='guardarotro')}
+  if(a==='editar'){const g=G.lista.find(x=>x.id===t.dataset.id);if(!g)return;G.form={...g};pintar();window.scrollTo({top:0,behavior:'smooth'});return}
+  if(a==='del'){G.del=t.dataset.id;return pintar()}
+  if(a==='delno'){G.del=null;return pintar()}
+  if(a==='delsi'){const g=G.lista.find(x=>x.id===t.dataset.id);G.del=null;if(!g)return pintar();try{await window.GDB.del(g.id);if(g.comprobante)try{await window.GDB.borrarArch(g.comprobante)}catch(x){}G.lista=G.lista.filter(x=>x.id!==g.id);aviso('Gasto borrado')}catch(x){G.err='No se pudo borrar'}return pintar()}
+  if(a==='quitacomp'){if(G.form){leerForm();G.form.archivo=null;G.form.comprobante=null}return pintar()}
+  if(a==='vercomp'){const w=window.open('','_blank');try{let u=await window.GDB.url(t.dataset.path);if(u&&u.startsWith('data:')){const b=await (await fetch(u)).blob();u=URL.createObjectURL(b)}if(w)w.location=u}catch(x){if(w)w.close();aviso('No se pudo abrir el comprobante')}return}
+  if(a==='excel'){try{await excel()}catch(x){aviso('No se pudo armar el Excel')}return}
+  if(a==='pdf'){try{await pdf()}catch(x){console.error(x);aviso('No se pudo armar el PDF')}return}
+});
+document.addEventListener('change',e=>{const t=e.target;if(!document.getElementById('gas-root'))return;
+  if(t.id==='gs-file'){const f=t.files&&t.files[0];if(!f)return;if(f.size>10*1048576){aviso('El archivo pesa más de 10 MB');t.value='';return}leerForm();G.form.archivo=f;return pintar()}
+  if(t.id==='gs-mes'){G.mes=t.value;return pintar()}
+  if(t.id==='gs-fcat'){G.cat=t.value;return pintar()}});
+document.addEventListener('input',e=>{const t=e.target;if(!document.getElementById('gas-root'))return;
+  if(t.id==='gs-q'){G.q=t.value;return pintar()}
+  if(t.id==='gs-cant'||t.id==='gs-pu'){const c=num((document.getElementById('gs-cant')||{}).value),p=num((document.getElementById('gs-pu')||{}).value);const tt=document.getElementById('gs-tot');if(tt&&c!=null&&p!=null)tt.value=mil(c*p)}});
+document.addEventListener('submit',e=>{if(e.target.id==='gs-form'){e.preventDefault();guardar(false)}},true);
+
+window.GASTOS={mount(){const o=OB();if(!o)return pintar();if(G.oid!==o.id){G.form=null;G.mes='todos';G.cat='todas';G.q='';G.lista=[];cargar(o.id)}else pintar()},
+  resumen:async oid=>{try{const L=await window.GDB.list(oid);return{n:L.length,total:suma(L)}}catch(e){return{n:0,total:0}}}};
+
+const css=document.createElement('style');css.textContent=`
+.gs{display:flex;flex-direction:column;gap:14px}.gs-hd{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.gs-k{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,2fr);gap:12px}.gs-k>.panel{padding:12px 14px;display:flex;flex-direction:column;gap:2px}.gs-k b{font-family:var(--f-display);font-size:28px;line-height:1.1}
+@media (max-width:760px){.gs-k{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gs-cats{grid-column:1 / -1}.gs-k b{font-size:22px}}
+.gs-cats{gap:6px!important}.gs-cr{display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13.5px}.gs-cr i{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.gs-cr em{display:block;height:100%;background:var(--accent,#f2b705);border-radius:99px}.gs-cr b{font-size:13.5px!important;font-family:inherit!important}
+.gs-fl{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.gs-lb{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}.gs-lb select,.gs-lb input{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:8px 10px;min-height:40px}.gs-qw{flex:1;min-width:180px}.gs-qw input{width:100%}
+.gs-f{padding:14px;display:flex;flex-direction:column;gap:10px;border:2px solid var(--accent,#f2b705)}.gs-fh{display:flex;justify-content:space-between;align-items:center}.gs-fh b{font-size:16px}
+.gs-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.gs-w2{grid-column:span 2}
+@media (max-width:760px){.gs-g{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.gs-g label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.gs-g input,.gs-g select{font:inherit;font-size:15px;text-transform:none;letter-spacing:0;font-weight:400;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 10px;min-width:0}
+.gs-cp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px}.gs-up{position:relative;overflow:hidden;cursor:pointer}.gs-up input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.gs-tw{overflow-x:auto;padding:0}.gs-t{width:100%;border-collapse:collapse;font-size:14px}.gs-t th{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:9px 10px;border-bottom:2px solid var(--line);white-space:nowrap}
+.gs-t td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}.gs-t .n{text-align:right}.gs-t .nw{white-space:nowrap}.gs-t tfoot td{border-bottom:0;font-weight:600;padding-top:10px}
+.gs-c{display:block;font-size:12.5px}.gs-ac{display:flex;gap:4px;justify-content:flex-end}
+@media (max-width:640px){.gs-t thead{display:none}.gs-t,.gs-t tbody,.gs-t tr,.gs-t td{display:block}.gs-t tr{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+ .gs-t td{border:0;padding:0}.gs-t td:nth-child(1){grid-row:1;grid-column:1;color:var(--muted);font-size:13px}.gs-t td:nth-child(2){grid-row:1 / span 2;grid-column:2}.gs-t td:nth-child(7){grid-row:1;grid-column:3}
+ .gs-t td:nth-child(3),.gs-t td:nth-child(4),.gs-t td:nth-child(5),.gs-t td:nth-child(6){grid-column:2;font-size:13px;color:var(--muted);text-align:left!important}.gs-t td:nth-child(3):empty,.gs-t td:nth-child(5):empty,.gs-t td:nth-child(6):empty{display:none}.gs-t td:nth-child(8){grid-column:3;grid-row:2 / span 3;align-self:end}
+ .gs-t tfoot tr{grid-template-columns:1fr auto}.gs-t tfoot td:nth-child(1){grid-column:1}.gs-t tfoot td:nth-child(2){grid-column:2;grid-row:1}}`;
+document.head.appendChild(css);
+})();
+
+(function(){
 /* ============ Resumen de obra: lo que el cliente necesita ver de un vistazo; el detalle se abre en ventanas ============ */
 const RS={oid:undefined,cargando:false,D:null,ver:null,arg:null,soloAv:true,serie:'ej'};
 const pctN=x=>isFinite(x)?Math.round(x*1000)/10:0;
@@ -4183,6 +4338,7 @@ const ICO={
  novedades:'<path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/>',
  personal:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0"/><circle cx="17.5" cy="9" r="2.5"/><path d="M16 14.5a5 5 0 016 5"/>',
  tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>',
+ gastos:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
  aprob:'<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',
  ot:'<path d="M9 4h6v3H9z"/><path d="M7 5H5v16h14V5h-2"/><path d="M8.5 13l2.5 2.5 4.5-5"/>'};
 const icono=k=>`<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICO[k]||''}</svg>`;
@@ -4197,6 +4353,7 @@ function accesos(){const D=RS.D,A=D.A;const L=[];const ap=window.APROB?window.AP
   if(ve('materiales'))L.push(['materiales','Compras y materiales','Pedidos, lo que llegó y lo que falta en obra.',D.ped.length?`${D.ped.length} pedidos · ${enC?enC+' en camino':'todo recibido'}`:'Sin pedidos aún',{tab:'materiales'}]);
   if(ve('contratistas'))L.push(['contratistas','Contratistas','Quién trabaja en la obra y cuánto lleva cada uno.',D.con.length?`${D.con.length} contratista${D.con.length===1?'':'s'}`:'Sin contratistas',{tab:'contratistas'}]);
   if(!window.CLI){if(ve('personal'))L.push(['personal','Personal en obra','Asistencia diaria, planilla y liquidación semanal.','Cargar asistencia',{tab:S.lastP||'cargar'}]);
+    if(!window.CLI&&!window.COL)L.push(['gastos','Gastos de obra','Compras con ítem, fecha, proveedor, factura y precio.','Ver gastos',{tab:'gastos'}]);
     if(ve('tareas'))L.push(['tareas','Tareas','Pendientes de la obra en lista, tablero o calendario.','Ver pendientes',{tab:'tareas'}]);
     if(ve('personal'))L.push(['ot','Órdenes de trabajo','OT para el ingreso de personal al shopping.','Nueva OT',{tab:'ot'}])}
   L.push(['novedades','Novedades','Todo lo último que pasó en la obra, en orden.',N.length?`Última: ${fdia(N[0].f)}`:'Sin novedades',{ver:'novedades'}]);
@@ -6204,11 +6361,12 @@ const ICS={
  planos:'<path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/>',
  materiales:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
  proyectos:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M8 13h8M8 16.5h5"/>',
- tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>'};
+ tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>',
+ gastos:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'};
 const svg=k=>`<svg class="side-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICS[k]||''}</svg>`;
 const SUBS='main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p';
 const ancho=()=>window.matchMedia('(min-width:900px)').matches;
-const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(t==='proyectos')return 'proyectos';if(['contratistas','presupuesto','planos','materiales','tareas'].includes(t))return t;return 'personal'};
+const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(t==='proyectos')return 'proyectos';if(['contratistas','presupuesto','planos','materiales','tareas','gastos'].includes(t))return t;return 'personal'};
 let pend=false;
 function armar(){pend=false;const nav=document.querySelector('header.top nav.tabs');if(!nav)return;
   nav.querySelectorAll('button[data-tab]').forEach(b=>{if(!b.querySelector('.side-ic'))b.insertAdjacentHTML('afterbegin',svg(claveDe(b)))});
