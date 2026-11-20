@@ -205,7 +205,11 @@ function backendNube(sb){
       .map(r=>({...r,horas:Number(r.horas)||0,mm:r.mm==null?null:Number(r.mm),actividades:r.actividades||[],observaciones:r.observaciones||''}))},
     async saveLluvia(r){const row={...r};delete row.id;ok(await sb.from('lluvias').upsert(row,{onConflict:'obra_id,fecha'}))},
     async delLluvia(oid,f){ok(await sb.from('lluvias').delete().eq('obra_id',oid).eq('fecha',f))},
-    async contratistas(oid){if(!oid)return[];return ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'))},
+    async contratistas(oid){if(!oid)return[];const l=ok(await sb.from('contratistas').select('*').eq('obra_id',oid).order('creado'));
+      /* avance real (borrador): solo la dirección; el cliente, el aprobador y el equipo no lo leen */
+      if(!window.CLI&&!window.COL&&l.length){try{const r=ok(await sb.from('avance_real').select('contratista_id,cant,fecha').eq('obra_id',oid));const m=Object.fromEntries(r.map(x=>[x.contratista_id,x]));l.forEach(c=>{const x=m[c.id];if(x)c.real={cant:x.cant||{},fecha:x.fecha||''}})}catch(e){console.error(e)}}
+      return l},
+    async saveReal(c){ok(await sb.from('avance_real').upsert({contratista_id:c.id,obra_id:c.obra_id,cant:(c.real&&c.real.cant)||{},fecha:(c.real&&c.real.fecha)||null,actualizado:new Date().toISOString()}))},
     async delContratista(id){ok(await sb.from('contratistas').delete().eq('id',id))},
     async proyectos(){return ok(await sb.from('proyectos').select('id,datos,actualizado').order('actualizado',{ascending:false})).map(r=>({...r.datos,id:r.id}))},
     async saveProyecto(p){const{id,...datos}=p;ok(await sb.from('proyectos').upsert({id,datos,actualizado:new Date().toISOString()}))},
@@ -1000,7 +1004,7 @@ window.ASIS_OBRA=()=>obraAct();
 window.PRYB={list:()=>DB.proyectos(),save:p=>DB.saveProyecto(p),del:id=>DB.delProyecto(id),arch:{save:a=>DB.saveArchPry(a),get:id=>DB.archPry(id),del:id=>DB.delArchPry(id)},doc:{subir:(pa,f)=>DB.docSubir(pa,f),url:(pa,n)=>DB.docUrl(pa,n),borrar:pa=>DB.docBorrar(pa)}};
 window.GDB={list:oid=>DB.gastos(oid),save:g=>DB.saveGasto(g),del:id=>DB.delGasto(id),des:{list:oid=>DB.desembolsos(oid),save:g=>DB.saveDesembolso(g),del:id=>DB.delDesembolso(id)},subir:(pa,f)=>NUBE?DB.archSubir('gastos',pa,f):DB.docSubir('g_'+pa,f),url:pa=>NUBE?DB.archUrl('gastos',pa):DB.docUrl('g_'+pa),borrarArch:pa=>NUBE?DB.archBorrar('gastos',pa):DB.docBorrar('g_'+pa)};
 const SEMILLA_PRY=[];
-window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id)};
+window.CDB={list:oid=>DB.contratistas(oid),save:c=>DB.saveContratista(c),del:id=>DB.delContratista(id),saveReal:c=>DB.saveReal(c)};
 window.PDB={get:oid=>DB.presupuesto(oid),save:p=>DB.savePresupuesto(p)};
 window.MDB={list:oid=>DB.pedidos(oid),save:p=>DB.savePedido(p),del:id=>DB.delPedido(id)};
 window.PVB={list:oid=>DB.proveedores(oid),save:v=>DB.saveProveedor(v),del:id=>DB.delProveedor(id)};
@@ -1129,7 +1133,7 @@ const clon=x=>JSON.parse(JSON.stringify(x));
 let ALL={contratistas:[]};let D=null;let OBRA_CARGADA=undefined,CARGANDO=false;
 const guardar=()=>{if(D&&window.CDB)window.CDB.save(D).catch(()=>toast('No se pudo guardar en la base. Revisá la conexión.'))};
 const S={tab:'contratistas',sel:0,cert:null,soloAvance:true,buscar:'',borrador:{},per:null};
-function usar(i){S.sel=i;D=ALL.contratistas[i]||null;S.cert=null;S.borrador={};S.buscar='';S.soloAvance=true;S.per=null}
+function usar(i){S.sel=i;D=ALL.contratistas[i]||null;S.cert=null;S.borrador={};S.buscar='';S.soloAvance=true;S.per=null;S.rb=null}
 async function asegurar(oid){if(CARGANDO)return;CARGANDO=true;try{ALL={contratistas:await window.CDB.list(oid)}}catch(e){ALL={contratistas:[]};toast('No se pudieron leer los contratistas')}
   OBRA_CARGADA=oid;CARGANDO=false;usar(Math.min(S.sel,Math.max(0,ALL.contratistas.length-1)));if(!D)S.tab='contratistas';render()}
 function conR(c){const p=D;D=c;const r=resumen();r.alertas=controles(r);D=p;return r}
@@ -1476,6 +1480,7 @@ function vTodos(){
       <div class="cv-ch"><span class="cv-av">${esc(iniciales(c.nombre))}</span><span class="cv-cn"><b>${esc(c.nombre)}</b><span class="sub">${esc(tipoCorto(c.tipo))}</span></span>${anilloC(X.avance,62)}</div>
       ${barraDinero(X.pag,X.sinPagar,X.tot,false)}
       <div class="cv-cs"><span><small>Contrato</small><b>${mill(X.tot)}</b></span><span><small>Certificado</small><b>${mill(X.cert)}</b></span><span><small>Pagado</small><b>${mill(X.pag)}</b></span></div>
+      ${verReal()?(()=>{const Z=datosReal(c);return Z.hay?`<div class="sub">Avance real <b>${pct(Z.av)}</b>${Z.sin>1?` · ${mill(Z.sin)} hecho sin certificar`:''}</div>`:''})():''}
       ${X.R.alertas.length?`<div class="cv-mot ${X.estado}">${esc(motivos(X.R.alertas))}</div>`:''}
       <div class="cv-cf"><span class="cv-est ${X.estado}"><i class="dot ${X.estado}"></i>${estTxt[X.estado]}</span><span class="sub">${u?`Cert. N°${u.n}${u.hasta?' al '+fcorta(u.hasta):''}`:'Sin certificados'}</span></div>
     </button>`};
@@ -1508,7 +1513,7 @@ function vRes(){
   <div class="panel cv-rh">
     <div class="cv-rt"><span class="cv-av lg">${esc(iniciales(D.nombre))}</span><div><h2>${esc(D.nombre)}</h2><div class="sub">${esc(D.tipo)} · ${esc(OBRA.obra)}</div>
       <div class="cv-chips"><button class="cv-est ${X.estado}" data-cx="controles"><i class="dot ${X.estado}"></i>${estTxt[X.estado]}${R.alertas.length?` · ${R.alertas.length} aviso${R.alertas.length>1?'s':''}`:''}</button><span class="cv-chip">${D.certs.length} certificado${D.certs.length===1?'':'s'}</span>${adic.length?`<button class="cv-chip" data-ctab="adicionales">${adic.length} adicional${adic.length>1?'es':''} · ${mill(R.adic)}</button>`:''}</div></div></div>
-    <div class="cv-rr">${anilloC(X.avance,120,'big')}<span class="cv-rl"><b>Avance del contrato</b><span class="sub">${mill(R.certO)} de ${mill(R.orig)}</span>${!window.CLI?`<button class="btn primary sm" data-cx="nuevo">+ Certificado N°${R.ult+1}</button>`:''}</span></div>
+    <div class="cv-rr">${anilloC(X.avance,120,'big')}<span class="cv-rl"><b>Avance del contrato</b><span class="sub">${mill(R.certO)} de ${mill(R.orig)}</span>${verReal()?(()=>{const Z=datosReal(D);return Z.hay?`<button class="cv-chip" data-ctab="real">Avance real ${pct(Z.av)}${Z.sin>1?' · '+mill(Z.sin)+' sin certificar':''}</button>`:`<button class="cv-chip" data-ctab="real">Cargar avance real</button>`})():''}${!window.CLI?`<button class="btn primary sm" data-cx="nuevo">+ Certificado N°${R.ult+1}</button>`:''}</span></div>
   </div>
   <div class="panel cv-mb"><div class="cv-ph"><b>Plata del contrato</b><span class="sub">${mill(X.tot)} con adicionales</span></div>${barraDinero(X.pag,X.sinPagar,X.tot,true)}</div>
   <div class="cv-two">
@@ -1723,6 +1728,62 @@ function vCertificado(){
   </div>`;
 }
 
+/* ---------- Avance real (borrador): lo hecho en obra aunque no esté certificado. Solo la dirección ---------- */
+const verReal=()=>!window.CLI&&!window.COL;
+/* calcula, ítem por ítem, lo certificado, lo real (lo cargado o, si está vacío, lo certificado) y lo que falta certificar */
+function calcReal(cant){const R=resumen();const L=[];let tot=0,ce=0,re=0,sin=0;
+  for(const it of D.items){const c=R.ac[it.id]||0;const has=cant[it.id]!=null&&cant[it.id]!=='';const r=has?Number(cant[it.id])||0:c;
+    const e=Math.max(c,Math.min(r,it.cant));const d=Math.max(0,e-c);
+    if(it.sec==='ORIG'){tot+=it.cant*it.pu;ce+=Math.min(c,it.cant)*it.pu;re+=e*it.pu}sin+=d*it.pu;
+    L.push({it,c,has,r,e,d,over:r>it.cant+1e-9,bajo:has&&r<c-1e-9})}
+  return{R,L,tot,ce,re,sin}}
+function datosReal(c){return conD(c,()=>{const K=calcReal((c.real&&c.real.cant)||{});return{hay:!!(c.real&&Object.keys(c.real.cant||{}).length),fecha:(c.real&&c.real.fecha)||'',av:K.tot?K.re/K.tot:0,sin:K.sin}})}
+function vReal(){
+  if(S.rb==null){S.rb={...((D.real&&D.real.cant)||{})};S.rraw={};S.rf=(D.real&&D.real.fecha)||hoy;S.rdirty=false}
+  const K=calcReal(S.rb);const ult=K.R.ult;const q=(S.buscar||'').toLowerCase();
+  const rows=[];let lastR=null,lastS=null;const over=K.L.filter(x=>x.over),bajo=K.L.filter(x=>x.bajo);
+  for(const x of K.L){const it=x.it;
+    const visible=(q?(it.desc+' '+it.n+' '+it.rubro).toLowerCase().includes(q):true)&&(S.soloAvance?it.pu>0:true);if(!visible)continue;
+    if(it.rubro!==lastR){rows.push(`<tr class="rubro"><td colspan="9">${esc(it.rubro)}</td></tr>`);lastR=it.rubro;lastS=null}
+    if(it.sector&&it.sector!==lastS){rows.push(`<tr class="sector"><td></td><td colspan="8">${esc(it.sector)}</td></tr>`);lastS=it.sector}
+    const val=S.rraw[it.id]!=null?S.rraw[it.id]:(x.has?qf(x.r):'');
+    rows.push(`<tr class="${x.over?'over':''} ${x.d>1e-9?'has':''}"><td class="num">${esc(it.n)}</td><td class="desc">${esc(it.desc)}${x.bajo?`<div class="sub" style="color:var(--warn)">Menos de lo ya certificado (${qf(x.c)})</div>`:''}</td><td>${esc(it.unidad)}</td>
+      <td class="n">${qf(it.cant)}</td><td class="n">${qf(x.c)||'0'}</td>
+      <td class="n pres"><input type="text" inputmode="decimal" autocomplete="off" id="r-${it.id}" data-rid="${it.id}" value="${esc(val)}" placeholder="${esc(qf(x.c)||'0')}" aria-label="Avance real ${esc(it.desc)}"></td>
+      <td class="n">${it.cant?pct(x.e/it.cant):''}</td><td class="n">${x.d>1e-9?qf(x.d):''}</td><td class="n">${x.d>1e-9?gs(x.d*it.pu):''}</td></tr>`)}
+  return `
+  <div class="bar between"><div><h2>Avance real · borrador</h2><div class="sub">${esc(D.nombre)} · ${esc(D.tipo)} · ${esc(OBRA.obra)}</div>
+    <div class="sub">Lo que está hecho en obra, aunque todavía no esté certificado. <b>Solo lo ve la dirección.</b> No cambia pagos, caja ni certificados.</div></div></div>
+  <div class="kpis">
+    <div class="kpi"><small>Certificado</small><b>${mill(K.ce)}</b><em>${pct(K.tot?K.ce/K.tot:0)} del contrato · ${ult} certificado${ult===1?'':'s'}</em></div>
+    <div class="kpi"><small>Avance real</small><b>${mill(K.re)}</b><em>${pct(K.tot?K.re/K.tot:0)} del contrato${D.real&&D.real.fecha?' · medido al '+ddm(D.real.fecha):''}</em></div>
+    <div class="kpi"><small>Hecho sin certificar</small><b>${mill(K.sin)}</b><em>${K.sin>1?'Se puede certificar más adelante':'Nada pendiente'}</em></div>
+  </div>
+  <div class="hint amarillo">En <b>Real a la fecha</b> escribí cuánto hay hecho <b>en total</b> de cada ítem. Si lo dejás vacío, se toma lo certificado. El cronograma y el resumen de la obra miden el atraso con este avance.</div>
+  <div class="panel form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><label>Medido al<input type="date" id="r-fecha" value="${esc(S.rf||hoy)}"></label></div>
+  <div class="bar">
+    <input type="search" id="buscar" placeholder="Buscar ítem o rubro" value="${esc(S.buscar)}" style="flex:1;min-width:200px">
+    <label class="bar sub"><input type="checkbox" id="solo" ${S.soloAvance?'checked':''}> Solo ítems con precio</label>
+  </div>
+  <div class="panel tw"><table>
+    <thead><tr><th>N°</th><th>Rubro</th><th>Unid.</th><th class="n">Cant.</th><th class="n">Certificado</th><th class="n">Real a la fecha</th><th class="n">% real</th><th class="n">Sin certificar</th><th class="n">Sin certificar Gs</th></tr></thead>
+    <tbody>${rows.join('')||'<tr><td colspan="9" class="sub">Ningún ítem coincide con el filtro.</td></tr>'}</tbody>
+  </table></div>
+  <div class="totales">
+    <div><small>Hecho sin certificar</small><b>${gs(K.sin)}</b></div>
+    <div><small>Avance real del contrato</small><b>${pct(K.tot?K.re/K.tot:0)}</b></div>
+    <button class="btn primary" data-cact="rguardar" ${over.length||!S.rdirty?'disabled':''}>${S.rdirty?'Guardar avance real':'Guardado'}</button>
+    ${S.rdirty?'<button class="btn ghost" data-cact="rdescartar">Descartar cambios</button>':''}
+    <button class="btn" data-cact="rpasar" ${over.length||K.sin<=1?'disabled':''}>Pasar al certificado N°${ult+1}</button>
+    ${over.length?`<div class="hint rojo letras">No se puede guardar: ${over.map(x=>esc(x.it.n+' '+x.it.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
+    ${bajo.length?`<div class="hint amarillo letras">${bajo.length} ítem${bajo.length>1?'s tienen':' tiene'} menos avance real que lo ya certificado. Para el cronograma se toma lo certificado.</div>`:''}
+  </div>`;
+}
+async function guardarReal(){const cant={};for(const[k,v]of Object.entries(S.rb||{}))if(v!==''&&v!=null&&isFinite(Number(v)))cant[k]=Number(v);
+  const prev=D.real;D.real={cant,fecha:S.rf||hoy};
+  try{await window.CDB.saveReal(D)}catch(e){D.real=prev;toast('No se pudo guardar el avance real. Revisá la conexión.');return false}
+  S.rb={...cant};S.rraw={};S.rdirty=false;return true}
+
 function vDesembolsos(){
   const R=resumen();
   let aO=0,aA=0;
@@ -1925,7 +1986,7 @@ function pdfResumen(){
   P.cerrar(doc,`Resumen_contratistas_${hoy}`);
 }
 
-const TABS=[['contratistas','Todos'],['resumen','Resumen'],['certificado','Certificados'],['desembolsos','Desembolsos'],['contrato','Contrato'],['adicionales','Adicionales']];
+const TABS=[['contratistas','Todos'],['resumen','Resumen'],['certificado','Certificados'],['real','Avance real'],['desembolsos','Desembolsos'],['contrato','Contrato'],['adicionales','Adicionales']];
 function render(){
   const ROOT=document.getElementById('cert-root');if(!ROOT)return;
   const o=window.ASIS_OBRA&&window.ASIS_OBRA();if(o){OBRA.obra=o.nombre;OBRA.cliente=o.cliente||'';OBRA.direccion=o.ubicacion||'';if(window.MEMB){const m=window.MEMB(o);OBRA.empresa=m.nombre;OBRA.ruc=m.ruc||'';OBRA.firma=m.prof||''}}
@@ -1933,10 +1994,11 @@ function render(){
   if(oid!==OBRA_CARGADA){ROOT.innerHTML='<p class="sub">Cargando contratistas…</p>';asegurar(oid);return}
   if(window.CERT_IR){const x=window.CERT_IR;window.CERT_IR=null;const i=ALL.contratistas.findIndex(c=>c.id===x.cid);if(i>=0){usar(i);S.tab='certificado';S.cert=x.n;S.soloAvance=true}}
   if(!D&&S.tab!=='contratistas')S.tab='contratistas';
-  const V={contratistas:vTodos,resumen:vRes,certificado:vCertificado,desembolsos:vDesembolsos,contrato:vContrato,adicionales:vAdicionales}[S.tab];
+  if(S.tab==='real'&&!verReal())S.tab='certificado';
+  const V={contratistas:vTodos,resumen:vRes,certificado:vCertificado,real:vReal,desembolsos:vDesembolsos,contrato:vContrato,adicionales:vAdicionales}[S.tab];
   const foco=document.activeElement&&document.activeElement.id;
   ROOT.innerHTML=`<div class="subnav">
-    <div class="subnav-p">${(()=>{const sub=TABS.filter(([k])=>k!=='contratistas'&&k!=='resumen');const enC=S.tab!=='contratistas'&&D;
+    <div class="subnav-p">${(()=>{const sub=TABS.filter(([k])=>k!=='contratistas'&&k!=='resumen'&&(k!=='real'||verReal()));const enC=S.tab!=='contratistas'&&D;
       return `<button class="chip-p" data-ctab="contratistas" aria-pressed="${S.tab==='contratistas'}">Todos</button>`+ALL.contratistas.map((c,i)=>{const sel=enC&&i===S.sel;
         return `<button class="chip-p solo-lateral" data-lvl="1" data-cact="abrir" data-i="${i}" aria-pressed="${sel?'true':'false'}">${esc(c.nombre.split(' (')[0])}</button>`+(sel?sub.map(([k,t])=>`<button class="chip-p" data-lvl="2" data-ctab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join(''):'')}).join('')})()}</div>
     ${S.tab!=='contratistas'?`<select id="sel" aria-label="Contratista">${ALL.contratistas.map((c,i)=>`<option value="${i}" ${i===S.sel?'selected':''}>${esc(c.nombre)} · ${esc(c.tipo.replace('Mano de obra · ',''))}</option>`).join('')}</select>`:''}
@@ -1971,15 +2033,23 @@ document.addEventListener('click',e=>{
     D.certs=D.certs.filter(x=>x.n!==n);D.des=D.des.filter(d=>d.cert!==n);S.anular=null;S.cert=null;S.ed=null;guardar();if(window.APROB)window.APROB.quitar(OBRA_CARGADA,'cert_contratista',D.id+':'+n);render();return toast(`Certificado N°${n} anulado`)}
   if(a==='emitir'){const ult=D.certs.length?D.certs[D.certs.length-1].n:0;const pres={};for(const[k,v]of Object.entries(S.borrador))if(Number(v))pres[k]=Number(v);
     D.certs.push({n:ult+1,fecha:hoy,desde:S.per,hasta:addDay(S.per,6),pres});S.borrador={};S.raw={};S.per=null;S.cert=ult+1;guardar();apbPedir(D,ult+1);render();return toast(`Certificado N°${ult+1} emitido`)}
+  if(a==='rdescartar'){S.rb=null;return render()}
+  if(a==='rguardar'){t.disabled=true;guardarReal().then(okk=>{render();if(okk)toast('Avance real guardado')});return}
+  if(a==='rpasar'){t.disabled=true;(async()=>{if(S.rdirty&&!(await guardarReal()))return render();
+    const K=calcReal(S.rb||{});const pres={};K.L.forEach(x=>{if(x.d>1e-9)pres[x.it.id]=Math.round(x.d*1e6)/1e6});
+    if(!Object.keys(pres).length){render();return toast('No hay avance sin certificar')}
+    S.tab='certificado';S.cert=K.R.ult+1;S.ed=null;S.borrador=pres;S.raw={};S.per=null;S.soloAvance=true;S.anular=null;render();window.scrollTo(0,0);
+    toast('Se cargó en Presente todo lo hecho sin certificar. Bajá lo que no quieras certificar esta semana.')})();return}
   if(a==='pagar'){const c=D.certs.find(x=>x.n===+t.dataset.n);const m=montoCert(c);D.des.push({sem:D.des.length+1,fecha:c.hasta?addDay(c.hasta,1):hoy,orig:m.o,adic:m.ad,total:m.t,cert:c.n});D.des.sort((a,b)=>a.fecha<b.fecha?-1:1);guardar();render();return toast('Pago registrado en Desembolsos')}
 
 });
 document.addEventListener('input',e=>{
   if(!document.getElementById('cert-root'))return;const t=e.target;
   if(t.id==='buscar'){S.buscar=t.value;return render()}
+  if(t.dataset.rid){const k=t.dataset.rid;S.rraw=S.rraw||{};S.rraw[k]=t.value;if(!t.value.trim())delete S.rb[k];else{const v=window.numES(t.value);S.rb[k]=v==null?0:v}S.rdirty=true;clearTimeout(S.k);S.k=setTimeout(render,500);return}
   if(t.dataset.id){S.raw=S.raw||{};S.raw[t.dataset.id]=t.value;const v=window.numES(t.value);S.borrador[t.dataset.id]=v==null?0:v;clearTimeout(S.k);S.k=setTimeout(render,500)}
 });
-document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas'||S.tab==='resumen')S.tab='certificado';render()}});
+document.addEventListener('change',e=>{if(!document.getElementById('cert-root'))return;if(e.target.id==='solo'){S.soloAvance=e.target.checked;render()}if(e.target.id==='contrato-todo'){S.contratoTodo=e.target.checked;return render()}if(e.target.id==='r-fecha'&&e.target.value){S.rf=e.target.value;S.rdirty=true;return render()}if(e.target.id==='c-desde'&&e.target.value){const v=sabado(e.target.value);if(v!==e.target.value)toast('Ajustado al sábado '+v.slice(8,10)+'/'+v.slice(5,7));S.per=v;return render()}if(e.target.id==='sel'){usar(+e.target.value);if(S.tab==='contratistas'||S.tab==='resumen')S.tab='certificado';render()}});
 document.addEventListener('submit',e=>{
   if(!document.getElementById('cert-root')||!document.getElementById('cert-root').contains(e.target))return;
   e.preventDefault();e.stopImmediatePropagation();const f=e.target;const fd=Object.fromEntries(new FormData(f));
@@ -2416,7 +2486,13 @@ window.PRES_DOC=()=>ES.doc?{doc:ES.doc,con:ES.con||[],guardar}:null;
 window.PRES.analizar=(doc,con)=>{const sd=ES.doc,sc=ES.con;ES.doc=doc;ES.con=con||[];
   try{const its=doc.items||[];const P=Object.fromEntries(its.map(i=>[i.id,precio(i)]));const tot=its.reduce((s,i)=>s+i.cant*P[i.id],0);
     const bh=doc.baseHasta||'';const M=mapa();
-    const todos=ES.con.flatMap(c=>(c.certs||[]).map(x=>({c,x,f:cierreDe(x)}))).filter(z=>z.f);const lista=todos.filter(z=>!(bh&&z.f<=bh));
+    const todos=ES.con.flatMap(c=>(c.certs||[]).map(x=>({c,x,f:cierreDe(x)}))).filter(z=>z.f);
+    /* avance real (borrador, solo la dirección): lo hecho sin certificar entra como un avance más, a la fecha de la medición */
+    for(const c of ES.con){const q=c.real&&c.real.cant;if(!q||!Object.keys(q).length)continue;const ac={};let fu='';
+      for(const x of c.certs||[]){const f=cierreDe(x);if(f>fu)fu=f;for(const[k,v]of Object.entries(x.pres||{}))ac[k]=(ac[k]||0)+v}
+      const pres={};for(const it of c.items||[]){const v=q[it.id];if(v==null||v==='')continue;const d=Math.min(Number(v)||0,it.cant)-(ac[it.id]||0);if(d>1e-9)pres[it.id]=d}
+      if(!Object.keys(pres).length)continue;const f=[c.real.fecha||hoy,fu].sort().pop();todos.push({c,x:{pres,desde:f,hasta:f,real:true},f})}
+    const lista=todos.filter(z=>!(bh&&z.f<=bh));
     const ejHasta=f=>{const antes=bh&&f<bh;const e=antes?{}:{...(doc.base||{})};for(const z of (antes?todos:lista)){if(z.f>f)continue;for(const[k,v]of Object.entries(z.x.pres||{})){const it=z.c.items.find(i=>i.id===k);if(!it||it.sec!=='ORIG')continue;const pid=M[z.c.id+'|'+k];if(pid)e[pid]=(e[pid]||0)+v}}
       for(const i of its)if((e[i.id]||0)>i.cant)e[i.id]=i.cant;return e};
     const certs=(doc.certs||[]).slice().sort((a,b)=>a.n-b.n);
