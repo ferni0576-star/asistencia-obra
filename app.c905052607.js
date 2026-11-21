@@ -1774,7 +1774,8 @@ function vReal(){
     <div><small>Avance real del contrato</small><b>${pct(K.tot?K.re/K.tot:0)}</b></div>
     <button class="btn primary" data-cact="rguardar" ${over.length||!S.rdirty?'disabled':''}>${S.rdirty?'Guardar avance real':'Guardado'}</button>
     ${S.rdirty?'<button class="btn ghost" data-cact="rdescartar">Descartar cambios</button>':''}
-    <button class="btn" data-cact="rpasar" ${over.length||K.sin<=1?'disabled':''}>Pasar al certificado N°${ult+1}</button>
+    ${selModo()}<button class="btn" data-cact="pdfreal">Descargar PDF</button>
+    <button class="btn" data-cact="rpasar"${over.length||K.sin<=1?'disabled':''}>Pasar al certificado N°${ult+1}</button>
     ${over.length?`<div class="hint rojo letras">No se puede guardar: ${over.map(x=>esc(x.it.n+' '+x.it.desc.slice(0,40))).join(' · ')} supera${over.length>1?'n':''} la cantidad contratada. Si es trabajo extra, cargalo como adicional en Contrato.</div>`:''}
     ${bajo.length?`<div class="hint amarillo letras">${bajo.length} ítem${bajo.length>1?'s tienen':' tiene'} menos avance real que lo ya certificado. Para el cronograma se toma lo certificado.</div>`:''}
   </div>`;
@@ -1928,6 +1929,29 @@ function pdfCertificado(n,modo){
   if(modo==='ejec'){doc.setFont('times','italic');doc.setFontSize(8);doc.text('Se muestran solo los ítems con avance ejecutado.',P.ML,y+16)}
   P.cerrar(doc,`Certificado_${n}_${D.nombre}_${c.desde||hoy}${modo==='ejec'?'_ejecutados':''}`);
 }
+/* PDF del avance real (borrador interno): lo que se ve en pantalla, con o sin guardar */
+function pdfReal(modo){
+  const P=PK();if(!P||!P.ok())return;
+  const cant=S.rb!=null?S.rb:((D.real&&D.real.cant)||{});const fecha=(S.rb!=null?S.rf:(D.real&&D.real.fecha))||hoy;
+  const K=calcReal(cant);const doc=P.nuevo('landscape');
+  let y=P.titulo(doc,'AVANCE REAL · BORRADOR · '+(D.tipo||'').toUpperCase(),[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Contratista:',D.nombre],['Medido al:',`${ddm(fecha)}/${fecha.slice(0,4)}`],['Certificados emitidos:',K.R.ult?'hasta el N°'+K.R.ult:'ninguno']]);
+  const body=[];let lastR=null,sub=null;const b=v=>({content:v,styles:{fontStyle:'bold',halign:'right'}});
+  const cierra=()=>{if(sub&&(sub.t||sub.mc||sub.mr)){body.push([{content:'Subtotal',colSpan:5,styles:{fontStyle:'bold',halign:'right'}},b(gs(sub.t)),'','','','',b(gs(sub.mc)),b(gs(sub.mr)),b(sub.ms?gs(sub.ms):'')])}};
+  for(const x of K.L){const it=x.it;
+    if(modo==='ejec'?!(x.e>0):!(it.pu>0||x.e>0))continue;
+    if(it.rubro!==lastR){cierra();sub={t:0,mc:0,mr:0,ms:0};body.push([{content:it.rubro||'',colSpan:13,styles:{fillColor:[238,238,238],fontStyle:'bold'}}]);lastR=it.rubro}
+    const mc=x.c*it.pu,mr=x.e*it.pu,ms=x.d*it.pu;sub.t+=it.cant*it.pu;sub.mc+=mc;sub.mr+=mr;sub.ms+=ms;
+    body.push([it.n,it.desc,it.unidad,qf(it.cant),gs(it.pu),gs(it.cant*it.pu),qf(x.c),qf(x.e),it.cant?pct(x.e/it.cant):'',x.d>1e-9?qf(x.d):'',gs(mc),gs(mr),x.d>1e-9?gs(ms):''])}
+  cierra();
+  y=P.tabla(doc,{startY:y,head:[['N°','Descripción','Unid.','Cant.','P. unit.','P. total','Certificado','Real','% real','Sin certif.','Monto certificado','Monto real','Sin certificar Gs']],
+    body:body.length?body:[[{content:'Ningún ítem con avance.',colSpan:13}]],styles:{fontSize:7.2,cellPadding:1.1,overflow:'linebreak',valign:'middle'},headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold',halign:'center',valign:'middle'},
+    columnStyles:{0:{cellWidth:10},1:{cellWidth:'auto',minCellWidth:80},2:{cellWidth:10,halign:'center'},3:{cellWidth:13,halign:'right'},4:{cellWidth:16,halign:'right'},5:{cellWidth:19,halign:'right'},6:{cellWidth:15,halign:'right'},7:{cellWidth:14,halign:'right',fontStyle:'bold'},8:{cellWidth:11,halign:'right'},9:{cellWidth:14,halign:'right'},10:{cellWidth:19,halign:'right'},11:{cellWidth:19,halign:'right',fontStyle:'bold'},12:{cellWidth:20,halign:'right'}}});
+  if(y>150){doc.addPage();y=P.TOP}
+  y=P.tabla(doc,{startY:y+5,theme:'plain',tableWidth:130,margin:{left:297-P.MR-130,right:P.MR,top:P.TOP},body:[['CERTIFICADO ACUMULADO',gs(K.ce)+'  ('+pct(K.tot?K.ce/K.tot:0)+')'],['AVANCE REAL',gs(K.re)+'  ('+pct(K.tot?K.re/K.tot:0)+')'],['HECHO SIN CERTIFICAR EN GS.',gs(K.sin)]],
+    styles:{fontSize:10,fontStyle:'bold'},columnStyles:{1:{halign:'right'}},didParseCell:d=>{if(d.row.index===2){d.cell.styles.lineWidth={top:0.4};d.cell.styles.lineColor=0}}});
+  doc.setFont('times','italic');doc.setFontSize(8);doc.text('Documento interno de la dirección. No es un certificado. Porcentajes sobre el contrato original.'+(modo==='ejec'?' Se muestran solo los ítems con avance.':''),P.ML,y+6);
+  P.cerrar(doc,`Avance_real_${D.nombre}_${fecha}${modo==='ejec'?'_ejecutados':''}`);
+}
 function pdfDesembolsos(){
   const P=PK();if(!P||!P.ok())return;const R=resumen();const doc=P.nuevo('portrait');
   let y=P.titulo(doc,'CONTROL DE DESEMBOLSOS',[['Obra:',OBRA.obra],['Cliente:',OBRA.cliente],['Contratista:',D.nombre+' · '+D.tipo],['Fecha:',fdm(hoy)]]);
@@ -2015,6 +2039,7 @@ document.addEventListener('click',e=>{
   if(a==='abrir'){usar(+t.dataset.i);S.tab='certificado';S.cert=null;render();window.scrollTo(0,0);return}
   if(a==='pdfcert'){return pdfCertificado(+t.dataset.n,pdfModo())}
   if(a==='pdfdes'){return pdfDesembolsos()}
+  if(a==='pdfreal'){if(!verReal())return;return pdfReal(pdfModo())}
   if(a==='pdfres'){return pdfResumen()}
   if(a==='pdfcontrato'){return pdfContrato()}
   if(a==='pdfadic'){return pdfAdicionales()}
