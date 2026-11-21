@@ -63,14 +63,20 @@ function MEMB(o){if(window.MEMB_OVR)return window.MEMB_OVR;if(o===undefined&&typ
   return{...EMP_DEF,...e,logo:e.logo||(e.id==='avaroga'&&typeof AVAROGA_LOGO!=='undefined'?AVAROGA_LOGO:null)}}
 window.MEMB=MEMB;window.EMPRESAS=empresas;window.EMP_DEF=EMP_DEF;
 /* dibuja el membrete arriba de cada hoja: logo (respeta proporción), nombre y contacto */
-function membretePdf(doc,m,ML,MR,W,y0){y0=y0||10;let tieneLogo=false;
+/* marca ARKURI en los PDF: grafito, arena y bronce (paleta Kuri'y) */
+const ARK_PDF={graf:[36,36,36],papel:[246,244,240],arena:[230,221,208],arenaS:[241,236,228],bronce:[155,123,92],verde:[47,74,60],linea:[196,184,168]};
+const pdfArk=m=>!!(m&&/arkuri/i.test(m.nombre||''));
+function membretePdf(doc,m,ML,MR,W,y0){y0=y0||10;let tieneLogo=false;const ark=pdfArk(m);
   if(m.logo){try{const pr=doc.getImageProperties(m.logo);const r=pr.width/pr.height||1;let h=13,w=h*r;if(w>48){w=48;h=w/r}
-    doc.addImage(m.logo,/image\/jpe?g/.test(m.logo)?'JPEG':'PNG',ML,y0,w,h);tieneLogo=true}catch(e){}}
-  doc.setTextColor(0);doc.setFont('helvetica','bold');doc.setFontSize(tieneLogo?9.5:13);doc.text(m.nombre||'',ML,tieneLogo?y0+17:y0+9);
-  if(m.ruc){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text('RUC '+m.ruc,ML,tieneLogo?y0+20.3:y0+14)}
+    doc.addImage(m.logo,/image\/jpe?g/.test(m.logo)?'JPEG':'PNG',ML,y0,w,h,'membrete-logo','FAST');tieneLogo=true}catch(e){}}
+  doc.setTextColor(...(ark?ARK_PDF.graf:[0,0,0]));
+  if(ark&&tieneLogo){if(m.ruc){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text('RUC '+m.ruc,ML,y0+17.5)}}
+  else{doc.setFont('helvetica','bold');doc.setFontSize(tieneLogo?9.5:13);doc.text(m.nombre||'',ML,tieneLogo?y0+17:y0+9);
+  if(m.ruc){doc.setFont('helvetica','normal');doc.setFontSize(7);doc.text('RUC '+m.ruc,ML,tieneLogo?y0+20.3:y0+14)}}
   doc.setFont('helvetica','normal');doc.setFontSize(7.5);const x=W-MR;
   [m.tel?'Tel: '+m.tel:'',m.dir,m.email,m.ciudad].filter(Boolean).forEach((t,i)=>doc.text(String(t),x,y0+2+i*3.5,{align:'right'}));
-  doc.setLineWidth(0.3);doc.line(ML,y0+22,W-MR,y0+22)}
+  if(ark){doc.setDrawColor(...ARK_PDF.bronce);doc.setLineWidth(0.8);doc.line(ML,y0+22,W-MR,y0+22);doc.setDrawColor(0);doc.setTextColor(0)}
+  else{doc.setLineWidth(0.3);doc.line(ML,y0+22,W-MR,y0+22)}}
 window.membretePdf=membretePdf;
 
 /* ---------- almacenamiento: local (prueba) o Supabase (nube) ---------- */
@@ -280,6 +286,11 @@ const nombreObra=()=>{const o=obraAct();return o?o.nombre+(o.cliente?' · '+o.cl
 const deObra=p=>p.obra_id===S.obra;
 const enObra=r=>r.obra_id?r.obra_id===S.obra:(S.personal.find(p=>p.id===r.personal_id)?.obra_id===S.obra);
 const activos=()=>S.personal.filter(p=>p.activo!==false&&deObra(p));
+/* marca de la empresa ejecutora: dentro de una obra de ARKURI la app toma sus colores y letras */
+const esArkuri=o=>!!(o&&o.empresa&&/arkuri/i.test(o.empresa.nombre||''));
+window.ES_ARKURI=esArkuri;
+function aplicarMarca(){const o=(S.tab==='inicio'||S.tab==='proyectos')?null:obraAct();const m=esArkuri(o)?'arkuri':'';const r=document.documentElement;
+  if((r.dataset.marca||'')===m)return;if(m){r.dataset.marca=m;if(!document.getElementById('f-arkuri')){const l=document.createElement('link');l.id='f-arkuri';l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Jost:wght@300;500;600&family=Instrument+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap';document.head.appendChild(l)}}else delete r.dataset.marca}
 function elegirObra(id){S.obra=id;try{localStorage.setItem('obra_sel',id)}catch(e){}}
 /* orden del personal: capataz/encargado, oficiales, medio oficiales, ayudantes y el resto; dentro de cada grupo por N° y nombre */
 const catRank=c=>{const t=String(c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return /capataz|encargad/.test(t)?0:/medio|\bmed\b|med\.|m\. ?of|1\/2 ?of/.test(t)?2:/oficial/.test(t)?1:/ayud|peon/.test(t)?3:4};
@@ -506,15 +517,22 @@ const PDFK={
   nuevo(orient){const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4',orientation:orient||'portrait'});doc.__o=orient||'portrait';return doc},
   dims(doc){return doc.__o==='landscape'?{W:297,H:210}:{W:210,H:297}},
   TOP:40,ML:14,MR:14,
-  titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;doc.setTextColor(0);doc.setFont('times','bold');doc.setFontSize(13);doc.text(pdfTxt(t),this.ML,y);y+=6;doc.setFontSize(10);
-    (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{v=pdfTxt(String(v));doc.setFont('times','bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont('times','normal');doc.text(String(v),this.ML+kw,y);y+=4.8});return y+2},
+  ark(){return pdfArk(MEMB())},
+  titulo(doc,t,kvs){const{W}=this.dims(doc);let y=this.TOP;const ark=this.ark(),F=ark?'helvetica':'times';doc.setTextColor(...(ark?ARK_PDF.graf:[0,0,0]));doc.setFont(F,'bold');doc.setFontSize(13);doc.text(pdfTxt(t),this.ML,y);y+=6;doc.setFontSize(ark?9.5:10);
+    (kvs||[]).filter(k=>k&&k[1]).forEach(([k,v])=>{v=pdfTxt(String(v));doc.setFont(F,'bold');doc.text(k,this.ML,y);const kw=doc.getTextWidth(k+' ');doc.setFont(F,'normal');doc.text(String(v),this.ML+kw,y);y+=4.8});doc.setTextColor(0);return y+2},
   tabla(doc,opts){const base={margin:{left:this.ML,right:this.MR,top:this.TOP,bottom:18},theme:'grid',showFoot:'lastPage',
       styles:{font:'times',fontSize:8.5,cellPadding:1.4,textColor:0,lineColor:[150,150,150],lineWidth:0.15,valign:'middle'},
       headStyles:{fillColor:[230,230,230],textColor:0,fontStyle:'bold'},footStyles:{fillColor:[240,240,240],textColor:0,fontStyle:'bold'}};
     opts={...opts,head:pdfFil(opts.head),body:pdfFil(opts.body),foot:pdfFil(opts.foot)};
+    if(this.ark()&&opts.theme!=='plain'){const A=ARK_PDF,gris=c=>Array.isArray(c)&&c.length===3&&c[0]===c[1]&&c[1]===c[2]&&c[0]>=200&&c[0]<255;
+      base.styles.font='helvetica';base.styles.textColor=A.graf;base.styles.lineColor=A.linea;
+      base.headStyles={fillColor:A.graf,textColor:A.papel,fontStyle:'bold'};base.footStyles={fillColor:A.arena,textColor:A.graf,fontStyle:'bold'};
+      if(opts.headStyles)opts.headStyles={...opts.headStyles,fillColor:A.graf,textColor:A.papel};if(opts.styles&&opts.styles.font==='times')opts.styles={...opts.styles,font:'helvetica'};
+      const dp=opts.didParseCell;opts.didParseCell=d=>{if(dp)dp(d);const st=d.cell.styles;if(st.font==='times')st.font='helvetica';
+        if(d.section==='head'){st.fillColor=A.graf;st.textColor=A.papel}else if(gris(st.fillColor))st.fillColor=st.fillColor[0]>=236?A.arenaS:A.arena}}
     doc.autoTable(Object.assign(base,opts,{styles:Object.assign(base.styles,opts.styles||{})}));return doc.lastAutoTable.finalY},
   firmas(doc,y,lista){const{W,H}=this.dims(doc);if(y>H-45){doc.addPage();y=this.TOP+10}y+=22;const n=lista.length,ancho=(W-this.ML-this.MR)/n;
-    doc.setFont('times','normal');doc.setFontSize(9.5);lista.forEach((l,i)=>{const x=this.ML+ancho*i+8,w=ancho-16;doc.setLineWidth(0.3);doc.line(x,y,x+w,y);
+    doc.setFont(this.ark()?'helvetica':'times','normal');doc.setFontSize(9.5);lista.forEach((l,i)=>{const x=this.ML+ancho*i+8,w=ancho-16;doc.setLineWidth(0.3);doc.line(x,y,x+w,y);
       String(l).split('\n').forEach((t,j)=>doc.text(t,x+w/2,y+4.5+j*4.2,{align:'center'}))});return y+14},
   cerrar(doc,nombre){const{W,H}=this.dims(doc);const m=MEMB();const emp=m.nombre;const n=doc.getNumberOfPages();
     const co=doc.__etq?colorObra(doc.__etq):null;const rgb=co?[1,3,5].map(k=>parseInt(co.hex.slice(k,k+2),16)):null;
@@ -523,7 +541,8 @@ const PDFK={
         doc.setFillColor(...rgb);const tx=String(doc.__etq.nombre||'').toUpperCase();doc.setFont('helvetica','bold');doc.setFontSize(9);const w=doc.getTextWidth(tx)+8;
         doc.roundedRect(W-this.MR-w,33.5,w,6,1.5,1.5,'F');doc.setTextColor(255,255,255);doc.text(tx,W-this.MR-w/2,37.6,{align:'center'});doc.setTextColor(0,0,0)}
       membretePdf(doc,m,this.ML,this.MR,W,10);
-      doc.setFont('helvetica','normal');doc.setFontSize(7.5);doc.text('©'+new Date().getFullYear()+' | '+emp,this.ML,H-8);doc.text('Pág. '+i+' de '+n,W-this.MR,H-8,{align:'right'})}
+      doc.setFont('helvetica','normal');doc.setFontSize(7.5);if(pdfArk(m)){doc.setDrawColor(...ARK_PDF.bronce);doc.setLineWidth(0.3);doc.line(this.ML,H-11.5,W-this.MR,H-11.5);doc.setDrawColor(0);doc.setTextColor(...ARK_PDF.graf)}
+      doc.text('©'+new Date().getFullYear()+' | '+(pdfArk(m)?'ARKURI · Arquitectura y Construcción':emp),this.ML,H-8);doc.text('Pág. '+i+' de '+n,W-this.MR,H-8,{align:'right'});doc.setTextColor(0)}
     if(this.capturar){this.capturado=new File([doc.output('blob')],nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf',{type:'application/pdf'});return}
     BAJAR(nombre.replace(/[^\wáéíóúñÁÉÍÓÚÑ.-]+/g,'_')+'.pdf',doc.output('blob'))}
   ,
@@ -826,9 +845,10 @@ function render(){
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
   if(window.COL&&!['inicio','obra'].includes(S.tab)&&(S.tab==='ajustes'||!window.COL.mods.includes(esP(S.tab)?'personal':S.tab)))S.tab='obra';
   const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',gastos:()=>'<div id="gas-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  aplicarMarca();
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
-  <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras</b>
+  <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras<span class="marca-ark" title="Obra de ARKURI · Arquitectura y Construcción"><img src="arkuri-isotipo.png" alt=""><span>ARKURI</span></span></b>
     ${S.tab==='inicio'||S.tab==='proyectos'?'':S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
     ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',gastos:'Caja',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}

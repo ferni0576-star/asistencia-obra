@@ -33,6 +33,32 @@
   --bg:#141817; --panel:#1d2321; --ink:#e8ecea; --muted:#9aa5a1; --line:#2f3835;
   --accent:#f2b705; --accent-ink:#141817; --ok:#5fcf9f; --ok-bg:#163a2c; --warn:#f0b35a; --warn-bg:#3a2a12;
   --bad:#ff8a80; --bad-bg:#3d1a17; --chip:#28302d; --edit:#2e2a14; --bar:#3a4441; color-scheme:dark}
+/* Marca ARKURI (paleta Kuri'y): se activa sola dentro de las obras de esa empresa */
+:root[data-marca="arkuri"]{
+  --bg:#F6F4F0; --panel:#ffffff; --ink:#242424; --muted:#6b645c; --line:#E0D8CC;
+  --accent:#2F4A3C; --accent-ink:#F6F4F0; --ok:#2F6B4F; --ok-bg:#DFEAE2; --warn:#8A5A1E; --warn-bg:#F3E6D2;
+  --bad:#A0492F; --bad-bg:#F4DED6; --chip:#E6DDD0; --edit:#FBF3E4; --bar:#D3C8B8; --bronce:#9B7B5C;
+  --ch-ej:#9B7B5C; --ch-ce:#2F4A3C; --ch-pl:#8C877F;
+  --f-display:"Jost","Barlow",system-ui,sans-serif;
+  --f-body:"Instrument Sans","Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono","JetBrains Mono",ui-monospace,Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root[data-marca="arkuri"]:not([data-theme="light"]){
+  --bg:#1A1A19; --panel:#242424; --ink:#F6F4F0; --muted:#B3A99C; --line:#3A3733;
+  --accent:#7FA791; --accent-ink:#142019; --ok:#8CC5A6; --ok-bg:#1E3329; --warn:#D9A66A; --warn-bg:#3A2B18;
+  --bad:#E08A70; --bad-bg:#3D2018; --chip:#302D29; --edit:#33291C; --bar:#45403A; --bronce:#C4A07D; --ch-ej:#C4A07D; --ch-ce:#7FA791; --ch-pl:#8C877F}}
+:root[data-marca="arkuri"][data-theme="dark"]{
+  --bg:#1A1A19; --panel:#242424; --ink:#F6F4F0; --muted:#B3A99C; --line:#3A3733;
+  --accent:#7FA791; --accent-ink:#142019; --ok:#8CC5A6; --ok-bg:#1E3329; --warn:#D9A66A; --warn-bg:#3A2B18;
+  --bad:#E08A70; --bad-bg:#3D2018; --chip:#302D29; --edit:#33291C; --bar:#45403A; --bronce:#C4A07D; --ch-ej:#C4A07D; --ch-ce:#7FA791; --ch-pl:#8C877F}
+:root[data-marca="arkuri"] header.top{background:#242424;color:#F6F4F0;border-bottom:3px solid var(--bronce)}
+:root[data-marca="arkuri"] header.top .brand b i{color:var(--bronce)}
+.marca-ark{display:none}
+:root[data-marca="arkuri"] .marca-ark{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:500;letter-spacing:.18em;font-size:13px;color:#F6F4F0}
+.marca-ark{margin-left:10px;vertical-align:middle;opacity:1}.marca-ark img{height:26px;width:auto;display:block}.brand .marca-ark span{opacity:1;font-size:13px}
+:root[data-marca="arkuri"] .marca-ark span{display:none}
+:root[data-marca="arkuri"] .brand b{font-size:17px;letter-spacing:.02em;white-space:nowrap}:root[data-marca="arkuri"] .marca-ark{margin-left:8px}:root[data-marca="arkuri"] .marca-ark img{height:22px}
+/* barra de pestañas: Jost es ancha, en el celular se cortaban los nombres; ahí se usa la condensada */
+:root[data-marca="arkuri"] nav.tabs button{font-family:"Barlow Condensed","Arial Narrow",sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
@@ -352,7 +378,7 @@ td.wrap{white-space:normal;min-width:200px}
     e.stopImmediatePropagation();avisa();cargar().then(()=>{t._libRe=true;try{t.dispatchEvent(new Event('change',{bubbles:true}))}finally{t._libRe=false}})},true);
 })();
 </script>
-<script src="app.ed1c5c8e49.js" charset="utf-8"></script><style>
+<script src="app.1c426ecf51.js" charset="utf-8"></script><style>
 .totales>.tot-tg{display:none}
 @media (max-width:760px){
   #cert-root .totales,#pres-root .totales,#planos-root .totales,#ped-root .totales{padding:8px 12px;gap:8px;border-radius:12px;box-shadow:0 -8px 22px rgba(0,0,0,.18)}
