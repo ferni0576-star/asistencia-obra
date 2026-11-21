@@ -118,8 +118,8 @@ button.cell{cursor:pointer}
 .liq .hd{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline}
 .neto{display:flex;justify-content:space-between;align-items:center;background:var(--chip);border-radius:8px;padding:10px 12px}
 .neto b{font-family:var(--f-num);font-size:20px}
-.desc-add{display:grid;grid-template-columns:130px minmax(0,1fr) 130px auto;gap:6px}
-@media (max-width:560px){.desc-add{grid-template-columns:1fr 1fr}}
+.desc-add{display:grid;grid-template-columns:130px minmax(0,1fr) 130px auto auto;gap:6px}
+@media (max-width:560px){.desc-add{grid-template-columns:1fr 1fr}.desc-add [data-prox]{grid-column:1/-1}}
 .x{border:0;background:transparent;color:var(--bad);font-weight:700;padding:2px 8px}
 .desc-edit{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1.6fr) 150px 130px;gap:8px;background:var(--chip);padding:10px;border-radius:8px;white-space:normal}
 .desc-edit label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
@@ -352,7 +352,7 @@ td.wrap{white-space:normal;min-width:200px}
     e.stopImmediatePropagation();avisa();cargar().then(()=>{t._libRe=true;try{t.dispatchEvent(new Event('change',{bubbles:true}))}finally{t._libRe=false}})},true);
 })();
 </script>
-<script src="app.c905052607.js" charset="utf-8"></script><style>
+<script src="app.ed1c5c8e49.js" charset="utf-8"></script><style>
 .totales>.tot-tg{display:none}
 @media (max-width:760px){
   #cert-root .totales,#pres-root .totales,#planos-root .totales,#ped-root .totales{padding:8px 12px;gap:8px;border-radius:12px;box-shadow:0 -8px 22px rgba(0,0,0,.18)}

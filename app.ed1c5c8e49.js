@@ -302,9 +302,11 @@ async function refrescar(){
   S.cargando=true;
   S.lluv=S.obra?await DB.lluvias(S.obra):[];
   if(S.tab==='cargar')await cargarRango(S.dia,S.dia);
-  if(S.tab==='planilla'||S.tab==='liquidacion'){const p=rango();await cargarRango(p.a,p.b);S.desc=await DB.descuentos(p.a,p.b)}
+  if(S.tab==='planilla'||S.tab==='liquidacion'){const p=rango();await cargarRango(p.a,p.b);await cargarDesc()}
   S.cargando=false;render();
 }
+/* descuentos del período y, aparte, los que ya quedaron para la semana siguiente (adelantos a cobrar) */
+async function cargarDesc(){const{a,b}=rango();S.desc=await DB.descuentos(a,b);const n=addD(b,1);try{S.descProx=await DB.descuentos(n,addD(n,6))}catch(e){S.descProx=[]}}
 
 /* ---------- vistas ---------- */
 const presets=()=>({
@@ -470,8 +472,10 @@ function vLiquidacion(){
         <select id="dc-${x.p.id}" name="concepto"><option>Adelanto</option><option>Botas</option><option>Herramienta</option><option>Otro</option></select>
         <input type="text" id="dd-${x.p.id}" name="detalle" placeholder="Detalle (opcional)">
         <input type="number" id="dm-${x.p.id}" name="monto" min="0" step="1000" placeholder="Monto Gs" required>
-        <button class="btn">Agregar descuento</button>
+        <button class="btn">Descontar esta semana</button>
+        <button class="btn" data-prox="1" title="Para un adelanto que le das hoy y le cobrás en la próxima liquidación">Descontar la semana que viene</button>
       </form>
+      ${(()=>{const L=(S.descProx||[]).filter(d=>d.personal_id===x.p.id&&enObra(d));return L.length?`<div class="sub" style="margin-top:6px">Para descontar la semana que viene: ${L.map(d=>`<b>${esc(d.concepto)}</b> Gs. ${gs(d.monto)}`).join(' · ')}</div>`:''})()}
       <div class="neto"><span>Neto a pagar</span><b>Gs. ${gs(x.neto)}</b></div>
       <div class="firmas"><div>Recibí conforme — ${esc(x.p.nombre)}</div><div>Entregado por</div></div>
     </div>`).join('');
@@ -888,7 +892,7 @@ document.addEventListener('click',async ev=>{
     render();for(const p of faltan){const r=S.asis[key(p.id,S.dia)];await DB.upsertAsis({...r})}
     return toast(`${faltan.length} cargados`);
   }
-  if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);S.editDesc=null;render();return toast('Descuento eliminado')}
+  if(a==='deldesc'){await DB.delDesc(t.dataset.id);S.desc=S.desc.filter(d=>d.id!==t.dataset.id);S.descProx=(S.descProx||[]).filter(d=>d.id!==t.dataset.id);S.editDesc=null;render();return toast('Descuento eliminado')}
   if(a==='editdesc'){S.editDesc=t.dataset.id;return render()}
   if(a==='canceldesc'){S.editDesc=null;return render()}
   if(a==='ver-per'){S.verPer=t.dataset.v||'';return render()}
@@ -970,13 +974,13 @@ document.addEventListener('submit',async ev=>{
   if(f.classList.contains('desc-edit')){const id=f.dataset.id;const monto=Number(fd.monto);if(!monto||!fd.fecha)return;
     const antes=S.desc.find(d=>d.id===id);const cambios={personal_id:fd.personal_id,concepto:fd.concepto.trim(),fecha:fd.fecha,monto};
     const nuevoDueno=S.personal.find(p=>p.id===fd.personal_id);if(nuevoDueno?.obra_id)cambios.obra_id=nuevoDueno.obra_id;
-    await DB.updDesc(id,cambios);const{a,b}=rango();S.desc=await DB.descuentos(a,b);S.editDesc=null;render();
+    await DB.updDesc(id,cambios);const{a,b}=rango();await cargarDesc();S.editDesc=null;render();
     const fuera=fd.fecha<a||fd.fecha>b;
     return toast(fuera?'Guardado · la fecha quedó fuera de este período':(antes&&antes.personal_id!==fd.personal_id?'Descuento pasado a '+(nuevoDueno?.nombre||'otra persona'):'Descuento corregido'))}
   if(f.classList.contains('desc-add')){const pid=f.dataset.pid;const monto=Number(fd.monto);if(!monto)return;
-    const{a,b}=rango();const fecha=hoy>=a&&hoy<=b?hoy:b;
+    const{a,b}=rango();const prox=!!(ev.submitter&&ev.submitter.dataset.prox);const fecha=prox?addD(b,1):hoy>=a&&hoy<=b?hoy:b;
     const r={personal_id:pid,obra_id:S.obra,fecha,concepto:fd.concepto+(fd.detalle?' · '+fd.detalle:''),monto};
-    await DB.addDesc(r);S.desc=await DB.descuentos(a,b);render();return toast('Descuento agregado')}
+    await DB.addDesc(r);await cargarDesc();render();return toast(prox?`${fd.concepto} de Gs. ${gs(monto)} anotado: se descuenta en la liquidación del ${dm(fecha)} al ${dm(addD(fecha,6))}`:'Descuento agregado')}
 });
 
 function exportarExcel(){
