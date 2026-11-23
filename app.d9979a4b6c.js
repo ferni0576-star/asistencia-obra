@@ -6864,7 +6864,7 @@ const OT_LOGO_DEF="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAdQAAACBCAIAAAD
 const COND_DEF='A Cargo del Contratista: clavos, equipos de protección individual: Uniformes, Casco, chaleco reflectivo, arneses, zapatón, guantes, y gafas. Taladros, amoladora, y circular de mano, así como andamios y escalera. Todos los implementos necesarios para la correcta ejecución del trabajo. Las cantidades a certificar serán determinadas por el encargado de obra de parte de TERRAVAZ SAE. según avance de obras. Todos los funcionarios en nómina deben contar con el seguro medico de IPS.';
 const LAB_DEF=['Proveedor/ Contratista','Supervisor de Obras','Seguridad Física'];
 /* datos de cabecera que forman el "formato" de la OT de cada obra (todo menos el personal, el número y las fechas) */
-const CAMPOS_FMT=['contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3','l1','l2','l3','filas','logo'];
+const CAMPOS_FMT=['contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3','l1','l2','l3','filas','logo','s1','s2','s3'];
 const O={oid:undefined,cargando:false,personas:[],ots:[],formato:null,form:null,vista:'nueva',q:'',cargo:'Todos',pedit:null,pconf:null,cconf:null};
 const hoyO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fOT=s=>s?s.split('-').reverse().join('.'):'';
@@ -6880,7 +6880,7 @@ function nuevoForm(base){const o=OB()||{};const ult=base||O.formato||O.ots[0];co
   return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),desde:hoyO(),hasta:'',
     contratista:d?d.contratista:'VANGUARD S.A',ruc:d?d.ruc:'80095183-2',direccion:d?d.direccion:(o.ubicacion||''),obra:d?d.obra:(o.nombre||''),
     servicio:d?d.servicio:'',horario:d?d.horario:'07:00 a 18:00 hs.',cond:d?d.cond:COND_DEF,
-    f1:d?d.f1:'',f2:d?d.f2:'Ing. Luis Oviedo',f3:d?d.f3:'Walter Benitez',l1:(d&&d.l1)||LAB_DEF[0],l2:(d&&d.l2)||LAB_DEF[1],l3:(d&&d.l3)||LAB_DEF[2],filas:(d&&d.filas)||'',logo:d&&d.logo?d.logo:((o.empresa&&o.empresa.id!=='avaroga'&&o.empresa.logo)||OT_LOGO_DEF),
+    f1:d?d.f1:'',f2:d?d.f2:'Ing. Luis Oviedo',f3:d?d.f3:'Walter Benitez',l1:(d&&d.l1)||LAB_DEF[0],l2:(d&&d.l2)||LAB_DEF[1],l3:(d&&d.l3)||LAB_DEF[2],filas:(d&&d.filas)||'',s1:(d&&d.s1)||'',s2:(d&&d.s2)||'',s3:(d&&d.s3)||'',logo:d&&d.logo?d.logo:((o.empresa&&o.empresa.id!=='avaroga'&&o.empresa.logo)||OT_LOGO_DEF),
     sel:d&&base?selDe(d):[]}}
 async function cargar(oid){if(O.cargando)return;O.cargando=true;
   try{[O.personas,O.ots]=await Promise.all([window.OTB.personas(oid),window.OTB.list(oid)]);O.formato=O.ots.find(x=>x.datos&&x.datos.formato)||null;O.ots=O.ots.filter(x=>!(x.datos&&x.datos.formato));O.ots.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(parseInt(b.numero)||0)-(parseInt(a.numero)||0))}
@@ -6888,7 +6888,7 @@ async function cargar(oid){if(O.cargando)return;O.cargando=true;
   O.oid=oid;O.cargando=false;O.form=nuevoForm(null);render()}
 const cargos=()=>[...new Set(O.personas.map(p=>p.cargo).filter(Boolean))];
 const selec=f=>f.sel.map(s=>({...(O.personas.find(p=>p.id===s.pid)||{}),obs:s.obs,pid:s.pid})).filter(p=>p.nombre);
-function datosForm(){const f=O.form;return{desde:'',hasta:'',contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,l1:f.l1||LAB_DEF[0],l2:f.l2||LAB_DEF[1],l3:f.l3||LAB_DEF[2],filas:parseInt(f.filas)||'',logo:f.logo,
+function datosForm(){const f=O.form;return{desde:'',hasta:'',contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,l1:f.l1||LAB_DEF[0],l2:f.l2||LAB_DEF[1],l3:f.l3||LAB_DEF[2],filas:parseInt(f.filas)||'',s1:f.s1||'',s2:f.s2||'',s3:f.s3||'',logo:f.logo,
   personas:selec(f).map(p=>({pid:p.pid,nombre:p.nombre,ci:p.ci,cargo:p.cargo,obs:p.obs}))}}
 function leerCampos(){const fm=document.getElementById('ot-f');if(!fm)return;['numero','fecha','desde','hasta','contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3','l1','l2','l3','filas'].forEach(k=>{if(fm[k])O.form[k]=fm[k].value})}
 
@@ -6919,7 +6919,7 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
     </div>
     <label class="ot-cond">Condiciones particulares<textarea name="cond" rows="4">${esc(f.cond)}</textarea></label>
     <div class="ot-firmas"><b>Firmas</b><span class="sub">Arriba el nombre que va sobre la línea; abajo el cargo que se imprime debajo.</span>
-      <div class="ot-fg">${[1,2,3].map(i=>`<div class="ot-fi"><input type="text" name="f${i}" value="${esc(f['f'+i]||'')}" placeholder="Nombre (opcional)" aria-label="Nombre firma ${i}"><input type="text" name="l${i}" value="${esc(f['l'+i]||LAB_DEF[i-1])}" class="ot-lab" aria-label="Cargo firma ${i}"></div>`).join('')}</div></div>
+      <div class="ot-fg">${[1,2,3].map(i=>`<div class="ot-fi"><div class="ot-sig">${f['s'+i]?`<img src="${f['s'+i]}" alt="Firma"><button type="button" class="btn sm ghost" data-oact="sigquita" data-i="${i}">Quitar firma</button>`:`<label class="btn sm">Subir firma<input type="file" class="ot-sigf" data-i="${i}" accept="image/*" hidden></label>`}</div><input type="text" name="f${i}" value="${esc(f['f'+i]||'')}" placeholder="Nombre (opcional)" aria-label="Nombre firma ${i}"><input type="text" name="l${i}" value="${esc(f['l'+i]||LAB_DEF[i-1])}" class="ot-lab" aria-label="Cargo firma ${i}"></div>`).join('')}</div></div>
     <div class="form" style="padding:0"><label>Renglones de personal en la planilla<input type="number" name="filas" min="1" max="60" value="${esc(String(f.filas||''))}" placeholder="15 en PDF · 22 en Excel"></label></div>
     <div class="ot-fmt"><span class="sub">${O.formato?`Esta obra tiene un <b>formato guardado</b>: cada OT nueva arranca con esos datos.`:'Guardá estos datos como formato y cada OT nueva de esta obra arranca con ellos.'}</span>
       <div class="bar"><button type="button" class="btn sm" data-oact="fmtguardar">${O.formato?'Actualizar formato con estos datos':'Guardar como formato de esta obra'}</button>${O.formato?'<button type="button" class="btn sm ghost" data-oact="fmtusar">Volver al formato</button>':''}</div></div>
@@ -6975,6 +6975,7 @@ async function pdfOT(num,fecha,d){
     head:[[{content:'Condiciones Particulares',styles:{fontStyle:'normal',fontSize:7,fillColor:false}}]],body:[[{content:T(d.cond||''),styles:{fontStyle:'bold'}}]]});
   y=doc.lastAutoTable.finalY+3;const cw=W/3;
   doc.rect(X,y,W,26);[1,2].forEach(i=>doc.line(X+cw*i,y,X+cw*i,y+26));doc.line(X,y+20,X+W,y+20);
+  for(const i of [0,1,2]){const sg=d['s'+(i+1)];if(!sg)continue;try{const im=new Image();im.src=sg;await new Promise(r=>{im.onload=r;im.onerror=r});const ra=im.width&&im.height?im.width/im.height:3;let h=13,w=h*ra;if(w>cw-8){w=cw-8;h=w/ra}doc.addImage(sg,/image\/jpe?g/.test(sg)?'JPEG':'PNG',X+cw*i+(cw-w)/2,y+1.5+(13-h)/2,w,h,'firma'+i,'FAST')}catch(e){}}
   doc.setFont('helvetica','normal');doc.setFontSize(8);[d.f1,d.f2,d.f3].forEach((n,i)=>{if(n)doc.text(T(n),X+cw*i+cw/2,y+18,{align:'center'})});
   doc.setFont('helvetica','bold');[d.l1||LAB_DEF[0],d.l2||LAB_DEF[1],d.l3||LAB_DEF[2]].forEach((t,i)=>doc.text(T(t),X+cw*i+cw/2,y+24.2,{align:'center'}));
   await window.BAJAR(`OT_${String(num).replace(/[^\w-]+/g,'_').padStart(2,'0')}_${(d.obra||'obra').replace(/[^\wáéíóúñÁÉÍÓÚÑ]+/g,'_').slice(0,40)}_${fecha}.pdf`,doc.output('blob'));
@@ -7002,6 +7003,7 @@ async function xlsOT(num,fecha,d){
   let r=h+filas+2;ws.getCell(r,1).value='Condiciones Particulares';ws.getCell(r,1).font={size:8};ws.mergeCells(r,1,r,6);
   r++;ws.mergeCells(r,1,r,6);const cc=ws.getCell(r,1);cc.value=d.cond||'';cc.font={bold:true,size:9};cc.alignment={wrapText:true,vertical:'top'};ws.getRow(r).height=68.4;caja(r,1,r,6);
   r+=2;ws.getRow(r).height=46.2;ws.mergeCells(r,1,r,2);ws.mergeCells(r,3,r,4);ws.mergeCells(r,5,r,6);caja(r,1,r+2,6);
+  for(const i of [0,1,2]){const sg=d['s'+(i+1)];if(!sg)continue;try{const im=new Image();im.src=sg;await new Promise(q=>{im.onload=q;im.onerror=q});const ra=im.width&&im.height?im.width/im.height:3;let h=52,w=h*ra;if(w>170){w=170;h=w/ra}const id=wb.addImage({base64:sg,extension:/image\/jpe?g/.test(sg)?'jpeg':'png'});ws.addImage(id,{tl:{col:i*2+0.25,row:r-1+0.08},ext:{width:w,height:h}})}catch(e){}}
   r++;[[1,2,d.f1],[3,4,d.f2],[5,6,d.f3]].forEach(([a,b,v])=>{ws.mergeCells(r,a,r,b);const c=ws.getCell(r,a);c.value=v||'';c.alignment={horizontal:'center'};c.font={size:9}});
   r++;[[1,2,d.l1||LAB_DEF[0]],[3,4,d.l2||LAB_DEF[1]],[5,6,d.l3||LAB_DEF[2]]].forEach(([a,b,v])=>{ws.mergeCells(r,a,r,b);const c=ws.getCell(r,a);c.value=v;c.alignment={horizontal:'center'};c.font={bold:true,size:9}});
   ws.eachRow({includeEmpty:true},row=>row.eachCell({includeEmpty:true},c=>{c.font={...(c.font||{}),name:'Arial'}}));
@@ -7037,6 +7039,7 @@ document.addEventListener('click',async e=>{
     for(const p of act){const ci=String(p.ci||'').replace(/\D/g,'');if(O.personas.some(x=>ci&&String(x.ci).replace(/\D/g,'')===ci||x.nombre.toLowerCase()===String(p.nombre).toLowerCase()))continue;
       const np={id:nid(),obra_id:O.oid,nombre:String(p.nombre).trim(),ci:p.ci||'',cargo:p.categoria||''};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
     render();return toast(n?`${n} persona${n>1?'s':''} del personal agregada${n>1?'s':''} a la base`:'El personal de la obra ya está en la base')}
+  if(a==='sigquita'){leerCampos();O.form['s'+t.dataset.i]='';return render()}
   if(a==='pdf'){if(!O.form.sel.length)return toast('Marcá al menos una persona');return pdfOT(O.form.numero,O.form.fecha,datosForm())}
   if(a==='xls'){if(!O.form.sel.length)return toast('Marcá al menos una persona');return xlsOT(O.form.numero,O.form.fecha,datosForm())}
   if(a==='hpdf'&&ot)return pdfOT(ot.numero,ot.fecha,ot.datos);
@@ -7065,6 +7068,7 @@ document.addEventListener('change',async e=>{
     for(const p of L){const ci=String(p.ci||'').replace(/\D/g,'');if(O.personas.some(x=>ci&&String(x.ci||'').replace(/\D/g,'')===ci||x.nombre.toLowerCase()===p.nombre.toLowerCase()))continue;
       const np={id:nid(),obra_id:O.oid,nombre:p.nombre,ci:p.ci||'',cargo:p.cargo||''};try{await window.OTB.savePersona(np);O.personas.push(np);n++}catch(err){}}
     render();return toast(n?`${n} persona${n>1?'s':''} copiada${n>1?'s':''} a esta obra`:'No había personas nuevas para copiar')}
+  if(t.classList&&t.classList.contains('ot-sigf')&&t.files[0]){leerCampos();const i=t.dataset.i;const fr=new FileReader();fr.onload=()=>{O.form['s'+i]=fr.result;render()};fr.readAsDataURL(t.files[0]);return}
   if(t.id==='ot-logo'&&t.files[0]){leerCampos();const fr=new FileReader();fr.onload=()=>{O.form.logo=fr.result;render()};fr.readAsDataURL(t.files[0])}
 });
 document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
@@ -7086,6 +7090,7 @@ const css=document.createElement('style');css.textContent=`
 .ot-head{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
 .ot-logo{display:flex;flex-direction:column;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff}
 .ot-logo img{height:44px;max-width:180px;object-fit:contain}.ot-logo .btn{cursor:pointer}
+.ot-sig{min-height:58px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--line);border-radius:8px;background:#fff;padding:4px}.ot-sig img{max-height:48px;max-width:60%;object-fit:contain}.ot-sig .btn{cursor:pointer}.ot-sig .btn.ghost{color:#222;border-color:#bbb;background:#fff}
 .ot-firmas{display:flex;flex-direction:column;gap:6px}.ot-fg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .ot-fi{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px}.ot-fi .ot-lab{font-weight:700}
 .ot-hoja{border:1px solid var(--ink);border-radius:6px;overflow:hidden;margin:6px 0 14px}.ot-hr{display:grid!important;grid-template-columns:170px minmax(0,1fr);align-items:stretch;margin:0!important;border-top:1px solid var(--line);font-size:14px!important;text-transform:none!important;letter-spacing:0!important}.ot-hr:first-child{border-top:0}.ot-hr>span{padding:10px 12px;font-weight:700;color:var(--ink);border-right:1px solid var(--line);display:flex;align-items:center}.ot-hr>input{border:0!important;border-radius:0!important;background:transparent!important;min-width:0;margin:0!important}@media (max-width:600px){.ot-hr{grid-template-columns:118px minmax(0,1fr)}.ot-hr>span{font-size:12.5px;padding:8px}}
