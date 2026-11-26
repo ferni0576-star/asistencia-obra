@@ -302,6 +302,7 @@ td .nlink{font-weight:600}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}}
 :root[data-theme="dark"]{--ll:#6aaee8;--ll-ink:#0d1a26;--ll-soft:#1d3a54;--llp:#e2a54c;--llp-soft:#4a3618}
 @media (max-width:760px){nav.tabs{gap:0}nav.tabs button{padding:8px 3px;font-size:14px;letter-spacing:.01em}}
+@media (max-width:440px){header.top nav.tabs button:not(:first-child){flex:1 1 auto;font-size:10.5px;padding:8px 1px;letter-spacing:-.02em}header.top nav.tabs button:first-child{flex:0 0 24px}}
 .ll-main{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start}
 @media (max-width:860px){.ll-main{grid-template-columns:minmax(0,1fr)}}
 .ll-cal{padding:14px;display:flex;flex-direction:column;gap:16px}
@@ -378,7 +379,7 @@ td.wrap{white-space:normal;min-width:200px}
     e.stopImmediatePropagation();avisa();cargar().then(()=>{t._libRe=true;try{t.dispatchEvent(new Event('change',{bubbles:true}))}finally{t._libRe=false}})},true);
 })();
 </script>
-<script src="app.bc9a3b454b.js" charset="utf-8"></script><style>
+<script src="app.a9fc478472.js" charset="utf-8"></script><style>
 .totales>.tot-tg{display:none}
 @media (max-width:760px){
   #cert-root .totales,#pres-root .totales,#planos-root .totales,#ped-root .totales{padding:8px 12px;gap:8px;border-radius:12px;box-shadow:0 -8px 22px rgba(0,0,0,.18)}

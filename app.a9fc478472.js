@@ -150,6 +150,8 @@ function backendLocal(){
     async delProveedor(id){d.proveedores=d.proveedores.filter(x=>x.id!==id);save()},
     async perfiles(){return JSON.parse(JSON.stringify(d.perfiles||[]))},
     async tareas(oid){return JSON.parse(JSON.stringify((d.tareas||[]).filter(t=>t.obra_id===oid)))},
+    async lps(oid){return JSON.parse(JSON.stringify((d.lps||{})[oid]||null))},
+    async saveLps(oid,doc){d.lps=d.lps||{};d.lps[oid]=JSON.parse(JSON.stringify(doc));save()},
     async otPersonas(oid){if(!d.otPersonas){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.otPersonas=o?SEMILLA_OTP.map(p=>({...p,id:uid(),obra_id:o.id})):[];save()}
       const leg=d.otPersonas.filter(x=>!x.obra_id);if(leg.length){d.otPersonas=d.otPersonas.filter(x=>x.obra_id);d.obras.forEach(o=>leg.forEach(p=>d.otPersonas.push({...p,id:uid(),obra_id:o.id})));save()}
       return JSON.parse(JSON.stringify(d.otPersonas.filter(x=>x.obra_id===oid)))},
@@ -248,6 +250,8 @@ function backendNube(sb){
     async delProveedor(id){ok(await sb.from('proveedores').delete().eq('id',id))},
     async perfiles(){return ok(await sb.from('perfiles').select('*').order('creado'))},
     async tareas(oid){if(!oid)return[];return ok(await sb.from('tareas').select('*').eq('obra_id',oid).order('creado'))},
+    async lps(oid){if(!oid)return null;const r=ok(await sb.from('lps').select('doc').eq('obra_id',oid));return r&&r[0]?r[0].doc:null},
+    async saveLps(oid,doc){ok(await sb.from('lps').upsert({obra_id:oid,doc,actualizado:new Date().toISOString()}))},
     async otPersonas(oid){if(!oid)return[];return ok(await sb.from('ot_personas').select('*').eq('obra_id',oid).order('orden').order('creado'))},
     async saveOtPersona(p){ok(await sb.from('ot_personas').upsert({id:p.id,obra_id:p.obra_id,nombre:p.nombre,ci:p.ci||null,cargo:p.cargo||null}))},
     async delOtPersona(id){ok(await sb.from('ot_personas').delete().eq('id',id))},
@@ -838,19 +842,19 @@ function vLogin(err=''){
 }
 
 const SUBP=[['cargar','Cargar'],['planilla','Planilla'],['liquidacion','Liquidación'],['lluvias','Lluvias'],['ot','OT'],['personal','Personal'],['ajustes','Ajustes']];
-const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['gastos','Caja'],['tareas','Tareas']];
-const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='gastos'&&t!=='obra'&&t!=='proyectos';
+const MODS=[['inicio','← Obras'],['obra','Resumen'],['personal-obra','Personal en obra'],['contratistas','Contratistas'],['presupuesto','Presupuesto'],['planos','Planos'],['materiales','Materiales'],['gastos','Caja'],['planificacion','Planificación'],['tareas','Tareas']];
+const esP=t=>t!=='contratistas'&&t!=='presupuesto'&&t!=='planos'&&t!=='materiales'&&t!=='inicio'&&t!=='tareas'&&t!=='gastos'&&t!=='obra'&&t!=='proyectos'&&t!=='planificacion';
 function render(){
   if((window.CLI||window.COL)&&S.tab==='proyectos')S.tab='inicio';
   if(window.CLI&&S.tab!=='inicio'&&!window.CLI.mods.includes(S.tab))S.tab=window.CLI.mods[0]||'inicio';
   if(window.COL&&!['inicio','obra'].includes(S.tab)&&(S.tab==='ajustes'||!window.COL.mods.includes(esP(S.tab)?'personal':S.tab)))S.tab='obra';
-  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',gastos:()=>'<div id="gas-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
+  const V={cargar:vCargar,planilla:vPlanilla,liquidacion:vLiquidacion,lluvias:vLluvias,contratistas:()=>'<div id="cert-root"></div>',presupuesto:()=>'<div id="pres-root"></div>',planos:()=>'<div id="planos-root"></div>',materiales:()=>'<div id="ped-root"></div>',inicio:()=>'<div id="ini-root"></div>',proyectos:()=>'<div id="pry-root"></div>',obra:()=>'<div id="rs-root"></div>',ot:()=>'<div id="ot-root"></div>',tareas:()=>'<div id="tar-root"></div>',planificacion:()=>'<div id="lps-root"></div>',gastos:()=>'<div id="gas-root"></div>',personal:vPersonal,ajustes:vAjustes}[S.tab];
   aplicarMarca();
   const foco=document.activeElement?.id;
   document.getElementById('app').innerHTML=`
   <header class="top"><div class="brand"><b data-tab="inicio" style="cursor:pointer" title="Ir al inicio">Control <i>de</i> Obras<span class="marca-ark" title="Obra de ARKURI · Arquitectura y Construcción"><img src="arkuri-isotipo.png" alt=""><span>ARKURI</span></span></b>
     ${S.tab==='inicio'||S.tab==='proyectos'?'':S.obras.length?`<select id="obra-sel" class="obra-sel" aria-label="Obra">${S.obras.filter(o=>o.activa!==false||o.id===S.obra).map(o=>`<option value="${o.id}" ${o.id===S.obra?'selected':''}>${esc(o.nombre)}${o.cliente?' · '+esc(o.cliente):''}</option>`).join('')}</select>`:'<span>Sin obras</span>'}</div>
-    ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',gastos:'Caja',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
+    ${(S.tab==='inicio'||S.tab==='proyectos')&&NUBE&&!(window.CLI&&window.CLI.preview)?`<div class="sesion"><span class="sub">${esc(S.email||'')}</span><button class="btn-salir" data-act="salir">Cerrar sesión</button></div>`:''}${S.tab==='inicio'||S.tab==='proyectos'?(window.CLI||window.COL?'':`<nav class="tabs nav-raiz"><button data-tab="inicio" aria-current="${S.tab==='inicio'}"><span class="nl">Obras</span><span class="ns">Obras</span></button><button data-tab="proyectos" aria-current="${S.tab==='proyectos'}"><span class="nl">Proyectos</span><span class="ns">Proyectos</span></button></nav>`):`<nav class="tabs">${MODS.filter(([k])=>(!window.CLI||k==='inicio'||window.CLI.mods.includes(k))&&(!window.COL||k==='inicio'||k==='obra'||window.COL.mods.includes(k==='personal-obra'?'personal':k))).map(([k,t])=>{const act=k==='personal-obra'?esP(S.tab):S.tab===k;return `<button data-tab="${k==='personal-obra'?(S.lastP||'cargar'):k}" aria-current="${act}"><span class="nl">${t}</span><span class="ns">${({inicio:'←',obra:'Resumen','personal-obra':'Personal',contratistas:'Contrat.',presupuesto:'Presup.',planos:'Planos',materiales:'Pedidos',gastos:'Caja',planificacion:'Plan',tareas:'Tareas'})[k]}</span></button>`}).join('')}</nav>`}</header>
   ${window.CLI?`<div class="demo cli-banner">${window.CLI.preview?(window.CLI.aprobador?'Vista previa: así ve la obra la administración del cliente (ve y aprueba) · ':'Vista previa: así ve la obra tu cliente (solo lectura) · ')+'<button class="btn sm" data-iact="salirprev">Salir de la vista previa</button>':(window.CLI.aprobador?'Administración del cliente':'Acceso de cliente')+(window.CLI.nombre?' · '+esc(window.CLI.nombre):'')+(window.CLI.aprobador?' · ve y aprueba':' · solo lectura')}</div>`:''}${NUBE||window.CLI?'':'<div class="demo">Prueba integrada: asistencia, lluvias, contratistas, presupuesto, planos y pedidos de materiales con tus planillas · se guarda solo en este dispositivo</div>'}
   <main>${esP(S.tab)?`<div class="subnav-p no-print">${SUBP.map(([k,t])=>`<button class="chip-p" data-tab="${k}" aria-pressed="${S.tab===k}">${t}</button>`).join('')}</div>`:''}${V()}${S.edit&&(S.tab==='personal'||S.tab==='cargar')?vEditPer():''}</main>`;
   if(S.tab==='contratistas'&&window.CERT)window.CERT.mount();
@@ -864,6 +868,7 @@ function render(){
   if(window.LATERAL)window.LATERAL();
   if(S.tab==='ot'&&window.OT)window.OT.mount();
   if(S.tab==='tareas'&&window.TAREAS)window.TAREAS.mount();
+  if(S.tab==='planificacion'&&window.LPS)window.LPS.mount();
   if(S.tab==='gastos'&&window.GASTOS)window.GASTOS.mount();
   if(foco){const el=document.getElementById(foco);if(el&&el.type==='text'){el.focus();const v=el.value;el.setSelectionRange(v.length,v.length)}}
 }
@@ -1037,6 +1042,7 @@ const SEMILLA_OTP=[];
 window.CMB={comps:oid=>DB.comps(oid),saveComp:c=>DB.saveComp(c),delComp:(oid,id)=>DB.delComp(oid,id),get:oid=>DB.computo(oid),save:(oid,v)=>DB.saveComputo(oid,v)};
 const SEMILLA_COMP=[];
 window.APB={todas:()=>DB.aprobTodas(),list:oid=>DB.aprob(oid),pedir:r=>DB.pedirAprob(r),resolver:(id,e,c)=>DB.resolverAprob(id,e,c),quitar:(o,t,r)=>DB.quitarAprob(o,t,r)};
+window.LPB={get:oid=>DB.lps(oid),save:(oid,doc)=>DB.saveLps(oid,doc)};
 window.TDB={list:oid=>DB.tareas(oid),save:t=>DB.saveTarea(t),del:id=>DB.delTarea(id)};
 window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
 const SEMILLA_PEDIDOS=[];
@@ -3079,6 +3085,7 @@ function render(){
   if(!oid){root.innerHTML='<div class="panel" style="padding:16px">Creá una obra en Personal en obra → Ajustes para cargar sus pedidos.</div>';return}
   if(oid!==M.oid){root.innerHTML='<p class="sub">Cargando pedidos…</p>';cargar(oid);return}
   if(window.PED_IR){const id=window.PED_IR;window.PED_IR=null;if(M.lista.some(x=>x.id===id)){M.sel=id;M.vista='ver';M.tab='pedidos';M.confirm=false;M.abierto={}}}
+  if(window.PED_NUEVO){const b=window.PED_NUEVO;window.PED_NUEVO=null;M.form=nuevoForm(b);M.form.id=b.id;M.vista='editar';M.tab='pedidos';setTimeout(cargarRubros)}
   const foco=document.activeElement;const fid=foco&&foco.id,fmf=foco&&foco.dataset&&foco.dataset.mf,fk=foco&&foco.dataset&&foco.dataset.k;
   const enForm=M.vista==='editar';
   const sub=enForm?'':`<div class="subnav-p no-print">${[['pedidos','Pedidos'],['faltantes','Faltantes'],['computo','Estimado vs pedido'],['proveedores','Proveedores']].map(([k,t])=>`<button class="chip-p" data-mtab="${k}" aria-pressed="${M.tab===k&&M.vista!=='ver'||(k==='pedidos'&&M.vista==='ver')}">${t}</button>`).join('')}</div>`;
@@ -3394,7 +3401,7 @@ button.wa-op{cursor:pointer}button.wa-op:hover{border-color:#1f8f4e}.wa-op.off{o
 const TIPOS=['Residencial','Comercial','Interiorismo','Industrial','Institucional','Otro'];
 const ESTADOS=[['activo','Activo'],['planificacion','Planificación'],['pausada','Pausada'],['terminada','Terminada']];
 const I={q:'',edit:null,stats:{},cargando:false,filtro:'todas',ocupado:false,cli:false,usr:null,uedit:null};
-const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra'],['personal','Personal en obra','asistencia, planilla, liquidación y OT · solo colaboradores'],['tareas','Tareas','pendientes de la obra · solo colaboradores']];
+const MODC=[['contratistas','Contratistas','certificados y pagos a contratistas'],['presupuesto','Presupuesto y avance','presupuesto y certificados de avance al cliente'],['planos','Planos','ver y descargar planos'],['materiales','Pedidos de materiales','pedidos y llegada a obra'],['personal','Personal en obra','asistencia, planilla, liquidación y OT · solo colaboradores'],['planificacion','Planificación','restricciones, look ahead, plan semanal y PPC · solo colaboradores'],['tareas','Tareas','pendientes de la obra · solo colaboradores']];
 const MOD_CLI=['contratistas','presupuesto','planos','materiales'];
 const ROLN={admin:'Administrador',equipo:'Colaborador',cliente:'Cliente',aprobador:'Administración'};
 async function cargarUsr(){try{I.usr=await window.USR.list()}catch(e){I.usr=[];toast('No se pudieron leer los accesos. ¿Ejecutaste el SQL 11?')}render()}
@@ -4856,7 +4863,7 @@ async function cargarTodas(forzar){if(!window.APB||!window.APB.todas||yo()==='cl
     try{if(window.Notification&&Notification.permission==='granted')new Notification('Control de Obras',{body:t+(nombreObra(x.obra_id)?' · '+nombreObra(x.obra_id):''),tag:x.id})}catch(e){}});
   campana();if(AP.bx.abierto)pintarBx();return AP.todas}
 const nombreObra=id=>((S.obras||[]).find(o=>o.id===id)||{}).nombre||'';
-function contar(){const L=AP.todas;if(yo()==='aprobador')return L.filter(x=>x.estado==='pendiente').length;if(yo()==='cliente')return 0;const v=visto();return L.filter(x=>x.estado!=='pendiente'&&(x.resuelto||'')>v).length}
+function contar(){const L=AP.todas;if(yo()==='aprobador')return L.filter(x=>x.estado==='pendiente').length;if(yo()==='cliente')return 0;const v=visto();return L.filter(x=>x.estado!=='pendiente'&&(x.resuelto||'')>v).length+(window.LPS_AV||[]).length}
 function campana(){if(yo()==='cliente'||!window.APB)return;const h=document.querySelector('header.top');if(!h)return;let b=h.querySelector('.apb-bell');
   if(!b){b=document.createElement('button');b.className='apb-bell';b.type='button';b.setAttribute('data-bx','abrir');const br=h.querySelector('.brand');(br||h.firstChild).after?br.after(b):h.prepend(b)}
   const n=contar();b.innerHTML=`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg><span class="apb-bl">${yo()==='aprobador'?'Por aprobar':'Notificaciones'}</span>${n?`<b class="apb-bn">${n>99?'99+':n}</b>`:''}`;
@@ -4880,6 +4887,7 @@ function pintarBx(){let el=document.getElementById('apb-bx');if(!AP.bx.abierto){
   el.innerHTML=`<div class="rs-ov" data-bx="cerrar"></div><aside class="bx-dr" role="dialog" aria-modal="true" aria-label="Bandeja">
     <div class="rs-wh"><b>${ap?'Bandeja de aprobación':'Notificaciones'}</b><button class="rs-x" data-bx="cerrar" aria-label="Cerrar">✕</button></div>
     <div class="bx-f2">${F.map(([k,n])=>`<button class="chip-p" data-bx="filtro" data-f="${k}" aria-pressed="${AP.bx.filtro===k}">${n} <span class="sub">${cuenta(k)}</span></button>`).join('')}</div>
+    ${!ap&&(window.LPS_AV||[]).length?`<div class="bx-lps"><b>Para planificar con tiempo</b>${window.LPS_AV.slice(0,8).map(x=>`<button class="bx-lpi ${x.g}" data-bx="lps" data-oid="${x.oid}" data-lps="${(x.go&&x.go.lps)||''}" data-s="${(x.go&&x.go.s)||''}"><span>${esc(x.t)}</span><span class="sub">${esc(x.obra||'')} · ${esc(x.d||'')}</span></button>`).join('')}</div>`:''}
     ${notif?`<button class="bx-act" data-bx="permiso">🔔 Avisarme en este dispositivo cuando llegue algo nuevo</button>`:''}
     <div class="bx-l">${L.map(fila).join('')||`<p class="sub" style="text-align:center;padding:30px 0">${AP.bx.filtro==='pend'?(ap?'No tenés nada pendiente de aprobar. 👍':'Nada esperando respuesta.'):'Sin novedades.'}</p>`}</div>
     <p class="sub bx-pie">${ap?'Acá llega todo lo que la oficina te envía para aprobar, de todas tus obras.':'Acá ves las respuestas de la administración del cliente: aprobados y observados.'} Se actualiza solo cada minuto.</p></aside>`;
@@ -4887,6 +4895,7 @@ function pintarBx(){let el=document.getElementById('apb-bx');if(!AP.bx.abierto){
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-bx]');if(!b)return;const a=b.dataset.bx;const x=AP.todas.find(r=>r.id===b.dataset.id);
   if(a==='abrir'){AP.bx.v0=visto();AP.bx.abierto=true;AP.bx.filtro=null;pintarBx();await cargarTodas(true);pintarBx();if(yo()!=='aprobador'){try{localStorage.setItem(kVisto(),new Date().toISOString())}catch(err){}campana()}return}
   if(a==='cerrar'){AP.bx.abierto=false;AP.bx.obs=null;pintarBx();campana();return}
+  if(a==='lps'){AP.bx.abierto=false;pintarBx();if(typeof elegirObra==='function')elegirObra(b.dataset.oid);window.LPS_IR={lps:b.dataset.lps||'prep',s:+b.dataset.s||null};S.tab='planificacion';window.render();window.scrollTo(0,0);return}
   if(a==='filtro'){AP.bx.filtro=b.dataset.f;return pintarBx()}
   if(a==='ver'&&x)return ir(x);
   if(a==='aprobar'&&x){await resolver(x.id,'aprobado','');campana();return}
@@ -4896,7 +4905,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-bx]'
   if(a==='permiso'){try{const r=await Notification.requestPermission();toast(r==='granted'?'Listo: te vamos a avisar mientras tengas la app abierta':'No se activaron los avisos')}catch(err){}pintarBx()}});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&AP.bx.abierto){AP.bx.abierto=false;pintarBx()}});
 setInterval(()=>{if(document.querySelector('header.top'))cargarTodas(true)},60000);
-window.APROB={todas:()=>cargarTodas(),listaTodas:()=>AP.todas,campana,get:(t,r)=>{const o=OBA();return o?get(o.id,t,r):null},pedir,quitar,banner,chip,resumen:oid=>resumen(oid),check,abrir:()=>{AP.abierto=true;pintar()}};
+window.APROB={campanaLps:()=>campana(),todas:()=>cargarTodas(),listaTodas:()=>AP.todas,campana,get:(t,r)=>{const o=OBA();return o?get(o.id,t,r):null},pedir,quitar,banner,chip,resumen:oid=>resumen(oid),check,abrir:()=>{AP.abierto=true;pintar()}};
 
 const css=document.createElement('style');css.textContent=`
 body.apb-modal{overflow:hidden}
@@ -4982,6 +4991,7 @@ async function cargar(){if(MD.cargando)return;MD.cargando=true;const h=hoyD();co
           if(x.fecha&&x.fecha>=lun&&x.fecha<=sab)eventos.push({f:x.fecha,c:'',t:x.titulo})}
         else if(x.hecha_el){const fo=(x.adjuntos||[])[0];bit.push({f:x.hecha_el,obra:on,oid:o.id,t:x.titulo,s:'Tarea terminada',img:fo&&fo.src,go:{tab:'tareas'}})}
         if(!x.hecha&&(x.adjuntos||[]).length)bit.push({f:(x.adjuntos[x.adjuntos.length-1].fecha)||'',obra:on,oid:o.id,t:x.titulo,s:'Foto agregada',img:x.adjuntos[x.adjuntos.length-1].src,go:{tab:'tareas'}})})}
+    if(!window.CLI&&puedeD('planificacion')&&window.LPS){const av=await t(()=>window.LPS.avisos(o.id,pr&&pr.items?pr:null));if(av){av.items.forEach(x=>items.push({...x,obra:on,oid:o.id}));av.eventos.forEach(ev=>{if(ev.f>=lun&&ev.f<=sab)eventos.push(ev)})}}
   }));
   AP.forEach(x=>{const o=S.obras.find(z=>z.id===x.obra_id);const on=o?corto(o.nombre):'';
     if(apr&&x.estado==='pendiente')items.push({g:'s',tipo:'Aprobaciones',obra:on,oid:x.obra_id,t:x.titulo+(x.monto?` · ${gs(x.monto)} Gs`:''),d:`Espera tu aprobación desde el ${fd((x.solicitado||'').slice(0,10))}`,a:'Revisar',bx:1,f:''});
@@ -4991,17 +5001,18 @@ async function cargar(){if(MD.cargando)return;MD.cargando=true;const h=hoyD();co
   items.forEach(i=>{const C=cart[i.oid];if(!C)return;if(i.g==='v')C.v++;else if(i.g==='s')C.s++;if(i.f&&i.f!=='9'&&i.f>=h&&(!C.prox||i.f<C.prox.f))C.prox={f:i.f,t:i.tipo==='Pagos'?'Pago':i.tipo==='Certificados'?'Cierre de certificado':i.tipo==='Tareas'?'Tarea':i.tipo}});
   Object.values(cart).forEach(C=>{if(!C.prox&&C.o.inicio&&C.o.inicio>=h)C.prox={f:C.o.inicio,t:'Inicio de obra'}});
   const ordG={v:0,s:1,l:2};items.sort((a,b)=>ordG[a.g]-ordG[b.g]||(a.f||'9').localeCompare(b.f||'9'));
+  window.LPS_AV=items.filter(i=>i.tipo==='Planificación'&&(i.g==='v'||i.g==='s'));if(window.APROB&&window.APROB.campanaLps)window.APROB.campanaLps();
   MD.datos={items,eventos,bit:bit.filter(b=>b.f).sort((a,b)=>b.f.localeCompare(a.f)).slice(0,6),cart,lun,h};MD.cargando=false;MD.t=Date.now();if(window.INICIO)window.INICIO.mount()}
 
 function ir(go,oid){if(oid&&typeof elegirObra==='function')elegirObra(oid);
-  if(go.cert){window.CERT_IR=go.cert;S.tab='contratistas'}else if(go.ped){window.PED_IR=go.ped;S.tab='materiales'}else if(go.tab)S.tab=go.tab;else S.tab='obra';
+  if(go.cert){window.CERT_IR=go.cert;S.tab='contratistas'}else if(go.ped){window.PED_IR=go.ped;S.tab='materiales'}else if(go.tab){S.tab=go.tab;if(go.lps)window.LPS_IR=go}else S.tab='obra';
   window.render();window.scrollTo(0,0);if(typeof refrescar==='function')refrescar()}
 
 function html(){const D=MD.datos;if(!D){if(!MD.cargando)cargar();return `<div class="md-load"><div class="sub">Preparando tu día…</div></div>`}
   if(Date.now()-MD.t>90000&&!MD.cargando)cargar();
   const quien=(window.CLI&&window.CLI.nombre)||(window.COL&&window.COL.nombre)||(S.email?S.email.split('@')[0]:'');
   let fecha=new Date().toLocaleDateString('es-PY',{weekday:'long',day:'numeric',month:'long'});fecha=fecha.charAt(0).toUpperCase()+fecha.slice(1);
-  const TIP=['Todo',...['Pagos','Certificados','Aprobaciones','Pedidos','Tareas'].filter(k=>D.items.some(i=>i.tipo===k))];if(!TIP.includes(MD.filtro))MD.filtro='Todo';
+  const TIP=['Todo',...['Pagos','Certificados','Aprobaciones','Pedidos','Planificación','Tareas'].filter(k=>D.items.some(i=>i.tipo===k))];if(!TIP.includes(MD.filtro))MD.filtro='Todo';
   const vis=D.items.filter(i=>MD.filtro==='Todo'||i.tipo===MD.filtro);
   const G=[['v','Vencido'],['s','Esta semana'],['l','Más adelante / sin fecha']];
   const band=G.map(([g,n])=>{const L=vis.filter(i=>i.g===g);if(!L.length)return '';const ab=(MD.verMas||{})[g];const L2=ab?L:L.slice(0,g==='l'?4:6);
@@ -6541,11 +6552,12 @@ const ICS={
  materiales:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
  proyectos:'<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M8 13h8M8 16.5h5"/>',
  tareas:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8l1.5 1.5L12 7M8 14l1.5 1.5L12 13M14 8.5h3M14 14.5h3"/>',
- gastos:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>'};
+ gastos:'<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+ planificacion:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7M15 13l1.5 1.5L19 12"/>'};
 const svg=k=>`<svg class="side-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICS[k]||''}</svg>`;
-const SUBS='main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p';
+const SUBS='main > .subnav-p, #cert-root > .subnav > .subnav-p, #pres-root > .subnav-p, #ped-root > .subnav-p, #lps-root > .subnav-p';
 const ancho=()=>window.matchMedia('(min-width:900px)').matches;
-const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(t==='proyectos')return 'proyectos';if(['contratistas','presupuesto','planos','materiales','tareas','gastos'].includes(t))return t;return 'personal'};
+const claveDe=b=>{const t=b.dataset.tab||'';if(t==='inicio')return 'inicio';if(t==='obra')return 'obra';if(t==='proyectos')return 'proyectos';if(['contratistas','presupuesto','planos','materiales','tareas','gastos','planificacion'].includes(t))return t;return 'personal'};
 let pend=false;
 function armar(){pend=false;const nav=document.querySelector('header.top nav.tabs');if(!nav)return;
   nav.querySelectorAll('button[data-tab]').forEach(b=>{if(!b.querySelector('.side-ic'))b.insertAdjacentHTML('afterbegin',svg(claveDe(b)))});
@@ -7107,5 +7119,453 @@ const css=document.createElement('style');css.textContent=`
 .ot-cond{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 .ot-cond textarea{font:inherit;text-transform:none;letter-spacing:0;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:14px}
 @media (max-width:760px){#ot-q{width:100%!important;flex:1 1 100%}.ot-lista{grid-template-columns:1fr}}
+`;document.head.appendChild(css);
+})();
+(function(){
+/* ============ Planificación (Last Planner System): restricciones con aviso, look ahead 6 semanas, plan semanal, PPC y causas ============ */
+const L={oid:undefined,cargando:false,doc:null,pres:null,peds:[],v:'prep',la:null,sem:null,form:null,rep:null,conf:null,verLib:false,abierto:null,imp:null,err:''};
+const CACHE={};
+const hoyL=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const addL=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const difL=(a,b)=>Math.round((new Date(a+'T12:00:00')-new Date(b+'T12:00:00'))/864e5);
+const DSL=['dom','lun','mar','mié','jue','vie','sáb'];
+const fL=s=>s?`${DSL[new Date(s+'T12:00:00').getDay()]} ${s.slice(8,10)}/${s.slice(5,7)}`:'';
+const fC=s=>s?`${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(2,4)}`:'';
+const nidL=()=>(crypto.randomUUID?crypto.randomUUID():'l'+Date.now().toString(36)+Math.random().toString(36).slice(2,7));
+const ndL=v=>new Date(Math.round((v-25569)*864e5)).toISOString().slice(0,10);
+const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
+const cort=(s,n=60)=>{s=String(s||'');return s.length>n?s.slice(0,n-1)+'…':s};
+const pctL=x=>x==null?'—':Math.round(x*100)+'%';
+const cmpN=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);for(let i=0;i<Math.max(x.length,y.length);i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+const CNC=[['A','Mala planificación'],['B','Terminación de un trabajo anterior'],['C','Terminación de un trabajo anterior propio'],['D','Falta de información'],['E','Cambios en el diseño'],['F','Ausencia no planificada'],['G','Falta de personal'],['H','Falta de materiales, equipos o andamios'],['I','Cambios del cliente'],['J','Falta de supervisión'],['K','Estimación incorrecta de tiempo'],['L','Requerimientos externos al proyecto'],['M','Condiciones meteorológicas'],['N','Condiciones inseguras de trabajo'],['O','Mala definición del proyecto'],['P','Mala calidad o retrabajo'],['Q','Rendimiento inferior al esperado'],['R','Malas condiciones del entorno'],['S','Cierre por vacaciones o abandono'],['T','Reorganización de tareas'],['U','Avería de maquinaria'],['V','Otras']];
+const CAT=[['pl','Planos / información'],['mat','Materiales'],['mo','Mano de obra'],['eq','Equipos / herramientas'],['fr','Frente / tarea anterior'],['ap','Aprobación / calidad']];
+const AREAS=['COMPRAS','RESIDENCIA DE OBRA','OFICINA TÉCNICA / PROYECTISTA','SUBCONTRATISTA','COMITENTE'];
+const PRIOS=['ALTA','MEDIA','BAJA'];
+const FEST=['Sin comprometer','Comprometida','En curso','Cumplida','Atrasada'];
+/* cosas típicas a preparar según lo que dice el ítem; ant = días antes del inicio del ítem */
+const SUG=[
+ {k:'ladrillo',re:/ladrillo|mamposter/i,no:/tramafix|revoque|encuentro|envarillado|dintel/i,rt:/ladrillo/i,txt:'Pedir ladrillos (por tandas) y cemento/cal para la mampostería',ant:14,area:'COMPRAS',prio:'ALTA',mat:1},
+ {k:'hierro',no:/^\s*para |excavac|relleno/i,re:/encadenado|columna|viga|zapata|fuste|losa|canal[oó]n|dintel/i,rt:/hierro|doblado/i,txt:'Planilla de doblado y pedido de hierro',ant:7,area:'RESIDENCIA DE OBRA',prio:'ALTA',mat:1},
+ {k:'hormigon',no:/^\s*para |excavac|relleno/i,re:/hormig[oó]n|encadenado|columna|viga|zapata|losa/i,rt:/hormig/i,txt:'Proveedor de hormigón y dosificación definidos',ant:5,area:'RESIDENCIA DE OBRA',prio:'MEDIA'},
+ {k:'encofrado',no:/^\s*para |excavac|relleno/i,re:/encadenado|columna|viga|losa|canal[oó]n|encofrado/i,rt:/encofrado|puntal/i,txt:'Encofrado y puntales disponibles en obra',ant:5,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'revoque',re:/revoque/i,rt:/arena|\bcal\b|cemento/i,txt:'Arena, cal y cemento acopiados para el revoque',ant:7,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'embutidos',re:/revoque/i,rt:/embutid|ca[ñn]er/i,txt:'Cañerías y cajas embutidas terminadas antes de revocar',ant:7,area:'RESIDENCIA DE OBRA',prio:'ALTA'},
+ {k:'bajopiso',re:/contrapiso/i,rt:/bajo (contra)?piso|ca[ñn]er/i,txt:'Cañerías bajo piso colocadas y probadas antes del contrapiso',ant:7,area:'RESIDENCIA DE OBRA',prio:'ALTA'},
+ {k:'chapa',re:/chapa|techo|cubierta|tinglado/i,no:/parapeto|remate|ladrillo|cielorraso/i,rt:/chapa|techo/i,txt:'Orden de compra de chapas y estructura del techo',ant:35,area:'COMPRAS',prio:'ALTA',mat:1},
+ {k:'aberturas',re:/abertura|puerta|ventana|blindex|vidrio|alumin|mampara/i,no:/viga|dintel|encadenado|hormig|mamposter|revoque|amurad/i,rt:/abertura|puerta|ventana|blindex|carpinter/i,txt:'Orden de fabricación de aberturas con medidas definitivas',ant:28,area:'SUBCONTRATISTA',prio:'MEDIA'},
+ {k:'piso',re:/\bpiso|porcelanato|cer[aá]mic|revestimiento|z[oó]calo/i,rt:/piso|revestim|porcelanato|cer[aá]mic/i,txt:'Elegir con el cliente y pedir pisos y revestimientos',ant:21,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'pintura',re:/pintura|l[aá]tex|esmalte/i,rt:/pintura|color/i,txt:'Definir colores con el cliente y pedir pintura',ant:10,area:'COMPRAS',prio:'BAJA',mat:1},
+ {k:'sanitarios',re:/sanitari|artefacto|inodoro|lavatorio|grifer|juego de ba/i,rt:/artefacto|sanitari/i,txt:'Confirmar fecha de entrega de artefactos sanitarios',ant:30,area:'COMITENTE',prio:'MEDIA'},
+ {k:'electrico',re:/el[eé]ctric|tablero|cableado|tomacorriente|interruptor|luminaria/i,rt:/el[eé]ctric|cable/i,txt:'Pedido de materiales eléctricos',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'sanitaria',re:/agua corriente|desag|cloacal|pluvial|ca[ñn]o /i,rt:/ca[ñn]o|accesorio|cloacal|desag/i,txt:'Pedido de caños y accesorios sanitarios',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'cielorraso',re:/cielorraso|durlock|yeso/i,rt:/placa|perfil|cielorraso|durlock/i,txt:'Pedido de placas y perfiles para cielorraso',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1}];
+
+const vacio=()=>({inicio:'',items:{},meta:0.85,restr:[],sem:[],fases:[],chk:{},desc:{}});
+function norm(d){const v=vacio();d=d&&typeof d==='object'?d:{};for(const k in v)if(d[k]==null)d[k]=v[k];return d}
+const semDe=(D,f)=>D.inicio&&f?Math.floor(difL(f,D.inicio)/7)+1:0;
+const iniSem=(D,s)=>addL(D.inicio,(s-1)*7);
+const finSem=(D,s)=>addL(D.inicio,(s-1)*7+6);
+/* ítems: los del presupuesto + las semanas de cada uno (importadas del cronograma detallado);
+   si un ítem no tiene semanas, toma las del rubro en el cronograma del presupuesto */
+function itemsDe(D,P){const m={};
+  ((P&&P.items)||[]).forEach(i=>{if(!i.n)return;m[String(i.n)]={n:String(i.n),desc:i.desc||'',zona:i.sector||'',ud:i.unidad||'',cant:i.cant}});
+  Object.entries(D.items||{}).forEach(([n,x])=>{const b=m[n]||{n,desc:'',zona:'',ud:x.ud||'',cant:x.cant};m[n]={...b,desc:b.desc||x.desc||'',zona:b.zona||x.zona||'',a:x.a,b:x.b}});
+  const C=P&&P.cronograma;
+  if(C&&C.rubros&&D.inicio)Object.values(m).forEach(it=>{if(it.a)return;const c=C.rubros[String(it.n).split('.')[0]];if(!c||!c.tramos||!c.tramos.length)return;
+    const d=c.tramos.map(t=>t.d).sort()[0],h=c.tramos.map(t=>t.h).sort().pop();it.a=Math.max(1,semDe(D,d));it.b=Math.max(it.a,semDe(D,h));it.aprox=true});
+  return Object.values(m).sort((a,b)=>cmpN(a.n,b.n))}
+function reqDe(D,IM,r){if(r.reprog)return r.reprog;const it=r.item&&IM.get(String(r.item));
+  if(it&&it.a&&D.inicio&&r.ant!==''&&r.ant!=null)return addL(iniSem(D,it.a),-Number(r.ant));return r.req||''}
+const estR=(r,req,h)=>r.lib?'LIBERADA':req&&req<h?'VENCIDA':'PENDIENTE';
+function estItem(D,n){const ab=D.restr.filter(r=>String(r.item)===String(n)&&!r.lib).length;if(ab)return 'RESTRINGIDA';const c=D.chk[n];if(!c)return 'SIN ANALIZAR';
+  const v=CAT.map(([k])=>c[k]||'');if(v.some(x=>x==='PEND'))return 'RESTRINGIDA';if(v.every(x=>x==='OK'||x==='N/A'))return 'LIBERADA';return 'SIN ANALIZAR'}
+const clsE=e=>({LIBERADA:'lib','RESTRINGIDA':'res','SIN ANALIZAR':'sin',VENCIDA:'ven',PENDIENTE:'pen'})[e]||'sin';
+function sugerencias(D,its,h){if(!D.inicio)return[];const sa=semDe(D,h);const out=[];const visto=new Set();const IM=new Map(its.map(i=>[i.n,i]));
+  for(const it of its){if(!it.a||it.a<sa)continue;const ini=iniSem(D,it.a);const rub=String(it.n).split('.')[0];
+    for(const s of SUG){if(!s.re.test(it.desc||'')||(s.no&&s.no.test(it.desc||'')))continue;const g=s.k+'|'+rub;if(visto.has(g)||D.desc[g])continue;
+      if(s.mat&&D.chk[it.n]&&D.chk[it.n].mat==='OK')continue;
+      /* ya cubierto por una restricción del mismo tipo en este ítem o en uno del mismo rubro que empieza cerca (±4 semanas) */
+      if(D.restr.some(r=>{if(!(r.sug===s.k||s.rt.test(r.txt||'')))return false;const ri=String(r.item||'');if(ri===it.n)return true;if(ri.split('.')[0]!==rub)return false;const x=IM.get(ri);return !!(x&&x.a&&Math.abs(x.a-it.a)<=4)}))continue;
+      const req=addL(ini,-s.ant);if(difL(req,h)>21)continue;visto.add(g);
+      out.push({k:s.k,g,item:it.n,desc:it.desc,txt:s.txt,ant:s.ant,area:s.area,prio:s.prio,req,ini})}}
+  return out.sort((a,b)=>a.req.localeCompare(b.req))}
+
+/* ---------- datos ---------- */
+async function datos(oid,P){let c=CACHE[oid];if(c&&Date.now()-c.t<60000&&(c.pres||!P))return c;
+  const doc=norm(await window.LPB.get(oid));if(!P){try{P=await window.PDB.get(oid)}catch(e){P=null}}
+  if(!doc.inicio)doc.inicio=(P&&P.cronograma&&P.cronograma.inicio)||(S.obras.find(o=>o.id===oid)||{}).inicio||'';
+  c=CACHE[oid]={doc,pres:P,t:Date.now()};return c}
+/* avisos para "Mi día" y la campana */
+async function avisos(oid,P){const{doc:D,pres}=await datos(oid,P);const h=hoyL();const items=[],eventos=[];
+  if(!D.restr.length&&!D.sem.length&&!Object.keys(D.items).length)return{items,eventos};
+  const its=itemsDe(D,pres);const IM=new Map(its.map(i=>[i.n,i]));
+  D.restr.forEach(r=>{if(r.lib)return;const req=reqDe(D,IM,r);if(!req)return;const dd=difL(req,h);if(dd>21)return;
+    items.push({g:dd<0?'v':dd<=7?'s':'l',tipo:'Planificación',t:`Preparar: ${r.txt}`,d:(dd<0?`Tenía que estar el ${fL(req)}`:dd===0?'Tiene que estar hoy':`Tiene que estar el ${fL(req)} · faltan ${dd} día${dd===1?'':'s'}`)+(r.item?` · ítem ${r.item}`:'')+(r.area?` · ${r.area}`:''),a:'Ver',go:{tab:'planificacion',lps:'prep'},f:req});
+    eventos.push({f:req,c:'',t:'Preparar: '+cort(r.txt,40)})});
+  const sg=sugerencias(D,its,h);
+  if(sg.length)items.push({g:sg.some(s=>s.req<=addL(h,7))?'s':'l',tipo:'Planificación',t:`${sg.length} cosa${sg.length>1?'s':''} para planificar con tiempo`,d:sg.slice(0,2).map(s=>`${s.txt} (ítem ${s.item})`).join(' · '),a:'Revisar',go:{tab:'planificacion',lps:'prep'},f:sg[0].req});
+  if(D.inicio){const sa=semDe(D,h);const ant=D.sem.filter(x=>x.s===sa-1);const sinM=ant.filter(x=>!x.ok).length;
+    if(sinM)items.push({g:'s',tipo:'Planificación',t:`Cerrar la semana ${sa-1}: marcar qué se cumplió`,d:`${sinM} tarea${sinM>1?'s':''} sin marcar · con esto se calcula el PPC`,a:'Cerrar semana',go:{tab:'planificacion',lps:'sem',s:sa-1},f:h});
+    if(sa>0&&!D.sem.some(x=>x.s===sa))items.push({g:'s',tipo:'Planificación',t:`Comprometer el plan de la semana ${sa}`,d:'Elegí qué se va a hacer esta semana: solo tareas liberadas',a:'Armar semana',go:{tab:'planificacion',lps:'sem',s:sa},f:h})}
+  return{items,eventos}}
+
+async function cargar(oid){if(L.cargando)return;L.cargando=true;L.err='';
+  try{delete CACHE[oid];const c=await datos(oid,null);L.doc=c.doc;L.pres=c.pres;
+    try{L.peds=window.MDB?await window.MDB.list(oid):[]}catch(e){L.peds=[]}}
+  catch(e){L.doc=norm(null);L.pres=null;L.err='No se pudo leer la planificación. Revisá la conexión.'}
+  L.oid=oid;L.cargando=false;L.form=null;L.conf=null;L.rep=null;L.abierto=null;L.imp=null;L.la=null;L.sem=null;render()}
+async function guardar(){CACHE[L.oid]={doc:L.doc,pres:L.pres,t:Date.now()};
+  try{await window.LPB.save(L.oid,L.doc)}catch(e){toast('No se pudo guardar la planificación. Revisá la conexión.')}
+  if(window.MIDIA)window.MIDIA.recargar()}
+
+/* ---------- vistas ---------- */
+function render(){const root=document.getElementById('lps-root');if(!root)return;const o=OB();
+  if(!o){root.innerHTML='<div class="panel" style="padding:16px">Elegí una obra.</div>';return}
+  if(o.id!==L.oid){root.innerHTML='<p class="sub">Cargando…</p>';cargar(o.id);return}
+  if(window.LPS_IR){const g=window.LPS_IR;window.LPS_IR=null;if(g.lps)L.v=g.lps;if(g.s)L.sem=g.s}
+  const D=L.doc,h=hoyL();const its=itemsDe(D,L.pres);const IM=new Map(its.map(i=>[i.n,i]));const ctx={D,h,its,IM,sa:D.inicio?semDe(D,h):0};
+  const urg=D.restr.filter(r=>{if(r.lib)return false;const q=reqDe(D,IM,r);return q&&difL(q,h)<=7}).length;
+  const V=[['prep',`Para preparar${urg?` (${urg})`:''}`],['la','Look Ahead'],['sem','Semana'],['ppc','PPC y causas'],['fases','Fases'],['rut','Reunión semanal']];
+  const foco=document.activeElement&&document.activeElement.id;
+  root.innerHTML=`<div class="lps-top"><h2>Planificación</h2><span class="sub">${D.inicio?`Semana ${ctx.sa} de obra · empezó el ${fC(D.inicio)}`:'Falta la fecha de inicio de obra'}</span></div>
+  <div class="subnav-p">${V.map(([k,t])=>`<button class="chip-p" data-lact="v" data-v="${k}" aria-pressed="${L.v===k}">${t}</button>`).join('')}</div>
+  ${L.err?`<div class="panel lps-aviso">${esc(L.err)}</div>`:''}
+  ${L.imp?vImp():''}
+  ${!D.inicio?vInicio():''}
+  ${({prep:vPrep,la:vLA,sem:vSem,ppc:vPPC,fases:vFases,rut:vRut})[L.v](ctx)}`;
+  if(foco){const el=document.getElementById(foco);if(el&&root.contains(el))el.focus()}
+  if(window.LATERAL)window.LATERAL()}
+
+const btnImp=()=>`<label class="btn">Importar Excel LPS<input type="file" id="lps-imp" accept=".xlsx,.xlsm,.xls" hidden></label>`;
+function vInicio(){return `<div class="panel lps-ini"><b>¿Cuándo empezó la obra?</b><span class="sub">Con esa fecha se cuentan las semanas del cronograma. También podés importar tu Excel de planificación y se carga todo.</span>
+  <div class="bar"><input type="date" id="lps-fini"><button class="btn primary" data-lact="fini">Guardar fecha</button>${btnImp()}</div></div>`}
+function vImp(){const x=L.imp;return `<div class="panel lps-imp"><b>Encontré en ${esc(x.nombre)}:</b>
+  <ul>${x.res.inicio?`<li>Inicio de obra: <b>${fC(x.res.inicio)}</b></li>`:''}<li><b>${Object.keys(x.res.items).length}</b> ítems con sus semanas</li><li><b>${x.res.restr.length}</b> restricciones (${x.res.restr.filter(r=>!r.lib).length} abiertas)</li><li><b>${x.res.sem.length}</b> tareas de planes semanales</li><li><b>${Object.keys(x.res.chk).length}</b> ítems analizados</li><li><b>${x.res.fases.length}</b> fases</li></ul>
+  ${L.doc.restr.length||L.doc.sem.length?'<p class="sub">Esto reemplaza lo que ya está cargado en esta obra.</p>':''}
+  <div class="bar"><button class="btn primary" data-lact="impok">Cargar</button><button class="btn ghost" data-lact="impno">Cancelar</button></div></div>`}
+
+function vPrep(ctx){const{D,h,IM}=ctx;
+  const R=D.restr.map(r=>{const req=reqDe(D,IM,r);return{r,req,e:estR(r,req,h),dd:req?difL(req,h):null}});
+  const po=x=>PRIOS.indexOf(x.r.prio)<0?1:PRIOS.indexOf(x.r.prio);
+  const ord=(a,b)=>(a.req||'9').localeCompare(b.req||'9')||po(a)-po(b);
+  const G=[['ven','Vencidas: ya tendrían que estar listas',x=>x.e==='VENCIDA'],['sem','Para esta semana',x=>x.e==='PENDIENTE'&&x.dd!=null&&x.dd<=7],['prox','Próximas 3 semanas',x=>x.e==='PENDIENTE'&&x.dd!=null&&x.dd>7&&x.dd<=21],['mas','Más adelante',x=>x.e==='PENDIENTE'&&(x.dd==null||x.dd>21)]];
+  const lib=R.filter(x=>x.e==='LIBERADA').sort((a,b)=>(b.r.lib||'').localeCompare(a.r.lib||''));
+  const sg=sugerencias(D,ctx.its,h);
+  const n=k=>R.filter(G.find(g=>g[0]===k)[2]).length;
+  return `<div class="lps-res"><span class="lps-k ven"><b>${n('ven')}</b> vencidas</span><span class="lps-k pen"><b>${n('sem')}</b> esta semana</span><span class="lps-k"><b>${n('prox')}</b> próximas 3 sem.</span><span class="lps-k lib"><b>${lib.length}</b> listas</span></div>
+  <div class="bar lps-tools"><button class="btn primary" data-lact="nueva">+ Nueva restricción</button>${D.inicio?btnImp():''}</div>
+  ${L.form?vForm(ctx):''}
+  ${sg.length?`<div class="panel lps-sug"><div><b>Para planificar con tiempo</b> <span class="sub">· sugerencias según lo que empieza en las próximas semanas</span></div>
+    ${sg.map(s=>`<div class="lps-sg"><div class="lps-sgt"><b>${esc(s.txt)}</b><span class="sub">Ítem ${esc(s.item)} · ${esc(cort(s.desc,55))} · empieza ${fL(s.ini)}</span><span class="sub">${s.req<h?`<b class="lps-rojo">Ya tendría que estar (${fL(s.req)})</b>`:`Tenerlo para el ${fL(s.req)} · ${s.ant} días antes`}</span></div>
+      <div class="bar"><button class="btn sm primary" data-lact="sugok" data-k="${s.k}" data-item="${esc(s.item)}">Agregar</button><button class="btn sm ghost" data-lact="sugno" data-g="${esc(s.g)}">No hace falta</button></div></div>`).join('')}</div>`:''}
+  ${G.map(([k,t,fn])=>{const xs=R.filter(fn).sort(ord);return xs.length?`<section class="lps-g"><h3 class="lps-h ${k}">${t} <span class="num">(${xs.length})</span></h3>${xs.map(x=>card(x,ctx)).join('')}</section>`:''}).join('')}
+  ${lib.length?`<section class="lps-g"><button class="btn ghost" data-lact="verlib">${L.verLib?'Ocultar':'Ver'} las ${lib.length} ya listas</button>${L.verLib?lib.map(x=>card(x,ctx)).join(''):''}</section>`:''}
+  ${!R.length&&!sg.length?`<div class="panel lps-vacio"><b>Todavía no hay nada para preparar.</b><span class="sub">Anotá lo que tiene que estar listo antes de cada tarea (materiales, planos, subcontratos, aprobaciones) y te aviso con tiempo en "Mi día".</span></div>`:''}`}
+function estPed(p){const its=p.items||[];const ok=its.filter(i=>i.rec&&(i.rec.cant==null||+i.rec.cant>=+i.cant)).length;return !its.length?'sin ítems':ok>=its.length?'llegó todo':`${ok} de ${its.length} llegaron`}
+function card(x,ctx){const{r,req,e,dd}=x;const it=r.item&&ctx.IM.get(String(r.item));const ped=r.ped&&L.peds.find(p=>p.id===r.ped);
+  const cuando=e==='LIBERADA'?`Lista el ${fL(r.lib)}`:!req?'Sin fecha':dd<0?`Venció hace ${-dd} día${dd===-1?'':'s'}`:dd===0?'Hoy':`${fL(req)} · faltan ${dd} día${dd===1?'':'s'}`;
+  return `<div class="lps-c ${clsE(e)}">
+    <div class="lps-c1"><b>${esc(r.txt)}</b><span class="lps-q ${clsE(e)}">${cuando}</span></div>
+    ${it||r.item?`<div class="sub">Ítem ${esc(r.item)}${it?` · ${esc(cort(it.desc,60))}${it.a&&ctx.D.inicio?` · empieza ${fL(iniSem(ctx.D,it.a))}`:''}`:''}${r.ant!==''&&r.ant!=null?` · ${r.ant} días antes`:''}${e==='VENCIDA'&&req?` · era para el ${fL(req)}`:''}</div>`:''}
+    <div class="sub">${[r.prio,r.area,r.resp].filter(Boolean).map(esc).join(' · ')}${r.nrep?` · reprogramada ${r.nrep} vez${r.nrep>1?'es':''}`:''}</div>
+    ${r.obs?`<div class="lps-obs">${esc(r.obs)}</div>`:''}
+    ${ped?`<div class="sub">Pedido N° ${esc(ped.numero)} · ${estPed(ped)}</div>`:''}
+    ${L.rep===r.id?`<div class="bar"><input type="date" id="lps-rep" value="${req||ctx.h}"><button class="btn sm primary" data-lact="repok" data-id="${r.id}">Guardar fecha</button><button class="btn sm ghost" data-lact="repno">Cancelar</button></div>`:''}
+    ${L.conf===r.id?`<div class="bar"><span class="sub">¿Borrar esta restricción?</span><button class="btn sm danger" data-lact="borrar" data-id="${r.id}">Sí, borrar</button><button class="btn sm ghost" data-lact="noconf">No</button></div>`:''}
+    <div class="bar lps-acc">${e==='LIBERADA'?`<button class="btn sm" data-lact="reabrir" data-id="${r.id}">Volver a pendiente</button>`:`<button class="btn sm primary" data-lact="lib" data-id="${r.id}">Listo ✓</button>`}
+      ${ped||e!=='LIBERADA'?`<button class="btn sm" data-lact="ped" data-id="${r.id}">${ped?'Ver pedido':'Armar pedido'}</button>`:''}
+      ${e!=='LIBERADA'?`<button class="btn sm" data-lact="rep" data-id="${r.id}">Cambiar fecha</button>`:''}
+      <button class="btn sm ghost" data-lact="edit" data-id="${r.id}">Editar</button><button class="btn sm ghost" data-lact="conf" data-id="${r.id}">Borrar</button></div></div>`}
+function vForm(ctx){const f=L.form;const sel=(n,L2,v)=>`<select name="${n}">${L2.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+  return `<form class="panel lps-f" id="lps-f" autocomplete="off"><h3>${f.nuevo?'Nueva restricción':'Editar restricción'}</h3>
+  <div class="form" style="padding:0">
+    <label class="wide">Qué tiene que estar listo<input type="text" name="txt" id="lps-ftxt" value="${esc(f.txt||'')}" placeholder="Ej.: Pedido de ladrillo hueco (primera entrega)" required></label>
+    <label>Ítem del cronograma<input type="text" name="item" value="${esc(f.item||'')}" list="lps-its" placeholder="Ej.: 5.3"></label>
+    <label>Días de anticipación<input type="number" name="ant" min="0" value="${f.ant??''}" placeholder="Ej.: 14"></label>
+    <label>Fecha requerida (si no hay ítem)<input type="date" name="req" value="${f.req||''}"></label>
+    <label>Prioridad${sel('prio',PRIOS,f.prio||'MEDIA')}</label>
+    <label>Área${sel('area',AREAS,f.area||'COMPRAS')}</label>
+    <label>Responsable<input type="text" name="resp" value="${esc(f.resp||'')}"></label>
+    <label class="wide">Observación<input type="text" name="obs" value="${esc(f.obs||'')}"></label>
+  </div>
+  <p class="sub">Con ítem y anticipación, la fecha se calcula sola: inicio del ítem en el cronograma menos esos días.</p>
+  <datalist id="lps-its">${ctx.its.map(i=>`<option value="${esc(i.n)}">${esc(i.n+' · '+cort(i.desc,60))}</option>`).join('')}</datalist>
+  <div class="bar"><button class="btn primary">Guardar</button><button type="button" class="btn ghost" data-lact="cancel">Cancelar</button></div></form>`}
+
+function vLA(ctx){const{D,sa}=ctx;if(!D.inicio)return '';const s0=L.la||Math.max(1,sa);const W=[0,1,2,3,4,5].map(i=>s0+i);
+  const cont=i=>i.b-i.a+1>=20;/* alquileres y servicios que duran toda la obra */
+  const xs=ctx.its.filter(i=>i.a&&i.b&&i.a<=W[5]&&i.b>=W[0]&&!cont(i));const E=xs.map(i=>estItem(D,i.n));const c=k=>E.filter(e=>e===k).length;
+  return `<div class="bar between lps-wk"><div class="bar"><button class="btn sm" data-lact="la" data-d="-1" aria-label="Semana anterior">‹</button><b>Semanas ${W[0]} a ${W[5]}</b><button class="btn sm" data-lact="la" data-d="1" aria-label="Semana siguiente">›</button>${s0!==Math.max(1,sa)?'<button class="btn sm ghost" data-lact="la" data-d="0">Hoy</button>':''}</div>
+    <span class="sub">${fL(iniSem(D,W[0]))} al ${fL(finSem(D,W[5]))}</span></div>
+  <div class="lps-res"><span class="lps-k"><b>${xs.length}</b> ítems</span><span class="lps-k lib"><b>${c('LIBERADA')}</b> liberados</span><span class="lps-k ven"><b>${c('RESTRINGIDA')}</b> restringidos</span><span class="lps-k pen"><b>${c('SIN ANALIZAR')}</b> sin analizar</span></div>
+  <p class="sub">Tocá un ítem para revisar si está todo listo: planos, materiales, mano de obra, equipos, frente libre y aprobaciones. Solo los liberados pasan al plan de la semana.</p>
+  ${xs.length?`<div class="lps-la"><div class="lps-lah"><span>Ítem</span>${W.map(w=>`<span class="${w===sa?'hoy':''}">S${w}</span>`).join('')}<span>Estado</span></div>
+  ${xs.map((i,k)=>{const e=E[k];const ab=D.restr.filter(r=>String(r.item)===i.n&&!r.lib).length;
+    return `<div class="lps-lar ${L.abierto===i.n?'abierto':''}"><button class="lps-lai" data-lact="chk" data-n="${esc(i.n)}"><b>${esc(i.n)}</b> ${esc(cort(i.desc,70))}${i.zona?` <span class="sub">· ${esc(i.zona)}</span>`:''}${i.aprox?' <span class="sub">(semanas del rubro)</span>':''}</button>${W.map(w=>`<span class="lps-w ${w>=i.a&&w<=i.b?'on':''} ${w===sa?'hoy':''}"></span>`).join('')}<span class="lps-e ${clsE(e)}">${e==='SIN ANALIZAR'?'Sin analizar':e==='LIBERADA'?'Liberado':'Restringido'}${ab?` · ${ab}`:''}</span></div>${L.abierto===i.n?vChk(ctx,i):''}`}).join('')}</div>`:'<div class="panel lps-vacio">No hay ítems del cronograma en estas semanas.</div>'}`}
+function vChk(ctx,i){const c=ctx.D.chk[i.n]||{};const R=ctx.D.restr.filter(r=>String(r.item)===i.n);
+  return `<div class="lps-chk"><div class="sub">Empieza ${fL(iniSem(ctx.D,i.a))} · termina ${fL(finSem(ctx.D,i.b))}${i.cant?` · ${esc(String(i.cant))} ${esc(i.ud||'')}`:''}</div>
+  <div class="lps-cg">${CAT.map(([k,t])=>`<div class="lps-ci"><span>${t}</span><div class="lps-seg">${['OK','PEND','N/A'].map(v=>`<button type="button" data-lact="ck" data-n="${esc(i.n)}" data-c="${k}" data-val="${v}" aria-pressed="${c[k]===v}" class="${v==='PEND'?'pend':v==='OK'?'ok':''}">${v==='PEND'?'Falta':v}</button>`).join('')}</div></div>`).join('')}</div>
+  <div class="bar"><input type="text" placeholder="Responsable (último planificador)" data-ckf="resp" data-n="${esc(i.n)}" value="${esc(c.resp||'')}"><input type="text" placeholder="Nota" data-ckf="obs" data-n="${esc(i.n)}" value="${esc(c.obs||'')}" style="flex:1 1 200px"></div>
+  ${R.length?`<div class="sub">Restricciones: ${R.map(r=>`${r.lib?'✓':'•'} ${esc(r.txt)}`).join(' · ')}</div>`:''}
+  <div class="bar"><button class="btn sm" data-lact="ckok" data-n="${esc(i.n)}">Todo OK</button><button class="btn sm" data-lact="nueva" data-item="${esc(i.n)}">+ Restricción para este ítem</button></div></div>`}
+
+function vSem(ctx){const{D,sa}=ctx;if(!D.inicio)return '';const s=L.sem||Math.max(1,sa);const T=D.sem.filter(x=>x.s===s);
+  const cum=T.filter(x=>x.ok==='SI').length,marc=T.filter(x=>x.ok).length;
+  const ya=new Set(T.map(x=>String(x.item)));const cand=ctx.its.filter(i=>i.a&&i.a<=s&&i.b>=s&&i.b-i.a+1<20&&!ya.has(i.n));const libs=cand.filter(i=>estItem(D,i.n)==='LIBERADA');
+  const ultR=[...D.sem].reverse().find(x=>x.resp);
+  return `<div class="bar between lps-wk"><div class="bar"><button class="btn sm" data-lact="sw" data-d="-1" aria-label="Semana anterior">‹</button><b>Semana ${s}</b><button class="btn sm" data-lact="sw" data-d="1" aria-label="Semana siguiente">›</button>${s!==Math.max(1,sa)?'<button class="btn sm ghost" data-lact="sw" data-d="0">Esta semana</button>':''}</div>
+    <span class="sub">${fL(iniSem(D,s))} al ${fL(finSem(D,s))}${s===sa?' · en curso':s<sa?' · pasada':' · próxima'}</span></div>
+  <div class="lps-res"><span class="lps-k"><b>${T.length}</b> comprometidas</span><span class="lps-k lib"><b>${cum}</b> cumplidas</span>${T.length?`<span class="lps-k ${marc<T.length?'pen':cum/T.length>=(D.meta||.85)?'lib':'ven'}">PPC <b>${pctL(cum/T.length)}</b>${marc<T.length?` · faltan marcar ${T.length-marc}`:''}</span>`:''}</div>
+  ${T.length?`<div class="lps-st">${T.map(x=>{const e=x.item?estItem(D,x.item):'';return `<div class="lps-t ${x.ok==='SI'?'si':x.ok==='NO'?'no':''}">
+    <div class="lps-tt"><b>${x.item?esc(x.item)+' · ':''}${esc(x.act||'')}</b><span class="sub">${[x.zona,e&&e!=='LIBERADA'?(e==='RESTRINGIDA'?'⚠ con restricciones':'sin analizar'):''].filter(Boolean).map(esc).join(' · ')}</span>
+      <input type="text" class="lps-in" placeholder="Responsable" data-sf="resp" data-id="${x.id}" value="${esc(x.resp||'')}"></div>
+    <div class="lps-seg lps-sn"><span class="sub">¿Se cumplió?</span><button type="button" class="ok" data-lact="ok" data-id="${x.id}" data-val="SI" aria-pressed="${x.ok==='SI'}">Sí</button><button type="button" class="pend" data-lact="ok" data-id="${x.id}" data-val="NO" aria-pressed="${x.ok==='NO'}">No</button><button type="button" class="lps-x" data-lact="sdel" data-id="${x.id}" aria-label="Quitar">✕</button></div>
+    ${x.ok==='NO'?`<div class="lps-cnc"><select data-sf="cnc" data-id="${x.id}"><option value="">¿Por qué no se cumplió?</option>${CNC.map(([k,t])=>`<option value="${k}" ${x.cnc===k?'selected':''}>${k} · ${t}</option>`).join('')}</select><input type="text" placeholder="Qué hacemos para que no se repita" data-sf="obs" data-id="${x.id}" value="${esc(x.obs||'')}"></div>`:''}</div>`}).join('')}</div>`:`<div class="panel lps-vacio"><b>Todavía no hay nada comprometido para esta semana.</b><span class="sub">Prometé solo lo que está liberado: así el PPC te dice la verdad.</span></div>`}
+  <div class="panel lps-add"><b>Agregar al plan de la semana</b>
+    ${libs.length?`<button class="btn primary" data-lact="addlib" data-s="${s}">Agregar los ${libs.length} ítems liberados de esta semana</button>`:''}
+    ${cand.length?`<div class="lps-cands">${cand.map(i=>{const e=estItem(D,i.n);return `<button class="lps-cand ${clsE(e)}" data-lact="add" data-s="${s}" data-n="${esc(i.n)}" title="${esc(i.desc)}"><b>${esc(i.n)}</b> ${esc(cort(i.desc,42))}<span>${e==='LIBERADA'?'liberado':e==='RESTRINGIDA'?'restringido':'sin analizar'}</span></button>`}).join('')}</div>`:'<span class="sub">No quedan ítems del cronograma para esta semana.</span>'}
+    <div class="bar"><input type="text" id="lps-otra" placeholder="Otra tarea (ej.: limpieza de obra)" style="flex:1 1 220px"><button class="btn" data-lact="addotra" data-s="${s}">Agregar</button></div>
+    <input type="hidden" id="lps-uresp" value="${esc(ultR?ultR.resp:'')}"></div>`}
+
+function ppcData(D,sa){const max=Math.max(sa,...D.sem.map(x=>x.s||0),1);const W=[];
+  for(let s=1;s<=max;s++){const T=D.sem.filter(x=>x.s===s);const c=T.filter(x=>x.ok==='SI').length;W.push({s,n:T.length,c,p:T.length?c/T.length:null})}
+  const tn=W.reduce((a,w)=>a+w.n,0),tc=W.reduce((a,w)=>a+w.c,0);return{W,acum:tn?tc/tn:null}}
+function vPPC(ctx){const{D,h,IM,sa}=ctx;const meta=D.meta||.85;const{W,acum}=ppcData(D,sa);const conDatos=W.filter(w=>w.n);const ult=[...conDatos].reverse().find(w=>w.s<sa)||conDatos[conDatos.length-1];
+  const no=D.sem.filter(x=>x.ok==='NO');const cnt={};no.forEach(x=>{const k=x.cnc||'?';cnt[k]=(cnt[k]||0)+1});const P=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);const tot=no.length;
+  const R=D.restr.map(r=>{const q=reqDe(D,IM,r);return{e:estR(r,q,h),ok:r.lib&&q?r.lib<=q:null}});
+  const aTiempo=R.filter(x=>x.ok!=null);
+  return `<div class="lps-kpi"><div class="panel"><span class="sub">PPC acumulado</span><b class="${acum==null?'':acum>=meta?'okc':'malc'}">${pctL(acum)}</b><span class="sub">meta <input type="number" min="1" max="100" id="lps-meta" value="${Math.round(meta*100)}" style="width:62px">%</span></div>
+    <div class="panel"><span class="sub">Última semana cerrada</span><b>${ult?pctL(ult.p):'—'}</b><span class="sub">${ult?`Semana ${ult.s} · ${ult.c} de ${ult.n}`:''}</span></div>
+    <div class="panel"><span class="sub">Causa principal</span><b class="lps-causa">${P.length?esc((CNC.find(c=>c[0]===P[0][0])||[0,'Sin causa cargada'])[1]):'—'}</b><span class="sub">${P.length?`${P[0][1]} de ${tot} incumplimientos`:''}</span></div>
+    <div class="panel"><span class="sub">Restricciones</span><b>${R.filter(x=>x.e==='VENCIDA').length} vencidas</b><span class="sub">${R.filter(x=>x.e==='PENDIENTE').length} pendientes · ${R.filter(x=>x.e==='LIBERADA').length} listas${aTiempo.length?` · ${pctL(aTiempo.filter(x=>x.ok).length/aTiempo.length)} a tiempo`:''}</span></div></div>
+  <div class="panel lps-ch"><b>PPC por semana</b><span class="sub">Tareas cumplidas sobre las comprometidas. La línea es la meta (${Math.round(meta*100)}%).</span>
+    <div class="lps-bars" style="--meta:${meta*100}%">${W.map(w=>`<div class="lps-b ${w.s===sa?'hoy':''}" title="Semana ${w.s}: ${w.n?pctL(w.p)+` (${w.c} de ${w.n})`:'sin plan'}"><div class="lps-bv ${w.p==null?'nada':w.p>=meta?'ok':'mal'}" style="height:${w.p==null?2:Math.max(3,w.p*100)}%"></div><span>${w.s}</span></div>`).join('')}</div></div>
+  <div class="panel lps-ch"><b>Por qué no se cumplió</b><span class="sub">Atacá la primera causa: es la que más plan te hace perder.</span>
+    ${P.length?P.map(([k,n])=>`<div class="lps-pr"><span>${k==='?'?'Sin causa cargada':esc(k+' · '+((CNC.find(c=>c[0]===k)||[0,''])[1]))}</span><div class="lps-pb"><i style="width:${n/tot*100}%"></i></div><b class="num">${n} · ${pctL(n/tot)}</b></div>`).join(''):'<p class="sub">Todavía no hay tareas marcadas como no cumplidas.</p>'}</div>`}
+
+function vFases(ctx){const{D}=ctx;const F=D.fases;
+  return `<p class="sub">Cada fase termina en un hito. Con los que ejecutan, se planifica de atrás para adelante qué tiene que estar listo para llegar a la fecha.</p>
+  ${F.map(f=>{const fh=D.inicio&&f.sh?finSem(D,+f.sh):'';const dv=f.comp&&fh?Math.round(difL(f.comp,fh)/7):null;return `<div class="panel lps-fa">
+    <div class="lps-fg"><label class="wide">Fase<input type="text" data-fz="nom" data-id="${f.id}" value="${esc(f.nom||'')}"></label>
+    <label>Ítems<input type="text" data-fz="alc" data-id="${f.id}" value="${esc(f.alc||'')}"></label>
+    <label>Sem. inicio<input type="number" min="1" data-fz="si" data-id="${f.id}" value="${esc(f.si||'')}"></label>
+    <label>Sem. hito<input type="number" min="1" data-fz="sh" data-id="${f.id}" value="${esc(f.sh||'')}"></label>
+    <label>Fecha del hito<input type="text" value="${fh?fC(fh):''}" disabled></label>
+    <label class="wide">Hito / entregable<input type="text" data-fz="hito" data-id="${f.id}" value="${esc(f.hito||'')}"></label>
+    <label class="wide">Quiénes planifican<input type="text" data-fz="quien" data-id="${f.id}" value="${esc(f.quien||'')}"></label>
+    <label>Fecha comprometida<input type="date" data-fz="comp" data-id="${f.id}" value="${f.comp||''}"></label>
+    <label>Estado<select data-fz="est" data-id="${f.id}">${FEST.map(x=>`<option ${x===(f.est||FEST[0])?'selected':''}>${x}</option>`).join('')}</select></label></div>
+    <div class="bar between"><span class="sub">${dv==null?'':dv>0?`<b class="lps-rojo">${dv} semana${dv>1?'s':''} después del hito</b>`:dv<0?`${-dv} semana${dv<-1?'s':''} antes del hito`:'Coincide con el hito'}</span>
+      ${L.conf===f.id?`<span class="bar"><button class="btn sm danger" data-lact="fdel" data-id="${f.id}">Sí, borrar fase</button><button class="btn sm ghost" data-lact="noconf">No</button></span>`:`<button class="btn sm ghost" data-lact="conf" data-id="${f.id}">Borrar</button>`}</div></div>`}).join('')}
+  <button class="btn" data-lact="fnueva">+ Agregar fase</button>`}
+
+function vRut(ctx){const{D,h,IM,sa}=ctx;const ant=D.sem.filter(x=>x.s===sa-1);const sinM=ant.filter(x=>!x.ok).length;const{W}=ppcData(D,sa);const ult=W.find(w=>w.s===sa-1);
+  const R=D.restr.map(r=>{const q=reqDe(D,IM,r);return{e:estR(r,q,h),dd:q?difL(q,h):null}});const ven=R.filter(x=>x.e==='VENCIDA').length,semN=R.filter(x=>x.e==='PENDIENTE'&&x.dd!=null&&x.dd<=7).length;
+  const s0=Math.max(1,sa);const sinA=ctx.its.filter(i=>i.a&&i.b&&i.a<=s0+5&&i.b>=s0&&i.b-i.a+1<20&&estItem(D,i.n)==='SIN ANALIZAR').length;const prox=D.sem.filter(x=>x.s===sa+1).length;
+  const P=[[`Cerrar la semana ${sa-1}`,ant.length?(sinM?`${sinM} de ${ant.length} sin marcar`:`Lista: ${ant.filter(x=>x.ok==='SI').length} de ${ant.length} cumplidas`):'No hubo plan esa semana',!sinM,{v:'sem',s:sa-1}],
+    ['Mirar el PPC y la causa principal',ult&&ult.n?`Semana ${sa-1}: ${pctL(ult.p)} (meta ${Math.round((D.meta||.85)*100)}%)`:'Sin datos de la semana pasada',true,{v:'ppc'}],
+    ['Actualizar restricciones',ven||semN?`${ven} vencidas · ${semN} para esta semana`:'Nada urgente',!ven,{v:'prep'}],
+    ['Recorrer el Look Ahead (6 semanas)',sinA?`${sinA} ítems sin analizar`:'Todo analizado',!sinA,{v:'la'}],
+    [`Comprometer la semana ${sa+1}`,prox?`${prox} tareas comprometidas`:'Todavía vacía',!!prox,{v:'sem',s:sa+1}]];
+  return `<div class="panel lps-rut"><b>Reunión semanal · en día fijo, 45 minutos</b><span class="sub">Seguí este orden. Cada paso te lleva a la pantalla donde se hace.</span>
+    ${P.map(([t,d,ok,go],i)=>`<button class="lps-paso ${ok?'ok':''}" data-lact="ir" data-v="${go.v}" data-s="${go.s||''}"><span class="lps-n">${ok?'✓':i+1}</span><span><b>${t}</b><span class="sub">${esc(d)}</span></span><span aria-hidden="true">›</span></button>`).join('')}
+    <button class="lps-paso" data-lact="ircont"><span class="lps-n">6</span><span><b>Cargar el avance real de los contratistas</b><span class="sub">Contratistas → Avance real</span></span><span aria-hidden="true">›</span></button></div>
+  <div class="panel lps-guia"><b>Cómo se usa (Last Planner)</b>
+    <ol><li><b>Plan maestro:</b> qué <i>debería</i> hacerse. Es el cronograma: no se toca salvo que cambie la estrategia.</li>
+    <li><b>Fases:</b> qué tiene que estar listo antes de cada hito, planificado con los que ejecutan.</li>
+    <li><b>Look Ahead (6 semanas):</b> qué <i>puede</i> hacerse. Se buscan y se liberan las restricciones antes de que la tarea llegue.</li>
+    <li><b>Plan semanal:</b> qué <i>se va a hacer</i>. Solo tareas liberadas, prometidas por quien las ejecuta.</li>
+    <li><b>Aprendizaje:</b> al cerrar la semana, PPC (meta ${Math.round((D.meta||.85)*100)}%) y causas de no cumplimiento.</li></ol>
+    <p class="sub">Preparar antes de prometer: una tarea con restricciones no entra al plan semanal.</p>
+    <div class="bar">${btnImp()}</div></div>`}
+
+/* ---------- importar el Excel LPS ---------- */
+async function leerExcel(file){await window.LIBS.cargar();if(!window.XLSX)throw new Error('xlsx');
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'});
+  const nz=s=>String(s??'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+  const hojas=wb.SheetNames.map(n=>({n,raw:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}),txt:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:false,defval:''})}));
+  const fx=v=>{if(v==null||v==='')return '';if(typeof v==='number')return v>20000&&v<90000?ndL(v):'';const s=String(v).trim();let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return m[0];m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(m){const y=m[3].length===2?'20'+m[3]:m[3];return `${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`}return ''};
+  const buscar=test=>{for(const hj of hojas)for(let i=0;i<Math.min(hj.raw.length,40);i++){const r=(hj.raw[i]||[]).map(nz);if(test(r))return{hj,i,r}}return null};
+  const col=(r,re)=>r.findIndex(c=>re.test(c));
+  const cod=v=>{const s=String(v??'').trim();return /^\d+(\.\d+)+$/.test(s)?s:''};
+  const res={inicio:'',items:{},restr:[],sem:[],chk:{},fases:[],meta:null};
+  /* fecha de inicio */
+  for(const hj of hojas){for(const r of hj.raw){const k=(r||[]).findIndex(v=>/fecha\s*(de\s*)?inicio/i.test(String(v||'')));if(k<0)continue;for(let j=k+1;j<r.length;j++){const f=fx(r[j]);if(f){res.inicio=f;break}}if(res.inicio)break}if(res.inicio)break}
+  /* cronograma detallado: semanas por ítem */
+  let H=buscar(r=>r.includes('item')&&col(r,/^sem\.? ?ini/)>=0&&col(r,/^sem\.? ?fin/)>=0&&col(r,/^descrip/)>=0);
+  if(H){const r=H.r,ci=r.indexOf('item'),ca=col(r,/^sem\.? ?ini/),cb=col(r,/^sem\.? ?fin/),cd=col(r,/^descrip/),cz=col(r,/^subgrupo|^zona/),cu=col(r,/^unid/),cq=col(r,/^cant/);
+    for(let i=H.i+1;i<H.hj.raw.length;i++){const R=H.hj.raw[i]||[],T=H.hj.txt[i]||[];const n=cod(T[ci])||cod(R[ci]);const a=Number(R[ca]),b=Number(R[cb]);if(!n||!(a>0)||!(b>=a))continue;
+      res.items[n]={a,b,desc:String(R[cd]||'').trim(),zona:cz>=0?String(R[cz]||'').trim():'',ud:cu>=0?String(R[cu]||'').trim():'',cant:cq>=0&&typeof R[cq]==='number'?R[cq]:null}}}
+  /* log de restricciones */
+  H=buscar(r=>col(r,/^restriccion$/)>=0&&col(r,/^estado/)>=0);
+  if(H){const r=H.r,c={txt:col(r,/^restriccion$/),item:col(r,/^item/),prio:col(r,/^prioridad/),cre:col(r,/creacion/),ant:col(r,/^anticip/),req:col(r,/requerida/),rep:col(r,/^fecha reprog/),nrep:col(r,/^cant\.? reprog/),lib:col(r,/liberada/),area:col(r,/^area/),resp:col(r,/^responsable/),est:col(r,/^estado/),obs:col(r,/^observ/)};
+    const g=(R,k)=>c[k]>=0?R[c[k]]:null;
+    for(let i=H.i+1;i<H.hj.raw.length;i++){const R=H.hj.raw[i]||[],T=H.hj.txt[i]||[];const txt=String(g(R,'txt')||'').trim();if(!txt)continue;
+      const est=nz(g(R,'est'));const req=fx(g(R,'req')),rep=fx(g(R,'rep')),cre=fx(g(R,'cre'));let lib=fx(g(R,'lib'));if(!lib&&est==='liberada')lib=rep||req||cre||hoyL();
+      const ant=Number(g(R,'ant'));
+      res.restr.push({id:nidL(),txt,item:cod(c.item>=0?T[c.item]:'')||cod(g(R,'item')),prio:String(g(R,'prio')||'MEDIA').toUpperCase(),creada:cre,ant:ant>=0&&g(R,'ant')!==null&&g(R,'ant')!==''?ant:'',req,reprog:lib?'':rep,nrep:Number(g(R,'nrep'))||0,lib,area:String(g(R,'area')||'').trim(),resp:String(g(R,'resp')||'').trim(),obs:String(g(R,'obs')||'').trim()})}}
+  /* plan semanal */
+  H=buscar(r=>col(r,/^semana/)>=0&&col(r,/cumplido/)>=0);
+  if(H){const r=H.r,c={s:col(r,/^semana/),item:col(r,/^item/),act:col(r,/^actividad/),zona:col(r,/^zona/),resp:col(r,/^responsable/),ok:col(r,/cumplido/),cnc:col(r,/^codigo/),obs:col(r,/^observ/)};
+    for(let i=H.i+1;i<H.hj.raw.length;i++){const R=H.hj.raw[i]||[],T=H.hj.txt[i]||[];const s=Number(R[c.s]);const act=c.act>=0?String(R[c.act]||'').trim():'';const item=c.item>=0?(cod(T[c.item])||cod(R[c.item])):'';if(!(s>0)||(!act&&!item))continue;
+      const ok=nz(R[c.ok]).replace('í','i');let obs=c.obs>=0?String(R[c.obs]||'').trim():'';if(/^propuesta/i.test(obs))obs='';
+      res.sem.push({id:nidL(),s,item,act,zona:c.zona>=0?String(R[c.zona]||'').trim():'',resp:c.resp>=0?String(R[c.resp]||'').trim():'',ok:ok==='si'?'SI':ok==='no'?'NO':'',cnc:c.cnc>=0?String(R[c.cnc]||'').trim().toUpperCase().slice(0,1):'',obs})}}
+  /* restricciones por ítem (checklist) */
+  H=buscar(r=>col(r,/^materiales/)>=0&&col(r,/^mano de obra/)>=0&&r.includes('item'));
+  if(H){const r=H.r,ci=r.indexOf('item'),c={pl:col(r,/^planos/),mat:col(r,/^materiales/),mo:col(r,/^mano de obra/),eq:col(r,/^equipos/),fr:col(r,/^frente/),ap:col(r,/^aprobacion/)},cr=col(r,/^responsable/),co=col(r,/tipicas|observ/);
+    const val=v=>{const s=nz(v).toUpperCase();return s==='OK'?'OK':s==='PEND'||s==='PENDIENTE'?'PEND':s==='N/A'||s==='NA'?'N/A':''};
+    for(let i=H.i+1;i<H.hj.raw.length;i++){const R=H.hj.raw[i]||[],T=H.hj.txt[i]||[];const n=cod(T[ci])||cod(R[ci]);if(!n)continue;const x={};let alguno=false;
+      for(const k in c){if(c[k]<0)continue;const v=val(R[c[k]]);if(v){x[k]=v;alguno=true}}
+      const resp=cr>=0?String(R[cr]||'').trim():'';let obs=co>=0?String(R[co]||'').trim():'';if(/ · /.test(obs))obs='';if(!alguno&&!obs)continue;if(resp)x.resp=resp;if(obs)x.obs=obs;res.chk[n]=x}}
+  /* plan de fases */
+  H=buscar(r=>r.includes('fase')&&col(r,/^hito/)>=0);
+  if(H){const r=H.r,c={nom:r.indexOf('fase'),alc:col(r,/^alcance/),si:col(r,/^sem\.? ?ini/),sh:col(r,/^sem\.? ?hito/),hito:col(r,/^hito/),quien:col(r,/planificadores/),comp:col(r,/comprometida/),est:col(r,/^estado/)};
+    for(let i=H.i+1;i<H.hj.raw.length;i++){const R=H.hj.raw[i]||[];const nom=String(R[c.nom]||'').trim();if(!nom){if(res.fases.length)break;continue}if(/pull planning/i.test(nom))break;
+      const est=c.est>=0?String(R[c.est]||'').trim():'';res.fases.push({id:nidL(),nom,alc:c.alc>=0?String(R[c.alc]||'').trim():'',si:Number(R[c.si])||'',sh:Number(R[c.sh])||'',hito:c.hito>=0?String(R[c.hito]||'').trim():'',quien:c.quien>=0?String(R[c.quien]||'').trim():'',comp:c.comp>=0?fx(R[c.comp]):'',est:FEST.find(f=>nz(f)===nz(est))||FEST[0]})}}
+  /* meta de PPC */
+  for(const hj of hojas){for(const r of hj.raw){const k=(r||[]).findIndex(v=>/ppc objetivo/i.test(String(v||'')));if(k<0)continue;for(let j=k+1;j<r.length;j++){const v=Number(r[j]);if(v>0&&v<=1){res.meta=v;break}if(v>1&&v<=100){res.meta=v/100;break}}if(res.meta)break}if(res.meta)break}
+  return res}
+
+/* ---------- eventos ---------- */
+const dentro=e=>{const r=document.getElementById('lps-root');return r&&r.contains(e.target)};
+const findR=id=>L.doc.restr.find(r=>r.id===id);
+function leerForm(){const fm=document.getElementById('lps-f');if(!fm)return;['txt','item','ant','req','prio','area','resp','obs'].forEach(k=>{if(fm[k])L.form[k]=fm[k].value})}
+document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.target.closest('[data-lact]');if(!t)return;const a=t.dataset.lact;const D=L.doc;const h=hoyL();
+  if(a!=='cancel'&&a!=='nueva'&&a!=='edit'&&L.form)leerForm();
+  if(a==='v'){L.v=t.dataset.v;L.form=null;L.conf=null;L.rep=null;render();return window.scrollTo(0,0)}
+  if(a==='ir'){L.v=t.dataset.v;if(t.dataset.s)L.sem=+t.dataset.s;render();return window.scrollTo(0,0)}
+  if(a==='ircont'){S.tab='contratistas';window.render();return window.scrollTo(0,0)}
+  if(a==='fini'){const v=(document.getElementById('lps-fini')||{}).value;if(!v)return toast('Elegí la fecha de inicio');D.inicio=v;await guardar();return render()}
+  if(a==='nueva'){L.form={nuevo:true,id:nidL(),item:t.dataset.item||'',ant:'',prio:'MEDIA',area:'COMPRAS',resp:'',txt:'',obs:'',req:''};L.v='prep';L.conf=null;render();const i=document.getElementById('lps-ftxt');if(i){i.focus();i.scrollIntoView({block:'center'})}return}
+  if(a==='edit'){const r=findR(t.dataset.id);if(!r)return;L.form={...r,nuevo:false};render();const i=document.getElementById('lps-ftxt');if(i){i.focus();i.scrollIntoView({block:'center'})}return}
+  if(a==='cancel'){L.form=null;return render()}
+  if(a==='lib'){const r=findR(t.dataset.id);if(!r)return;r.lib=h;await guardar();render();return toast('Lista ✓')}
+  if(a==='reabrir'){const r=findR(t.dataset.id);if(!r)return;r.lib='';await guardar();return render()}
+  if(a==='rep'){L.rep=t.dataset.id;return render()}
+  if(a==='repno'){L.rep=null;return render()}
+  if(a==='repok'){const r=findR(t.dataset.id);const v=(document.getElementById('lps-rep')||{}).value;if(!r||!v)return;r.reprog=v;r.nrep=(r.nrep||0)+1;L.rep=null;await guardar();render();return toast('Nueva fecha guardada')}
+  if(a==='conf'){L.conf=t.dataset.id;return render()}
+  if(a==='noconf'){L.conf=null;return render()}
+  if(a==='borrar'){D.restr=D.restr.filter(r=>r.id!==t.dataset.id);L.conf=null;await guardar();render();return toast('Restricción borrada')}
+  if(a==='verlib'){L.verLib=!L.verLib;return render()}
+  if(a==='ped'){const r=findR(t.dataset.id);if(!r)return;
+    if(r.ped&&L.peds.some(p=>p.id===r.ped)){window.PED_IR=r.ped;S.tab='materiales';window.render();return window.scrollTo(0,0)}
+    r.ped=nidL();await guardar();const desc=r.txt.replace(/^(pedir|pedido de|orden de compra de|compra de)\s+/i,'');
+    window.PED_NUEVO={id:r.ped,ref:cort(r.txt+(r.item?' · ítem '+r.item:''),80),proveedor:'',items:[{desc:desc.charAt(0).toUpperCase()+desc.slice(1),ud:'',cant:null,precio:0}]};
+    L.oid=undefined;S.tab='materiales';window.render();window.scrollTo(0,0);return toast('Completá cantidades y guardá el pedido')}
+  if(a==='sugok'){const s=SUG.find(x=>x.k===t.dataset.k);if(!s)return;D.restr.push({id:nidL(),txt:s.txt,item:t.dataset.item,ant:s.ant,prio:s.prio,area:s.area,resp:'',obs:'',req:'',creada:h,lib:'',sug:s.k});await guardar();render();return toast('Agregada a las restricciones')}
+  if(a==='sugno'){D.desc[t.dataset.g]=h;await guardar();return render()}
+  if(a==='impok'){const x=L.imp.res;if(x.inicio)D.inicio=x.inicio;D.items=x.items;D.restr=x.restr;D.sem=x.sem;D.chk=x.chk;D.fases=x.fases;if(x.meta)D.meta=x.meta;L.imp=null;await guardar();render();return toast('Planificación cargada')}
+  if(a==='impno'){L.imp=null;return render()}
+  if(a==='la'){const d=+t.dataset.d;const sa=Math.max(1,semDe(D,h));L.la=d===0?null:Math.max(1,(L.la||sa)+d);L.abierto=null;return render()}
+  if(a==='chk'){L.abierto=L.abierto===t.dataset.n?null:t.dataset.n;return render()}
+  if(a==='ck'){const n=t.dataset.n;const c=D.chk[n]=D.chk[n]||{};c[t.dataset.c]=c[t.dataset.c]===t.dataset.val?'':t.dataset.val;await guardar();return render()}
+  if(a==='ckok'){const n=t.dataset.n;const c=D.chk[n]=D.chk[n]||{};CAT.forEach(([k])=>{if(c[k]!=='N/A')c[k]='OK'});await guardar();return render()}
+  if(a==='sw'){const d=+t.dataset.d;const sa=Math.max(1,semDe(D,h));L.sem=d===0?null:Math.max(1,(L.sem||sa)+d);return render()}
+  const uresp=()=>((document.getElementById('lps-uresp')||{}).value||'');
+  const nuevaT=(s,n,act)=>{const it=n&&itemsDe(D,L.pres).find(i=>i.n===n);return{id:nidL(),s,item:n||'',act:act||(it?it.desc:''),zona:it?it.zona:'',resp:uresp(),ok:'',cnc:'',obs:''}};
+  if(a==='add'){const s=+t.dataset.s,n=t.dataset.n;D.sem.push(nuevaT(s,n));await guardar();render();if(estItem(D,n)!=='LIBERADA')toast('Ojo: este ítem no está liberado. Prepará las restricciones antes de prometerlo.');return}
+  if(a==='addlib'){const s=+t.dataset.s;const ya=new Set(D.sem.filter(x=>x.s===s).map(x=>String(x.item)));itemsDe(D,L.pres).filter(i=>i.a&&i.a<=s&&i.b>=s&&i.b-i.a+1<20&&!ya.has(i.n)&&estItem(D,i.n)==='LIBERADA').forEach(i=>D.sem.push(nuevaT(s,i.n)));await guardar();return render()}
+  if(a==='addotra'){const v=((document.getElementById('lps-otra')||{}).value||'').trim();if(!v)return toast('Escribí la tarea');D.sem.push(nuevaT(+t.dataset.s,'',v));await guardar();return render()}
+  if(a==='ok'){const x=D.sem.find(y=>y.id===t.dataset.id);if(!x)return;x.ok=x.ok===t.dataset.val?'':t.dataset.val;if(x.ok!=='NO'){x.cnc='';}await guardar();return render()}
+  if(a==='sdel'){D.sem=D.sem.filter(y=>y.id!==t.dataset.id);await guardar();return render()}
+  if(a==='fnueva'){D.fases.push({id:nidL(),nom:'Nueva fase',alc:'',si:'',sh:'',hito:'',quien:'',comp:'',est:FEST[0]});await guardar();return render()}
+  if(a==='fdel'){D.fases=D.fases.filter(f=>f.id!==t.dataset.id);L.conf=null;await guardar();return render()}
+});
+document.addEventListener('submit',async e=>{if(e.target.id!=='lps-f')return;e.preventDefault();leerForm();const f=L.form;const D=L.doc;
+  const txt=String(f.txt||'').trim();if(!txt)return toast('Escribí qué tiene que estar listo');
+  const r={id:f.id,txt,item:String(f.item||'').trim(),ant:f.ant===''||f.ant==null?'':Math.max(0,parseInt(f.ant)||0),req:f.req||'',prio:f.prio,area:f.area,resp:String(f.resp||'').trim(),obs:String(f.obs||'').trim()};
+  const it=r.item&&itemsDe(D,L.pres).find(i=>i.n===r.item);
+  if(r.item&&!it)return toast(`No encuentro el ítem ${r.item} en el cronograma`);
+  if(!(it&&it.a&&r.ant!=='')&&!r.req)return toast('Poné los días de anticipación (con ítem) o la fecha requerida');
+  const i=D.restr.findIndex(x=>x.id===r.id);if(i>=0)D.restr[i]={...D.restr[i],...r};else D.restr.push({...r,creada:hoyL(),lib:'',reprog:'',nrep:0});
+  L.form=null;await guardar();render();toast('Restricción guardada')},true);
+document.addEventListener('change',async e=>{if(!dentro(e))return;const t=e.target;const D=L.doc;
+  if(t.id==='lps-imp'&&t.files[0]){const file=t.files[0];t.value='';try{const res=await leerExcel(file);if(!Object.keys(res.items).length&&!res.restr.length&&!res.sem.length)return toast('No encontré hojas de planificación en ese Excel');L.imp={nombre:file.name,res};render();window.scrollTo(0,0)}catch(err){console.error(err);toast('No se pudo leer el Excel')}return}
+  if(t.id==='lps-meta'){const v=Number(t.value);if(v>0&&v<=100){D.meta=v/100;await guardar();render()}return}
+  if(t.dataset.ckf){const c=D.chk[t.dataset.n]=D.chk[t.dataset.n]||{};c[t.dataset.ckf]=t.value.trim();return guardar()}
+  if(t.dataset.sf){const x=D.sem.find(y=>y.id===t.dataset.id);if(!x)return;x[t.dataset.sf]=t.value.trim();await guardar();if(t.dataset.sf==='cnc')render();return}
+  if(t.dataset.fz){const f=D.fases.find(y=>y.id===t.dataset.id);if(!f)return;const k=t.dataset.fz;f[k]=k==='si'||k==='sh'?(parseInt(t.value)||''):t.value;await guardar();if(['sh','comp'].includes(k))render();return}
+});
+
+window.LPS={mount:render,avisos,leerExcel,reset:()=>{L.oid=undefined}};
+
+const css=document.createElement('style');css.textContent=`
+#lps-root{display:flex;flex-direction:column;gap:12px}
+#lps-root .btn.sm{padding:5px 10px;font-size:13px}
+.lps-top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}.lps-top h2{margin:0}
+.lps-aviso,.lps-ini,.lps-imp,.lps-vacio{padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.lps-imp ul{margin:0;padding-left:20px}
+.lps-res{display:flex;gap:8px;flex-wrap:wrap}
+.lps-k{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;background:var(--panel)}
+.lps-k.ven{border-color:var(--bad);color:var(--bad)}.lps-k.pen{border-color:var(--warn,#c98a00)}.lps-k.lib{border-color:var(--ok);color:var(--ok)}
+.lps-tools{gap:8px}.lps-tools .btn,.lps-ini .btn,.lps-guia .btn{cursor:pointer}
+.lps-f{padding:14px 16px;display:flex;flex-direction:column;gap:10px}.lps-f h3{margin:0}
+#lps-root .form .wide{grid-column:span 2}@media (max-width:760px){#lps-root .form .wide{grid-column:1/-1}}
+.lps-sug{padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--accent)}
+.lps-sg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px}
+.lps-sgt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px}
+.lps-rojo{color:var(--bad)}
+.lps-g{display:flex;flex-direction:column;gap:8px}
+.lps-h{margin:6px 0 0;font-size:15px}.lps-h.ven{color:var(--bad)}
+.lps-c{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.lps-c.ven{border-left-color:var(--bad)}.lps-c.pen{border-left-color:var(--warn,#c98a00)}.lps-c.lib{border-left-color:var(--ok);opacity:.85}
+.lps-c1{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}.lps-c1 b{flex:1 1 220px}
+.lps-q{font-size:13px;white-space:nowrap;padding:2px 8px;border-radius:999px;background:var(--chip,#eee)}.lps-q.ven{background:var(--bad);color:#fff}.lps-q.lib{color:var(--ok)}
+.lps-obs{font-size:13px;background:var(--chip,#f2f2f2);border-radius:6px;padding:4px 8px}
+.lps-acc{gap:6px;flex-wrap:wrap;margin-top:4px}
+.lps-wk{flex-wrap:wrap;gap:8px}
+.lps-la{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.lps-lah,.lps-lar{display:grid;grid-template-columns:minmax(0,1fr) repeat(6,30px) 120px;gap:4px;align-items:center;padding:6px 10px}
+.lps-lah{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}.lps-lah span{text-align:center}.lps-lah span:first-child{text-align:left}.lps-lah .hoy{color:var(--ink);font-weight:700}
+.lps-lar{border-top:1px solid var(--line)}.lps-lar:first-of-type{border-top:0}.lps-lar.abierto{background:var(--chip,#f4f4f4)}
+.lps-lai{all:unset;cursor:pointer;min-width:0;font-size:14px;line-height:1.3}.lps-lai:hover b{text-decoration:underline}
+.lps-w{height:16px;border-radius:3px;background:transparent;border:1px dashed var(--line)}.lps-w.on{background:var(--accent);border-color:var(--accent)}.lps-w.hoy{outline:2px solid var(--ink);outline-offset:1px}
+.lps-e{font-size:12px;text-align:center;border-radius:999px;padding:3px 6px;border:1px solid var(--line)}
+.lps-e.lib{color:var(--ok);border-color:var(--ok)}.lps-e.res{color:var(--bad);border-color:var(--bad)}.lps-e.sin{color:var(--muted)}
+.lps-chk{padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:var(--chip,#f4f4f4);border-top:1px dashed var(--line)}
+.lps-cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px}
+.lps-ci{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:14px}
+.lps-seg{display:flex;gap:4px;align-items:center}
+.lps-seg button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:5px 9px;font:inherit;font-size:13px;cursor:pointer}
+.lps-seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.lps-seg button.ok[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}.lps-seg button.pend[aria-pressed="true"]{background:var(--bad);border-color:var(--bad);color:#fff}
+.lps-st{display:flex;flex-direction:column;gap:8px}
+.lps-t{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.lps-t.si{border-left-color:var(--ok)}.lps-t.no{border-left-color:var(--bad)}
+.lps-tt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.lps-in{max-width:240px;padding:4px 8px!important;font-size:13px!important}
+.lps-x{border:0!important;background:none!important;color:var(--muted)!important}
+.lps-cnc{grid-column:1/-1;display:flex;gap:6px;flex-wrap:wrap}.lps-cnc select{flex:1 1 220px}.lps-cnc input{flex:2 1 220px}
+.lps-add{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.lps-cands{display:flex;flex-wrap:wrap;gap:6px}
+.lps-cand{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;text-align:left;display:flex;gap:6px;align-items:baseline;max-width:100%}
+.lps-cand span{font-size:11px;color:var(--muted)}.lps-cand.lib{border-color:var(--ok)}.lps-cand.lib span{color:var(--ok)}.lps-cand.res span{color:var(--bad)}
+.lps-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.lps-kpi .panel{padding:12px 14px;display:flex;flex-direction:column;gap:2px}.lps-kpi b{font-size:26px;font-family:var(--f-num,inherit)}.lps-kpi b.lps-causa{font-size:16px}
+.okc{color:var(--ok)}.malc{color:var(--bad)}
+.lps-ch{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.lps-bars{position:relative;display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:6px;border-bottom:1px solid var(--line);overflow-x:auto}
+.lps-bars::after{content:"";position:absolute;left:0;right:0;bottom:var(--meta);border-top:2px dashed var(--ink);opacity:.5;pointer-events:none}
+.lps-b{flex:1 0 14px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:2px}
+.lps-b span{font-size:10px;color:var(--muted)}.lps-b.hoy span{color:var(--ink);font-weight:700}
+.lps-bv{width:100%;border-radius:3px 3px 0 0}.lps-bv.ok{background:var(--ok)}.lps-bv.mal{background:var(--bad)}.lps-bv.nada{background:var(--line)}
+.lps-pr{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(60px,1fr) auto;gap:8px;align-items:center;font-size:14px}
+.lps-pb{height:10px;background:var(--chip,#eee);border-radius:5px;overflow:hidden}.lps-pb i{display:block;height:100%;background:var(--bad)}
+.lps-fa{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.lps-fg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.lps-fg label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}.lps-fg .wide{grid-column:span 2}
+.lps-rut,.lps-guia{padding:12px 14px;display:flex;flex-direction:column;gap:8px}.lps-guia ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.lps-paso{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;cursor:pointer}
+.lps-paso>span:nth-child(2){display:flex;flex-direction:column}
+.bx-lps{display:flex;flex-direction:column;gap:6px;padding:8px 16px 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.bx-lpi{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;border:1px solid var(--line);border-left:4px solid var(--warn,#c98a00);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;cursor:pointer}.bx-lpi.v{border-left-color:var(--bad)}
+.lps-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--chip,#eee);font-weight:700}.lps-paso.ok .lps-n{background:var(--ok);color:#fff}
+@media (max-width:760px){
+ .lps-lah,.lps-lar{grid-template-columns:repeat(6,minmax(0,1fr)) auto}
+ .lps-lah span:first-child{display:none}.lps-lai{grid-column:1/-1}
+ .lps-t{grid-template-columns:1fr}.lps-in{max-width:none}
+ .lps-fg{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .lps-pr{grid-template-columns:1fr auto}.lps-pb{grid-column:1/-1;order:3}
+}
 `;document.head.appendChild(css);
 })();
