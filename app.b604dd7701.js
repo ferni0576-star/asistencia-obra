@@ -243,7 +243,7 @@ function backendNube(sb){
     async savePresupuesto(p){const row={obra_id:p.obra_id,items:p.items,base:p.base||{},certs:p.certs||[],vinculos:p.vinculos||{},base_hasta:p.baseHasta||null,m2:p.m2||null,usd:p.usd||null,indice:p.indice||1};if(p.cronograma!==undefined)row.cronograma=p.cronograma;
       let r=await sb.from('presupuestos').upsert(row,{onConflict:'obra_id'});if(r.error&&/cronograma/i.test(r.error.message||'')){delete row.cronograma;r=await sb.from('presupuestos').upsert(row,{onConflict:'obra_id'});if(!r.error)toast('Falta pegar el SQL 24 en Supabase para guardar el cronograma')}ok(r)},
     async pedidos(oid){if(!oid)return[];return ok(await sb.from('pedidos').select('*').eq('obra_id',oid).order('numero')).map(p=>({...p,items:p.items||[]}))},
-    async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items,sugeridos:p.sugeridos||[]}))},
+    async savePedido(p){ok(await sb.from('pedidos').upsert({id:p.id,obra_id:p.obra_id,numero:p.numero,fecha:p.fecha,ref:p.ref||null,proveedor:p.proveedor||null,nota:p.nota||null,items:p.items,sugeridos:p.sugeridos||[],borrador:!!p.borrador}))},
     async delPedido(id){ok(await sb.from('pedidos').delete().eq('id',id))},
     async proveedores(oid){if(!oid)return[];return ok(await sb.from('proveedores').select('*').eq('obra_id',oid).order('nombre')).map(v=>({...v,rubros:v.rubros||[]}))},
     async saveProveedor(v){ok(await sb.from('proveedores').upsert({id:v.id,obra_id:v.obra_id,nombre:v.nombre,contacto:v.contacto||null,telefono:v.telefono||null,whatsapp:v.whatsapp||null,email:v.email||null,direccion:v.direccion||null,notas:v.notas||null,rubros:v.rubros||[],favorito:!!v.favorito}))},
@@ -2845,7 +2845,7 @@ function vLista(){
   <div class="m-lista">${vis.map(p=>{const e=estPed(p);const n=p.items.length,ok=llegados(p);const t=total(p);
     return `<div class="panel m-card" style="border-left:6px solid ${(window.colorObra&&window.colorObra(OB())||{}).hex||'var(--line)'}"><button class="m-abrir" data-mact="ver" data-id="${p.id}">
       <div class="m-n num">N° ${esc(p.numero)}</div>
-      <div class="m-info"><b>${esc(p.ref||'Sin referencia')} ${window.APROB?window.APROB.chip('pedido',p.id):''}</b><span class="sub">${fch(p.fecha)}${p.proveedor?' · '+esc(p.proveedor):''} · ${n} ítem${n===1?'':'s'}${t?' · Gs '+gs(t):''}</span>
+      <div class="m-info"><b>${esc(p.ref||'Sin referencia')} ${p.borrador?'<span class="m-badge warn">Borrador</span>':window.APROB?window.APROB.chip('pedido',p.id):''}</b><span class="sub">${fch(p.fecha)}${p.proveedor?' · '+esc(p.proveedor):''} · ${n} ítem${n===1?'':'s'}${t?' · Gs '+gs(t):''}</span>
         <span class="m-prog" aria-label="${ok} de ${n} llegaron"><i style="width:${n?Math.round(ok/n*100):0}%"></i></span></div>
       <div class="m-est">${badge(e)}<span class="sub num">${ok}/${n}</span></div></button>
       <div class="m-acc"><span class="sub">Descargar:</span><button class="btn sm" data-mact="pdf-ped" data-id="${p.id}">PDF</button><button class="btn sm" data-mact="xls-ped" data-id="${p.id}">Excel</button><button class="btn sm m-wab" data-mact="wa-ped" data-id="${p.id}">WhatsApp</button></div></div>`}).join('')
@@ -2873,9 +2873,9 @@ function vVer(){
   const e=estPed(p);const n=p.items.length,ok=llegados(p);const t=total(p);
   return `
   <div class="bar between"><button class="btn" data-mact="volver">← Pedidos</button>
-    <div class="bar"><button class="btn sm ghost" data-mact="editar">Editar</button><button class="btn sm ghost" data-mact="duplicar">Duplicar</button>
+    <div class="bar">${window.CLI?'':`<button class="btn sm ${p.borrador?'':'ghost'}" data-mact="borr">${p.borrador?'Quitar borrador':'Borrador'}</button>`}<button class="btn sm ghost" data-mact="editar">Editar</button><button class="btn sm ghost" data-mact="duplicar">Duplicar</button>
       ${M.confirm?`<button class="btn sm" style="color:var(--bad)" data-mact="borrar">¿Borrar el pedido?</button>`:`<button class="btn sm ghost" data-mact="conf" aria-label="Borrar pedido">×</button>`}</div></div>
-  ${window.APROB?window.APROB.banner('pedido',p.id,infoPed(p)):''}
+  ${p.borrador?`<div class="apb-ban warn"><span class="apb-ic">✎</span><div><b>Borrador</b><span class="sub">El cliente y la administración todavía no ven este pedido. Cuando esté listo tocá “Quitar borrador”.</span></div></div>`:window.APROB?window.APROB.banner('pedido',p.id,infoPed(p)):''}
   <div class="panel" style="padding:14px 16px;display:flex;flex-direction:column;gap:6px">
     <div class="bar between"><h2>Pedido N° ${esc(p.numero)}</h2>${badge(e)}</div>
     <div class="m-meta"><span><small>Fecha</small>${fch(p.fecha)}</span><span><small>Referencia</small>${esc(p.ref||'—')}</span>${p.proveedor?`<span><small>Proveedor elegido</small>${esc(p.proveedor)}</span>`:''}<span><small>Llegaron</small><b class="num">${ok} de ${n}</b></span>${t?`<span><small>Total</small><b class="num">Gs ${gs(t)}</b></span>`:''}</div>
@@ -3227,6 +3227,7 @@ document.addEventListener('click',async e=>{
   if(a==='abrir'){M.abierto[t.dataset.iid]=!M.abierto[t.dataset.iid];return render()}
   if(a==='editar'&&p){M.form=JSON.parse(JSON.stringify(p));M.form.numero=String(p.numero);M.vista='editar';render();return cargarRubros()}
   if(a==='duplicar'&&p){M.form=nuevoForm(p);M.vista='editar';render();cargarRubros();window.scrollTo(0,0);return toast('Copia lista: revisá cantidades y guardá')}
+  if(a==='borr'&&p){p.borrador=!p.borrador;render();await guardar(p);return toast(p.borrador?'Pedido en borrador: el cliente no lo ve':'Pedido visible para el cliente')}
   if(a==='conf'){M.confirm=true;return render()}
   if(a==='borrar'&&p){try{await window.MDB.del(p.id);if(window.APROB)window.APROB.quitar(M.oid,'pedido',p.id);M.lista=M.lista.filter(x=>x.id!==p.id);M.vista='lista';M.confirm=false;render();toast('Pedido borrado')}catch(err){toast('No se pudo borrar')}return}
   if(a==='todo'&&p){p.items.forEach(i=>{if(estItem(i)!=='ok')marcar(p,i,true)});render();await guardar(p);return toast('Todo marcado como llegado')}
@@ -7158,9 +7159,15 @@ const SUG=[
  {k:'sanitarios',re:/sanitari|artefacto|inodoro|lavatorio|grifer|juego de ba/i,rt:/artefacto|sanitari/i,txt:'Confirmar fecha de entrega de artefactos sanitarios',ant:30,area:'COMITENTE',prio:'MEDIA'},
  {k:'electrico',re:/el[eé]ctric|tablero|cableado|tomacorriente|interruptor|luminaria/i,rt:/el[eé]ctric|cable/i,txt:'Pedido de materiales eléctricos',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1},
  {k:'sanitaria',re:/agua corriente|desag|cloacal|pluvial|ca[ñn]o /i,rt:/ca[ñn]o|accesorio|cloacal|desag/i,txt:'Pedido de caños y accesorios sanitarios',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1},
+ {k:'retro',re:/excavac|zanja|movimiento de suelo|desmonte|limpieza (del |de )?terreno|destronque/i,rt:/retro|m[aá]quina|excavadora/i,txt:'Coordinar retroexcavadora (día, horas y acceso a obra)',ant:7,area:'SUBCONTRATISTA',prio:'ALTA'},
+ {k:'sapito',re:/relleno|compacta|terrapl|contrapiso|enripiado|base de piso/i,rt:/sapito|compactador|vibro/i,txt:'Coordinar compactador (sapito) y combustible',ant:5,area:'COMPRAS',prio:'MEDIA'},
  {k:'cielorraso',re:/cielorraso|durlock|yeso/i,rt:/placa|perfil|cielorraso|durlock/i,txt:'Pedido de placas y perfiles para cielorraso',ant:10,area:'COMPRAS',prio:'MEDIA',mat:1}];
 
-const vacio=()=>({inicio:'',items:{},meta:0.85,restr:[],sem:[],fases:[],chk:{},desc:{}});
+const vacio=()=>({inicio:'',items:{},meta:0.85,restr:[],sem:[],fases:[],chk:{},desc:{},reglas:[]});
+/* recordatorios propios del usuario: palabras del ítem -> qué preparar y cuántos días antes */
+const nzL=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const palsDe=p=>String(p||'').split(/[,;\n]/).map(nzL).map(x=>x.trim()).filter(Boolean);
+function reglasSug(D){return (D.reglas||[]).map(g=>{const P=palsDe(g.pal);return{k:g.id,re:{test:d=>P.length?P.some(p=>nzL(d).includes(p)):false},rt:{test:x=>nzL(x).trim()===nzL(g.txt).trim()},txt:g.txt,ant:+g.ant||0,area:g.area||'COMPRAS',prio:g.prio||'MEDIA',propia:1}})}
 function norm(d){const v=vacio();d=d&&typeof d==='object'?d:{};for(const k in v)if(d[k]==null)d[k]=v[k];return d}
 const semDe=(D,f)=>D.inicio&&f?Math.floor(difL(f,D.inicio)/7)+1:0;
 const iniSem=(D,s)=>addL(D.inicio,(s-1)*7);
@@ -7182,7 +7189,7 @@ function estItem(D,n){const ab=D.restr.filter(r=>String(r.item)===String(n)&&!r.
 const clsE=e=>({LIBERADA:'lib','RESTRINGIDA':'res','SIN ANALIZAR':'sin',VENCIDA:'ven',PENDIENTE:'pen'})[e]||'sin';
 function sugerencias(D,its,h){if(!D.inicio)return[];const sa=semDe(D,h);const out=[];const visto=new Set();const IM=new Map(its.map(i=>[i.n,i]));
   for(const it of its){if(!it.a||it.a<sa)continue;const ini=iniSem(D,it.a);const rub=String(it.n).split('.')[0];
-    for(const s of SUG){if(!s.re.test(it.desc||'')||(s.no&&s.no.test(it.desc||'')))continue;const g=s.k+'|'+rub;if(visto.has(g)||D.desc[g])continue;
+    for(const s of [...SUG,...reglasSug(D)]){if(!s.re.test(it.desc||'')||(s.no&&s.no.test(it.desc||'')))continue;const g=s.k+'|'+rub;if(visto.has(g)||D.desc[g])continue;
       if(s.mat&&D.chk[it.n]&&D.chk[it.n].mat==='OK')continue;
       /* ya cubierto por una restricción del mismo tipo en este ítem o en uno del mismo rubro que empieza cerca (±4 semanas) */
       if(D.restr.some(r=>{if(!(r.sug===s.k||s.rt.test(r.txt||'')))return false;const ri=String(r.item||'');if(ri===it.n)return true;if(ri.split('.')[0]!==rub)return false;const x=IM.get(ri);return !!(x&&x.a&&Math.abs(x.a-it.a)<=4)}))continue;
@@ -7255,12 +7262,28 @@ function vPrep(ctx){const{D,h,IM}=ctx;
   return `<div class="lps-res"><span class="lps-k ven"><b>${n('ven')}</b> vencidas</span><span class="lps-k pen"><b>${n('sem')}</b> esta semana</span><span class="lps-k"><b>${n('prox')}</b> próximas 3 sem.</span><span class="lps-k lib"><b>${lib.length}</b> listas</span></div>
   <div class="bar lps-tools"><button class="btn primary" data-lact="nueva">+ Nueva restricción</button>${D.inicio?btnImp():''}</div>
   ${L.form?vForm(ctx):''}
-  ${sg.length?`<div class="panel lps-sug"><div><b>Para planificar con tiempo</b> <span class="sub">· sugerencias según lo que empieza en las próximas semanas</span></div>
+  ${D.inicio?`<div class="panel lps-sug"><div><b>Para planificar con tiempo</b> <span class="sub">· sugerencias según lo que empieza en las próximas semanas</span></div>
+    <div class="bar lps-sgb"><button class="btn sm" data-lact="nueva">+ Agregar algo para preparar</button><button class="btn sm" data-lact="rnueva">+ Recordatorio automático</button>${(D.reglas||[]).length?`<button class="btn sm ghost" data-lact="rver">Mis recordatorios (${D.reglas.length})</button>`:''}</div>
+    ${L.regla?vRegla(ctx):''}${L.verReglas&&!L.regla&&(D.reglas||[]).length?vReglas(D):''}
+    ${sg.length?'':'<span class="sub">Por ahora no hay nada sugerido para las próximas semanas.</span>'}
     ${sg.map(s=>`<div class="lps-sg"><div class="lps-sgt"><b>${esc(s.txt)}</b><span class="sub">Ítem ${esc(s.item)} · ${esc(cort(s.desc,55))} · empieza ${fL(s.ini)}</span><span class="sub">${s.req<h?`<b class="lps-rojo">Ya tendría que estar (${fL(s.req)})</b>`:`Tenerlo para el ${fL(s.req)} · ${s.ant} días antes`}</span></div>
       <div class="bar"><button class="btn sm primary" data-lact="sugok" data-k="${s.k}" data-item="${esc(s.item)}">Agregar</button><button class="btn sm ghost" data-lact="sugno" data-g="${esc(s.g)}">No hace falta</button></div></div>`).join('')}</div>`:''}
   ${G.map(([k,t,fn])=>{const xs=R.filter(fn).sort(ord);return xs.length?`<section class="lps-g"><h3 class="lps-h ${k}">${t} <span class="num">(${xs.length})</span></h3>${xs.map(x=>card(x,ctx)).join('')}</section>`:''}).join('')}
   ${lib.length?`<section class="lps-g"><button class="btn ghost" data-lact="verlib">${L.verLib?'Ocultar':'Ver'} las ${lib.length} ya listas</button>${L.verLib?lib.map(x=>card(x,ctx)).join(''):''}</section>`:''}
   ${!R.length&&!sg.length?`<div class="panel lps-vacio"><b>Todavía no hay nada para preparar.</b><span class="sub">Anotá lo que tiene que estar listo antes de cada tarea (materiales, planos, subcontratos, aprobaciones) y te aviso con tiempo en "Mi día".</span></div>`:''}`}
+function vRegla(ctx){const g=L.regla;const sel=(n,L2,v)=>`<select name="${n}">${L2.map(x=>`<option ${x===v?'selected':''}>${esc(x)}</option>`).join('')}</select>`;
+  return `<form class="lps-rf" id="lps-rf" autocomplete="off"><b>${g.nuevo?'Nuevo recordatorio automático':'Editar recordatorio'}</b>
+  <span class="sub">Cada vez que en el cronograma se acerque un ítem que diga alguna de estas palabras, te lo sugiero acá y en "Mi día".</span>
+  <div class="form" style="padding:0">
+    <label class="wide">Qué hay que hacer o pedir<input type="text" name="txt" id="lps-rtxt" value="${esc(g.txt||'')}" placeholder="Ej.: Coordinar retro / Pedir sapito" required></label>
+    <label class="wide">Cuando el ítem diga… <span class="sub">(palabras separadas por coma)</span><input type="text" name="pal" value="${esc(g.pal||'')}" placeholder="Ej.: excavación, zanja, relleno" required></label>
+    <label>Días antes<input type="number" name="ant" min="0" value="${g.ant??7}"></label>
+    <label>Prioridad${sel('prio',PRIOS,g.prio||'MEDIA')}</label>
+    <label>Quién se ocupa${sel('area',AREAS,g.area||'COMPRAS')}</label>
+  </div>
+  <div class="bar"><button class="btn primary">Guardar</button><button type="button" class="btn ghost" data-lact="rcancel">Cancelar</button></div></form>`}
+function vReglas(D){return `<div class="lps-rl">${D.reglas.map(g=>`<div class="lps-ri"><div class="lps-sgt"><b>${esc(g.txt)}</b><span class="sub">Cuando diga: ${esc(g.pal)} · ${+g.ant||0} días antes</span></div>
+  <div class="bar">${L.rconf===g.id?`<button class="btn sm danger" data-lact="rborrar" data-id="${g.id}">Sí, borrar</button><button class="btn sm ghost" data-lact="rnoconf">No</button>`:`<button class="btn sm ghost" data-lact="redit" data-id="${g.id}">Editar</button><button class="btn sm ghost" data-lact="rconf" data-id="${g.id}">Borrar</button>`}</div></div>`).join('')}</div>`}
 function estPed(p){const its=p.items||[];const ok=its.filter(i=>i.rec&&(i.rec.cant==null||+i.rec.cant>=+i.cant)).length;return !its.length?'sin ítems':ok>=its.length?'llegó todo':`${ok} de ${its.length} llegaron`}
 function card(x,ctx){const{r,req,e,dd}=x;const it=r.item&&ctx.IM.get(String(r.item));const ped=r.ped&&L.peds.find(p=>p.id===r.ped);
   const cuando=e==='LIBERADA'?`Lista el ${fL(r.lib)}`:!req?'Sin fecha':dd<0?`Venció hace ${-dd} día${dd===-1?'':'s'}`:dd===0?'Hoy':`${fL(req)} · faltan ${dd} día${dd===1?'':'s'}`;
@@ -7453,8 +7476,15 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
     r.ped=nidL();await guardar();const desc=r.txt.replace(/^(pedir|pedido de|orden de compra de|compra de)\s+/i,'');
     window.PED_NUEVO={id:r.ped,ref:cort(r.txt+(r.item?' · ítem '+r.item:''),80),proveedor:'',items:[{desc:desc.charAt(0).toUpperCase()+desc.slice(1),ud:'',cant:null,precio:0}]};
     L.oid=undefined;S.tab='materiales';window.render();window.scrollTo(0,0);return toast('Completá cantidades y guardá el pedido')}
-  if(a==='sugok'){const s=SUG.find(x=>x.k===t.dataset.k);if(!s)return;D.restr.push({id:nidL(),txt:s.txt,item:t.dataset.item,ant:s.ant,prio:s.prio,area:s.area,resp:'',obs:'',req:'',creada:h,lib:'',sug:s.k});await guardar();render();return toast('Agregada a las restricciones')}
+  if(a==='sugok'){const s=[...SUG,...reglasSug(D)].find(x=>x.k===t.dataset.k);if(!s)return;D.restr.push({id:nidL(),txt:s.txt,item:t.dataset.item,ant:s.ant,prio:s.prio,area:s.area,resp:'',obs:'',req:'',creada:h,lib:'',sug:s.k});await guardar();render();return toast('Agregada a las restricciones')}
   if(a==='sugno'){D.desc[t.dataset.g]=h;await guardar();return render()}
+  if(a==='rnueva'){L.regla={nuevo:true,id:'u_'+nidL(),txt:'',pal:'',ant:7,prio:'MEDIA',area:'COMPRAS'};render();const i=document.getElementById('lps-rtxt');if(i){i.focus();i.scrollIntoView({block:'center'})}return}
+  if(a==='redit'){const g=(D.reglas||[]).find(x=>x.id===t.dataset.id);if(!g)return;L.regla={...g,nuevo:false};render();const i=document.getElementById('lps-rtxt');if(i)i.focus();return}
+  if(a==='rcancel'){L.regla=null;return render()}
+  if(a==='rver'){L.verReglas=!L.verReglas;L.rconf=null;return render()}
+  if(a==='rconf'){L.rconf=t.dataset.id;return render()}
+  if(a==='rnoconf'){L.rconf=null;return render()}
+  if(a==='rborrar'){D.reglas=(D.reglas||[]).filter(x=>x.id!==t.dataset.id);L.rconf=null;await guardar();render();return toast('Recordatorio borrado')}
   if(a==='impok'){const x=L.imp.res;if(x.inicio)D.inicio=x.inicio;D.items=x.items;D.restr=x.restr;D.sem=x.sem;D.chk=x.chk;D.fases=x.fases;if(x.meta)D.meta=x.meta;L.imp=null;await guardar();render();return toast('Planificación cargada')}
   if(a==='impno'){L.imp=null;return render()}
   if(a==='la'){const d=+t.dataset.d;const sa=Math.max(1,semDe(D,h));L.la=d===0?null:Math.max(1,(L.la||sa)+d);L.abierto=null;return render()}
@@ -7472,6 +7502,10 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
   if(a==='fnueva'){D.fases.push({id:nidL(),nom:'Nueva fase',alc:'',si:'',sh:'',hito:'',quien:'',comp:'',est:FEST[0]});await guardar();return render()}
   if(a==='fdel'){D.fases=D.fases.filter(f=>f.id!==t.dataset.id);L.conf=null;await guardar();return render()}
 });
+document.addEventListener('submit',async e=>{if(e.target.id!=='lps-rf')return;e.preventDefault();const fm=e.target;const D=L.doc;const g=L.regla;if(!D||!g)return;
+  const txt=fm.txt.value.trim(),pal=fm.pal.value.trim();if(!txt)return toast('Escribí qué hay que hacer');if(!palsDe(pal).length)return toast('Poné al menos una palabra del ítem');
+  const v={id:g.id,txt,pal,ant:Math.max(0,parseInt(fm.ant.value)||0),prio:fm.prio.value,area:fm.area.value};D.reglas=D.reglas||[];
+  const i=D.reglas.findIndex(x=>x.id===v.id);if(i>=0)D.reglas[i]=v;else D.reglas.push(v);L.regla=null;L.verReglas=true;await guardar();render();toast('Recordatorio guardado: te lo voy a sugerir cuando se acerque')});
 document.addEventListener('submit',async e=>{if(e.target.id!=='lps-f')return;e.preventDefault();leerForm();const f=L.form;const D=L.doc;
   const txt=String(f.txt||'').trim();if(!txt)return toast('Escribí qué tiene que estar listo');
   const r={id:f.id,txt,item:String(f.item||'').trim(),ant:f.ant===''||f.ant==null?'':Math.max(0,parseInt(f.ant)||0),req:f.req||'',prio:f.prio,area:f.area,resp:String(f.resp||'').trim(),obs:String(f.obs||'').trim()};
@@ -7503,6 +7537,8 @@ const css=document.createElement('style');css.textContent=`
 .lps-f{padding:14px 16px;display:flex;flex-direction:column;gap:10px}.lps-f h3{margin:0}
 #lps-root .form .wide{grid-column:span 2}@media (max-width:760px){#lps-root .form .wide{grid-column:1/-1}}
 .lps-sug{padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--accent)}
+.lps-sgb{gap:6px;flex-wrap:wrap}.lps-rf{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.lps-rl{display:flex;flex-direction:column;gap:0}.lps-ri{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px dashed var(--line);padding:6px 0}
 .lps-sg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px}
 .lps-sgt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px}
 .lps-rojo{color:var(--bad)}
