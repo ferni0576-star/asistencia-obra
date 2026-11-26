@@ -2151,6 +2151,7 @@ function mapa(){
     if(m&&m.length>1)m=m.filter(x=>Math.abs(x.cant-it.cant)<1e-6);
     if((!m||m.length!==1)&&it.n){const mn=ES.doc.items.filter(x=>rnum(x.rubro)===rnum(it.rubro)&&String(x.n).trim()===String(it.n).trim()&&nu(x.unidad)===nu(it.unidad));if(mn.length===1&&[...pal(mn[0].desc)].some(w=>pal(it.desc).has(w)))m=mn}
     if(!m||m.length!==1)m=byCant[rnum(it.rubro)+'|'+nu(it.unidad)+'|'+it.cant];
+    if(!m||m.length!==1){let g=ES.doc.items.filter(x=>nz(x.desc)===nz(it.desc));if(g.length>1)g=g.filter(x=>Math.abs(x.cant-it.cant)<1e-6);if(g.length===1)m=g}
     M[key]=m&&m.length===1?m[0].id:undefined;
   }
   return M;
@@ -2379,7 +2380,7 @@ function panelContratistas(E){
     :`<p class="sub" style="padding:0 14px 12px">No hay certificados de contratistas hasta esta fecha.</p>`}</details>
     ${sin.length?`<div class="alerta"><i class="dot amarillo"></i><div><b>${sin.length} ítem${sin.length>1?'s':''} de contratistas sin vincular al presupuesto</b><div class="sub">Elegí a qué ítem del presupuesto corresponde cada uno. Queda guardado.</div>
       <div class="tw"><table><tbody>${sin.map(x=>`<tr><td>${esc(x.c.nombre.split(' (')[0])}</td><td class="desc">${esc(x.it.n+' '+x.it.desc)} <span class="sub">(${q2(x.q)} ${esc(x.it.unidad)})</span></td>
-        <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${(()=>{const L=its.filter(i=>rnum(i.rubro)===rnum(x.it.rubro)).map(i=>({i,p:parecido(x.it,i)})).sort((a,b)=>b.p-a.p);return L.map(({i,p},k)=>`<option value="${i.id}">${k===0&&p>=2?'Sugerido: ':''}${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')})()}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
+        <td><select data-vinc="${x.c.id}|${x.it.id}"><option value="">Elegir ítem…</option><option value="-">No suma avance al cliente</option>${(()=>{const L=its.map(i=>({i,p:parecido(x.it,i)+(rnum(i.rubro)===rnum(x.it.rubro)?1:0)+(nz(i.desc)===nz(x.it.desc)?5:0)})).sort((a,b)=>b.p-a.p);return L.map(({i,p},k)=>`<option value="${i.id}">${k===0&&p>=2?'Sugerido: ':''}${esc(i.n+' '+i.desc.slice(0,60))} (${esc(i.unidad)})</option>`).join('')})()}</select></td></tr>`).join('')}</tbody></table></div></div></div>`:''}
   </div>`;
 }
 
