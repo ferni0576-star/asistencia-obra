@@ -7344,7 +7344,7 @@ function vLA(ctx){const{D,sa}=ctx;if(!D.inicio)return '';const s0=L.la||Math.max
   <p class="sub">Tocá un ítem para revisar si está todo listo: planos, materiales, mano de obra, equipos, frente libre y aprobaciones. Solo los liberados pasan al plan de la semana.</p>
   ${xs.length?`<div class="lps-la"><div class="lps-lah"><span>Ítem</span>${W.map(w=>`<span class="${w===sa?'hoy':''}">S${w}</span>`).join('')}<span>Estado</span></div>
   ${xs.map((i,k)=>{const e=E[k];const ab=D.restr.filter(r=>String(r.item)===i.n&&!r.lib).length;
-    return `<div class="lps-lar ${L.abierto===i.n?'abierto':''}"><button class="lps-lai" data-lact="chk" data-n="${esc(i.n)}"><b>${esc(i.n)}</b> ${esc(cort(i.desc,70))}${i.zona?` <span class="sub">· ${esc(i.zona)}</span>`:''}${i.aprox?' <span class="sub">(semanas del rubro)</span>':''}</button>${W.map(w=>`<span class="lps-w ${w>=i.a&&w<=i.b?'on':''} ${w===sa?'hoy':''}"></span>`).join('')}<span class="lps-e ${clsE(e)}">${e==='SIN ANALIZAR'?'Sin analizar':e==='LIBERADA'?'Liberado':'Restringido'}${ab?` · ${ab}`:''}</span></div>${L.abierto===i.n?vChk(ctx,i):''}`}).join('')}</div>`:'<div class="panel lps-vacio">No hay ítems del cronograma en estas semanas.</div>'}`}
+    return `<div class="lps-lar ${L.abierto===i.n?'abierto':''}"><button class="lps-lai" data-lact="chk" data-n="${esc(i.n)}"><b>${esc(i.n)}</b> ${esc(cort(i.desc,70))}${D.real&&(D.real.items||{})[i.n]?` <span class="lps-pc">${Math.round(D.real.items[i.n]*100)}% hecho</span>`:''}${i.zona?` <span class="sub">· ${esc(i.zona)}</span>`:''}${i.aprox?' <span class="sub">(semanas del rubro)</span>':''}</button>${W.map(w=>`<span class="lps-w ${w>=i.a&&w<=i.b?'on':''} ${w===sa?'hoy':''}"></span>`).join('')}<span class="lps-e ${clsE(e)}">${e==='SIN ANALIZAR'?'Sin analizar':e==='LIBERADA'?'Liberado':'Restringido'}${ab?` · ${ab}`:''}</span></div>${L.abierto===i.n?vChk(ctx,i):''}`}).join('')}</div>`:'<div class="panel lps-vacio">No hay ítems del cronograma en estas semanas.</div>'}`}
 function vChk(ctx,i){const c=ctx.D.chk[i.n]||{};const R=ctx.D.restr.filter(r=>String(r.item)===i.n);
   return `<div class="lps-chk"><div class="sub">Empieza ${fL(iniSem(ctx.D,i.a))} · termina ${fL(finSem(ctx.D,i.b))}${i.cant?` · ${esc(String(i.cant))} ${esc(i.ud||'')}`:''}</div>
   <div class="lps-cg">${CAT.map(([k,t])=>`<div class="lps-ci"><span>${t}</span><div class="lps-seg">${['OK','PEND','N/A'].map(v=>`<button type="button" data-lact="ck" data-n="${esc(i.n)}" data-c="${k}" data-val="${v}" aria-pressed="${c[k]===v}" class="${v==='PEND'?'pend':v==='OK'?'ok':''}">${v==='PEND'?'Falta':v}</button>`).join('')}</div></div>`).join('')}</div>
@@ -7386,8 +7386,35 @@ function vPPC(ctx){const{D,h,IM,sa}=ctx;const meta=D.meta||.85;const{W,acum}=ppc
   <div class="panel lps-ch"><b>Por qué no se cumplió</b><span class="sub">Atacá la primera causa: es la que más plan te hace perder.</span>
     ${P.length?P.map(([k,n])=>`<div class="lps-pr"><span>${k==='?'?'Sin causa cargada':esc(k+' · '+((CNC.find(c=>c[0]===k)||[0,''])[1]))}</span><div class="lps-pb"><i style="width:${n/tot*100}%"></i></div><b class="num">${n} · ${pctL(n/tot)}</b></div>`).join(''):'<p class="sub">Todavía no hay tareas marcadas como no cumplidas.</p>'}</div>`}
 
-function vFases(ctx){const{D}=ctx;const F=D.fases;
-  return `<p class="sub">Cada fase termina en un hito. Con los que ejecutan, se planifica de atrás para adelante qué tiene que estar listo para llegar a la fecha.</p>
+/* avance real: cruza lo certificado + el avance real (borrador) de los contratistas con los ítems del cronograma */
+const nzR=x=>String(x||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const palR=x=>new Set(nzR(x).split(' ').filter(w=>w.length>3));
+function itemsAlc(alc,its){const out=new Set();String(alc||'').split(/[·,;]/).map(x=>x.trim()).filter(Boolean).forEach(t=>{
+  let m=t.match(/^(\d+)\.x$/i);if(m){its.forEach(i=>{if(String(i.n).split('.')[0]===m[1])out.add(i.n)});return}
+  m=t.match(/^(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)$/);if(m){its.forEach(i=>{if(cmpN(i.n,m[1])>=0&&cmpN(i.n,m[2])<=0)out.add(i.n)});return}
+  if(/^\d+(\.\d+)?$/.test(t))out.add(t)});return [...out]}
+function pesoItems(P){const w={};((P&&P.items)||[]).forEach(i=>{if(i.n)w[String(i.n)]=((+i.cant||0)*((+i.mat||0)+(+i.mo||0)))||0});return w}
+function avFase(D,f,its,P){const ns=itemsAlc(f.alc,its);const R=(D.real&&D.real.items)||{};const W=pesoItems(P);let sw=0,sa=0;
+  ns.forEach(n=>{const w=W[n]||1;sw+=w;sa+=w*(+R[n]||0)});return ns.length&&sw?sa/sw:null}
+async function syncReal(oid,D,its,P){const cs=await window.CDB.list(oid);const CI=[];
+  (cs||[]).forEach(c=>{const ac={};(c.certs||[]).forEach(x=>Object.entries(x.pres||{}).forEach(([k,v])=>ac[k]=(ac[k]||0)+(+v||0)));const rc=(c.real&&c.real.cant)||{};
+    (c.items||[]).forEach(i=>{const cant=+i.cant||0;if(!cant)return;const ce=ac[i.id]||0;const r=rc[i.id]!=null&&rc[i.id]!==''?+rc[i.id]:ce;const e=Math.max(ce,Math.min(r,cant));
+      CI.push({c:c.id,n:String(i.n||''),k:nzR(i.desc),p:palR(i.desc),cant,e})})});
+  const items={};let n0=0;
+  its.forEach(it=>{const k=nzR(it.desc);const ex=CI.filter(x=>x.k===k);let m=ex.filter(x=>x.n===it.n);
+    if(!m.length){const P2=palR(it.desc);const sc=x=>[...x.p].filter(w=>P2.has(w)).length;const C2=CI.filter(x=>x.n===it.n&&sc(x)>=Math.max(2,Math.ceil(Math.min(x.p.size,P2.size)*0.5)));
+      if(C2.length){const mx=Math.max(...C2.map(sc));const top=C2.filter(x=>sc(x)===mx);m=top.length===1?top:[]}}
+    if(!m.length&&ex.length===1)m=ex;
+    if(!m.length)return;const cant=m.reduce((s,x)=>s+x.cant,0),e=m.reduce((s,x)=>s+x.e,0);const p=cant?Math.min(1,e/cant):0;if(p>0){items[it.n]=Math.round(p*1000)/1000;n0++}});
+  const h=hoyL();D.real={fecha:h,items};const sa=semDe(D,h);
+  D.fases.forEach(f=>{const a=avFase(D,f,its,P);if(a==null)return;
+    f.est=a>=0.999?'Cumplida':a>0?(f.sh&&sa>+f.sh?'Atrasada':'En curso'):(f.si&&sa>+f.si?'Atrasada':(f.est==='Cumplida'||f.est==='En curso'?'Sin comprometer':f.est||'Sin comprometer'))});
+  return n0}
+function vFases(ctx){const{D}=ctx;const F=D.fases;const h=hoyL();const sa=semDe(D,h);
+  return `<div class="panel lps-real"><div><b>Avance real de la obra</b> <span class="sub">${D.real&&D.real.fecha?`actualizado el ${fL(D.real.fecha)} · ${Object.keys(D.real.items||{}).length} ítems con avance`:'todavía no se cargó'}</span></div>
+    <span class="sub">Toma lo certificado y el avance real (borrador) de los contratistas, y pone el estado de cada fase según cómo está la obra hoy (semana ${sa}).</span>
+    <div class="bar"><button class="btn sm primary" data-lact="freal" ${L.sync?'disabled':''}>${L.sync?'Actualizando…':'Actualizar con el avance real'}</button></div></div>
+  <p class="sub">Cada fase termina en un hito. Con los que ejecutan, se planifica de atrás para adelante qué tiene que estar listo para llegar a la fecha.</p>
   ${F.map(f=>{const fh=D.inicio&&f.sh?finSem(D,+f.sh):'';const dv=f.comp&&fh?Math.round(difL(f.comp,fh)/7):null;return `<div class="panel lps-fa">
     <div class="lps-fg"><label class="wide">Fase<input type="text" data-fz="nom" data-id="${f.id}" value="${esc(f.nom||'')}"></label>
     <label>Ítems<input type="text" data-fz="alc" data-id="${f.id}" value="${esc(f.alc||'')}"></label>
@@ -7398,6 +7425,8 @@ function vFases(ctx){const{D}=ctx;const F=D.fases;
     <label class="wide">Quiénes planifican<input type="text" data-fz="quien" data-id="${f.id}" value="${esc(f.quien||'')}"></label>
     <label>Fecha comprometida<input type="date" data-fz="comp" data-id="${f.id}" value="${f.comp||''}"></label>
     <label>Estado<select data-fz="est" data-id="${f.id}">${FEST.map(x=>`<option ${x===(f.est||FEST[0])?'selected':''}>${x}</option>`).join('')}</select></label></div>
+    ${D.real?(()=>{const a=avFase(D,f,ctx.its,L.pres);if(a==null)return '';const ns=itemsAlc(f.alc,ctx.its).filter(n=>(D.real.items||{})[n]);const fal=f.sh&&sa>=+f.sh&&a<0.999;
+      return `<div class="lps-fav"><span class="lps-fb"><i style="width:${Math.round(a*100)}%"></i></span><b class="num">${Math.round(a*100)}%</b><span class="sub">avance real${ns.length?' · '+ns.slice(0,6).map(n=>`${esc(n)} ${Math.round(D.real.items[n]*100)}%`).join(' · ')+(ns.length>6?' …':''):''}${fal?` · <b class="lps-rojo">${sa===+f.sh?'el hito es esta semana':'el hito era la semana '+esc(f.sh)}</b>`:''}</span></div>`})():''}
     <div class="bar between"><span class="sub">${dv==null?'':dv>0?`<b class="lps-rojo">${dv} semana${dv>1?'s':''} después del hito</b>`:dv<0?`${-dv} semana${dv<-1?'s':''} antes del hito`:'Coincide con el hito'}</span>
       ${L.conf===f.id?`<span class="bar"><button class="btn sm danger" data-lact="fdel" data-id="${f.id}">Sí, borrar fase</button><button class="btn sm ghost" data-lact="noconf">No</button></span>`:`<button class="btn sm ghost" data-lact="conf" data-id="${f.id}">Borrar</button>`}</div></div>`}).join('')}
   <button class="btn" data-lact="fnueva">+ Agregar fase</button>`}
@@ -7498,6 +7527,7 @@ document.addEventListener('click',async e=>{if(!dentro(e))return;const t=e.targe
     L.oid=undefined;S.tab='materiales';window.render();window.scrollTo(0,0);return toast('Completá cantidades y guardá el pedido')}
   if(a==='sugok'){const s=[...SUG,...reglasSug(D)].find(x=>x.k===t.dataset.k);if(!s)return;D.restr.push({id:nidL(),txt:s.txt,item:t.dataset.item,ant:s.ant,prio:s.prio,area:s.area,resp:'',obs:'',req:'',creada:h,lib:'',sug:s.k});await guardar();render();return toast('Agregada a las restricciones')}
   if(a==='sugno'){D.desc[t.dataset.g]=h;await guardar();return render()}
+  if(a==='freal'){if(L.sync)return;L.sync=true;render();try{const its=itemsDe(D,L.pres);const n=await syncReal(L.oid,D,its,L.pres);await guardar();toast(`Listo: ${n} ítems con avance y fases actualizadas`)}catch(err){console.error(err);toast('No se pudo leer el avance de los contratistas')}L.sync=false;return render()}
   if(a==='rnueva'){L.regla={nuevo:true,id:'u_'+nidL(),txt:'',pal:'',ant:7,prio:'MEDIA',area:'COMPRAS'};render();const i=document.getElementById('lps-rtxt');if(i){i.focus();i.scrollIntoView({block:'center'})}return}
   if(a==='redit'){const g=(D.reglas||[]).find(x=>x.id===t.dataset.id);if(!g)return;L.regla={...g,nuevo:false};render();const i=document.getElementById('lps-rtxt');if(i)i.focus();return}
   if(a==='rcancel'){L.regla=null;return render()}
@@ -7557,7 +7587,9 @@ const css=document.createElement('style');css.textContent=`
 .lps-f{padding:14px 16px;display:flex;flex-direction:column;gap:10px}.lps-f h3{margin:0}
 #lps-root .form .wide{grid-column:span 2}@media (max-width:760px){#lps-root .form .wide{grid-column:1/-1}}
 .lps-sug{padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-left:4px solid var(--accent)}
-.lps-sgb{gap:6px;flex-wrap:wrap}.lps-rf{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.lps-sgb{gap:6px;flex-wrap:wrap}.lps-real{padding:12px 14px;display:flex;flex-direction:column;gap:6px;border-left:4px solid var(--ok)}
+.lps-fav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-top:6px}.lps-fb{flex:0 0 120px;height:8px;border-radius:99px;background:var(--line);overflow:hidden}.lps-fb i{display:block;height:100%;background:var(--ok)}
+.lps-pc{font-size:12px;font-weight:700;color:var(--ok);white-space:nowrap}.lps-rf{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:10px}
 .lps-rl{display:flex;flex-direction:column;gap:0}.lps-ri{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px dashed var(--line);padding:6px 0}
 .lps-sg{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:8px}
 .lps-sgt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px}
