@@ -6882,6 +6882,7 @@ const CAMPOS_FMT=['contratista','ruc','direccion','obra','servicio','horario','c
 const O={oid:undefined,cargando:false,personas:[],ots:[],formato:null,form:null,vista:'nueva',q:'',cargo:'Todos',pedit:null,pconf:null,cconf:null};
 const hoyO=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const fOT=s=>s?s.split('-').reverse().join('.'):'';
+const fechaOT=(f,al)=>al&&al>f?`${fOT(f)} al ${fOT(al)}`:fOT(f);
 const DSO=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];const fDia=s=>{if(!s)return '';const d=new Date(s+'T12:00:00');return DSO[d.getDay()]+' '+s.split('-').reverse().join('/')};
 const periodo=d=>d.desde&&d.hasta&&d.hasta!==d.desde?`Del ${fDia(d.desde)} al ${fDia(d.hasta)}`:d.desde?(d.hasta?`${fDia(d.desde)} (un día)`:`Desde el ${fDia(d.desde)}`):'';
 const dias=d=>d.desde&&d.hasta?Math.round((new Date(d.hasta)-new Date(d.desde))/864e5)+1:0;
@@ -6891,7 +6892,7 @@ const OB=()=>window.ASIS_OBRA&&window.ASIS_OBRA()||null;
 
 function selDe(d){const busca=p=>{const ci=String(p.ci||'').replace(/\D/g,'');const x=O.personas.find(y=>y.id===p.pid)||O.personas.find(y=>ci&&String(y.ci||'').replace(/\D/g,'')===ci)||O.personas.find(y=>y.nombre.toLowerCase()===String(p.nombre||'').toLowerCase());return x?{pid:x.id,obs:p.obs||''}:null};return(d.personas||[]).map(busca).filter(Boolean)}
 function nuevoForm(base){const o=OB()||{};const ult=base||O.formato||O.ots[0];const d=ult?JSON.parse(JSON.stringify(ult.datos)):null;
-  return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),desde:hoyO(),hasta:'',
+  return{id:nid(),numero:String((O.ots.reduce((m,x)=>Math.max(m,parseInt(x.numero)||0),0))+1),fecha:hoyO(),al:'',desde:hoyO(),hasta:'',
     contratista:d?d.contratista:'VANGUARD S.A',ruc:d?d.ruc:'80095183-2',direccion:d?d.direccion:(o.ubicacion||''),obra:d?d.obra:(o.nombre||''),
     servicio:d?d.servicio:'',horario:d?d.horario:'07:00 a 18:00 hs.',cond:d?d.cond:COND_DEF,
     f1:d?d.f1:'',f2:d?d.f2:'Ing. Luis Oviedo',f3:d?d.f3:'Walter Benitez',l1:(d&&d.l1)||LAB_DEF[0],l2:(d&&d.l2)||LAB_DEF[1],l3:(d&&d.l3)||LAB_DEF[2],filas:(d&&d.filas)||'',s1:(d&&d.s1)||'',s2:(d&&d.s2)||'',s3:(d&&d.s3)||'',logo:d&&d.logo?d.logo:((o.empresa&&o.empresa.id!=='avaroga'&&o.empresa.logo)||OT_LOGO_DEF),
@@ -6902,9 +6903,9 @@ async function cargar(oid){if(O.cargando)return;O.cargando=true;
   O.oid=oid;O.cargando=false;O.form=nuevoForm(null);render()}
 const cargos=()=>[...new Set(O.personas.map(p=>p.cargo).filter(Boolean))];
 const selec=f=>f.sel.map(s=>({...(O.personas.find(p=>p.id===s.pid)||{}),obs:s.obs,pid:s.pid})).filter(p=>p.nombre);
-function datosForm(){const f=O.form;return{desde:'',hasta:'',contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,l1:f.l1||LAB_DEF[0],l2:f.l2||LAB_DEF[1],l3:f.l3||LAB_DEF[2],filas:parseInt(f.filas)||'',s1:f.s1||'',s2:f.s2||'',s3:f.s3||'',logo:f.logo,
+function datosForm(){const f=O.form;return{desde:'',hasta:'',al:f.al&&f.al>f.fecha?f.al:'',contratista:f.contratista,ruc:f.ruc,direccion:f.direccion,obra:f.obra,servicio:f.servicio,horario:f.horario,cond:f.cond,f1:f.f1,f2:f.f2,f3:f.f3,l1:f.l1||LAB_DEF[0],l2:f.l2||LAB_DEF[1],l3:f.l3||LAB_DEF[2],filas:parseInt(f.filas)||'',s1:f.s1||'',s2:f.s2||'',s3:f.s3||'',logo:f.logo,
   personas:selec(f).map(p=>({pid:p.pid,nombre:p.nombre,ci:p.ci,cargo:p.cargo,obs:p.obs}))}}
-function leerCampos(){const fm=document.getElementById('ot-f');if(!fm)return;['numero','fecha','desde','hasta','contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3','l1','l2','l3','filas'].forEach(k=>{if(fm[k])O.form[k]=fm[k].value})}
+function leerCampos(){const fm=document.getElementById('ot-f');if(!fm)return;['numero','fecha','al','desde','hasta','contratista','ruc','direccion','obra','servicio','horario','cond','f1','f2','f3','l1','l2','l3','filas'].forEach(k=>{if(fm[k])O.form[k]=fm[k].value})}
 
 /* ---------- vistas ---------- */
 function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=O.q.trim().toLowerCase();
@@ -6913,7 +6914,7 @@ function vNueva(){const f=O.form;const ids=new Set(f.sel.map(s=>s.pid));const q=
     <div class="ot-head"><div class="ot-logo"><img src="${f.logo}" alt="Logo"><label class="btn sm">Cambiar logo<input type="file" id="ot-logo" accept="image/*" hidden></label></div><div><h3>Orden de trabajo N° ${esc(f.numero)}</h3><span class="sub">Completá los datos, marcá quiénes entran y descargala en PDF o Excel para el shopping.</span></div></div>
     <div class="ot-hoja">
       <label class="ot-hr"><span>N° de OT</span><input type="text" name="numero" value="${esc(f.numero)}" required></label>
-      <label class="ot-hr"><span>Fecha de la OT:</span><input type="date" name="fecha" value="${f.fecha}" required></label>
+      <div class="ot-hr"><span>Fecha de la OT:</span><div class="ot-rango"><input type="date" name="fecha" value="${f.fecha}" required aria-label="Fecha de la OT (desde)"><span class="ot-al"><span class="sub">al</span><input type="date" name="al" value="${f.al||''}" min="${f.fecha||''}" aria-label="Hasta (opcional)" title="Hasta (opcional). Dejalo vacío si es un solo día"></span></div></div>
       <label class="ot-hr"><span>Contratista:</span><input type="text" name="contratista" value="${esc(f.contratista)}"></label>
       <label class="ot-hr"><span>C.I. N° / RUC N°:</span><input type="text" name="ruc" value="${esc(f.ruc)}"></label>
       <label class="ot-hr"><span>Dirección:</span><input type="text" name="direccion" value="${esc(f.direccion)}"></label>
@@ -6950,7 +6951,7 @@ function vBase(){
   </tbody></table></div>`}
 function vHist(){
   return `<div class="panel tw"><table><thead><tr><th>OT</th><th>Fecha</th><th>Servicio</th><th class="n">Personas</th><th></th></tr></thead><tbody>
-  ${O.ots.map(x=>`<tr><td class="num">N° ${x.numero}</td><td class="num">${fOT(x.fecha)}</td><td>${esc(x.datos.servicio||'')}${periodo(x.datos)?`<div class="sub">${esc(periodo(x.datos))}</div>`:''}</td><td class="n">${(x.datos.personas||[]).length}</td>
+  ${O.ots.map(x=>`<tr><td class="num">N° ${x.numero}</td><td class="num">${fechaOT(x.fecha,x.datos&&x.datos.al)}</td><td>${esc(x.datos.servicio||'')}${periodo(x.datos)?`<div class="sub">${esc(periodo(x.datos))}</div>`:''}</td><td class="n">${(x.datos.personas||[]).length}</td>
     <td><div class="bar" style="justify-content:flex-end"><button class="btn sm" data-oact="hpdf" data-id="${x.id}">PDF</button><button class="btn sm" data-oact="hxls" data-id="${x.id}">Excel</button><button class="btn sm ghost" data-oact="abrir" data-id="${x.id}">Abrir</button><button class="btn sm ghost" data-oact="duplicar" data-id="${x.id}">Duplicar</button>
       ${O.cconf===x.id?`<button class="btn sm" style="color:var(--bad)" data-oact="borraot" data-id="${x.id}">¿Borrar?</button>`:`<button class="btn sm ghost" data-oact="confot" data-id="${x.id}">×</button>`}</div></td></tr>`).join('')||'<tr><td colspan="5" class="sub">Todavía no guardaste ninguna OT.</td></tr>'}
   </tbody></table></div>`}
@@ -6978,7 +6979,7 @@ async function pdfOT(num,fecha,d){
   doc.setFont('helvetica','bold');doc.setFontSize(13);doc.text('ORDEN DE TRABAJO',X+118+32,num?22.5:25,{align:'center'});if(num){doc.setFontSize(11);doc.text('N° '+T(String(num)),X+118+32,29,{align:'center'})}
   doc.autoTable({startY:34,margin:{left:X,right:14},theme:'grid',tableWidth:W,styles:{font:'helvetica',fontSize:8.5,cellPadding:1.3,textColor:0,lineColor:0,lineWidth:0.2},
     columnStyles:{0:{cellWidth:38,fontStyle:'bold'},1:{cellWidth:W-38}},
-    body:[['Fecha de la OT:',fOT(fecha)],['Contratista:',T(d.contratista||'')],['C.I. N° / RUC N°:',T(d.ruc||'')],['Dirección:',T(d.direccion||'')],['Obra:',T(d.obra||'')],['Servicio:',T(d.servicio||'')],['Horario de trabajo:',T(d.horario||'')]]});
+    body:[['Fecha de la OT:',fechaOT(fecha,d.al)],['Contratista:',T(d.contratista||'')],['C.I. N° / RUC N°:',T(d.ruc||'')],['Dirección:',T(d.direccion||'')],['Obra:',T(d.obra||'')],['Servicio:',T(d.servicio||'')],['Horario de trabajo:',T(d.horario||'')]]});
   const body=[];for(let k=0;k<filas;k++){const p=P[k];body.push([k+1,p?T(p.nombre):'',p?ciTxt(p.ci):'',p?T(p.cargo||''):'',p?T(p.obs||''):''])}
   doc.autoTable({startY:doc.lastAutoTable.finalY,margin:{left:X,right:14,top:14,bottom:14},theme:'grid',tableWidth:W,
     head:[['ÍTEMS','NOMBRE Y APELLIDO','CI','CARGO','OBS']],body,
@@ -7006,7 +7007,7 @@ async function xlsOT(num,fecha,d){
   ws.mergeCells('A1:C1');ws.mergeCells('D1:F1');ws.getRow(1).height=62;
   const t=ws.getCell('D1');t.value=num?'ORDEN DE TRABAJO\nN° '+num:'ORDEN DE TRABAJO';t.font={bold:true,size:14};t.alignment={horizontal:'center',vertical:'middle',wrapText:true};caja(1,1,1,6);
   try{const lg=d.logo||OT_LOGO_DEF;const ext=/image\/jpe?g/.test(lg)?'jpeg':'png';const id=wb.addImage({base64:lg,extension:ext});ws.addImage(id,{tl:{col:0.4,row:0.15},ext:{width:250,height:70}})}catch(e){}
-  const enc=[['Fecha de la OT:',fOT(fecha)],['Contratista:',d.contratista],['C.I.N°/ Ruc N°:',d.ruc],['Dirección:',d.direccion],['Obra:',d.obra],['Servicio:',d.servicio],['Horario de trabajo',d.horario]];
+  const enc=[['Fecha de la OT:',fechaOT(fecha,d.al)],['Contratista:',d.contratista],['C.I.N°/ Ruc N°:',d.ruc],['Dirección:',d.direccion],['Obra:',d.obra],['Servicio:',d.servicio],['Horario de trabajo',d.horario]];
   enc.forEach(([k,v],i)=>{const r=2+i;ws.getCell(r,1).value=k;ws.getCell(r,1).font={size:9};ws.mergeCells(r,2,r,6);ws.getCell(r,2).value=v||'';ws.getCell(r,2).font={size:9};caja(r,1,r,6)});
   const h=2+enc.length;['ÍTEMS','NOMBRE Y APELLIDO','CI','CARGO','OBS'].forEach((x,i)=>{const c=ws.getCell(h,i+1);c.value=x;c.font={bold:true,size:9};c.alignment={horizontal:'center'};c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEBEBEB'}}});
   ws.mergeCells(h,5,h,6);caja(h,1,h,6);
@@ -7090,7 +7091,7 @@ document.addEventListener('input',e=>{if(!dentro(e))return;const t=e.target;
   if(t.dataset.oobs){const s=O.form.sel.find(x=>x.pid===t.dataset.oobs);if(s)s.obs=t.value}});
 document.addEventListener('keydown',e=>{if(!dentro(e))return;if(e.key==='Enter'&&e.target.closest('.ot-pf')){e.preventDefault();guardarP()}});
 document.addEventListener('submit',async e=>{if(!dentro(e))return;e.preventDefault();e.stopImmediatePropagation();if(e.target.id!=='ot-f')return;leerCampos();
-  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');if(f.desde&&f.hasta&&f.hasta<f.desde)return toast('La fecha final de los trabajos es anterior a la inicial');
+  const f=O.form;f.numero=String(f.numero||'').trim();if(!f.numero)return toast('Poné el número de OT');if(!f.sel.length)return toast('Marcá al menos una persona');if(f.desde&&f.hasta&&f.hasta<f.desde)return toast('La fecha final de los trabajos es anterior a la inicial');if(f.al&&f.al<f.fecha)return toast('La fecha “al” es anterior a la fecha de la OT');
   const prev=O.ots.find(x=>x.id===f.id);if(prev&&String(prev.numero)!==f.numero)f.id=nid();
   const dup=O.ots.find(x=>x.id!==f.id&&String(x.numero)===f.numero);if(dup&&!f.confirmDup){f.confirmDup=true;return toast(`Ya existe la OT N° ${f.numero}. Tocá Guardar otra vez para guardarla igual, o cambiá el número.`)}delete f.confirmDup;const row={id:f.id,obra_id:O.oid,numero:f.numero,fecha:f.fecha,datos:datosForm()};
   try{await window.OTB.save(row)}catch(err){return toast('No se pudo guardar. ¿Ejecutaste el SQL 14?')}
@@ -7107,7 +7108,8 @@ const css=document.createElement('style');css.textContent=`
 .ot-sig{min-height:58px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px dashed var(--line);border-radius:8px;background:#fff;padding:4px}.ot-sig img{max-height:48px;max-width:60%;object-fit:contain}.ot-sig .btn{cursor:pointer}.ot-sig .btn.ghost{color:#222;border-color:#bbb;background:#fff}
 .ot-firmas{display:flex;flex-direction:column;gap:6px}.ot-fg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .ot-fi{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:8px;padding:8px}.ot-fi .ot-lab{font-weight:700}
-.ot-hoja{border:1px solid var(--ink);border-radius:6px;overflow:hidden;margin:6px 0 14px}.ot-hr{display:grid!important;grid-template-columns:170px minmax(0,1fr);align-items:stretch;margin:0!important;border-top:1px solid var(--line);font-size:14px!important;text-transform:none!important;letter-spacing:0!important}.ot-hr:first-child{border-top:0}.ot-hr>span{padding:10px 12px;font-weight:700;color:var(--ink);border-right:1px solid var(--line);display:flex;align-items:center}.ot-hr>input{border:0!important;border-radius:0!important;background:transparent!important;min-width:0;margin:0!important}@media (max-width:600px){.ot-hr{grid-template-columns:118px minmax(0,1fr)}.ot-hr>span{font-size:12.5px;padding:8px}}
+.ot-hoja{border:1px solid var(--ink);border-radius:6px;overflow:hidden;margin:6px 0 14px}.ot-hr{display:grid!important;grid-template-columns:170px minmax(0,1fr);align-items:stretch;margin:0!important;border-top:1px solid var(--line);font-size:14px!important;text-transform:none!important;letter-spacing:0!important}.ot-hr:first-child{border-top:0}.ot-hr>span{padding:10px 12px;font-weight:700;color:var(--ink);border-right:1px solid var(--line);display:flex;align-items:center}.ot-rango{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}.ot-rango input{border:0!important;border-radius:0!important;background:transparent!important;min-width:0;margin:0!important;flex:1 1 130px}.ot-rango .sub{flex:0 0 auto}.ot-al{display:flex;align-items:center;gap:6px;flex:1 1 150px;min-width:0}.ot-al input{flex:1 1 auto}
+.ot-hr>input{border:0!important;border-radius:0!important;background:transparent!important;min-width:0;margin:0!important}@media (max-width:600px){.ot-hr{grid-template-columns:118px minmax(0,1fr)}.ot-hr>span{font-size:12.5px;padding:8px}}
 .ot-fmt{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:10px}
 @media (max-width:760px){.ot-fg{grid-template-columns:1fr}}
 .ot-pers{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
