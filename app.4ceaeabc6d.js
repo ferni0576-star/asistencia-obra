@@ -152,6 +152,8 @@ function backendLocal(){
     async tareas(oid){return JSON.parse(JSON.stringify((d.tareas||[]).filter(t=>t.obra_id===oid)))},
     async lps(oid){return JSON.parse(JSON.stringify((d.lps||{})[oid]||null))},
     async saveLps(oid,doc){d.lps=d.lps||{};d.lps[oid]=JSON.parse(JSON.stringify(doc));save()},
+    async rutina(sem){return JSON.parse(JSON.stringify((d.rutina||[]).filter(x=>x.semana===sem)))},
+    async marcarRutina(oid,sem,tipo,on){d.rutina=(d.rutina||[]).filter(x=>!(x.obra_id===oid&&x.semana===sem&&x.tipo===tipo));if(on)d.rutina.push({obra_id:oid,semana:sem,tipo});save()},
     async otPersonas(oid){if(!d.otPersonas){const o=d.obras.find(x=>/locales comerciales/i.test(x.nombre))||d.obras[0];d.otPersonas=o?SEMILLA_OTP.map(p=>({...p,id:uid(),obra_id:o.id})):[];save()}
       const leg=d.otPersonas.filter(x=>!x.obra_id);if(leg.length){d.otPersonas=d.otPersonas.filter(x=>x.obra_id);d.obras.forEach(o=>leg.forEach(p=>d.otPersonas.push({...p,id:uid(),obra_id:o.id})));save()}
       return JSON.parse(JSON.stringify(d.otPersonas.filter(x=>x.obra_id===oid)))},
@@ -252,6 +254,8 @@ function backendNube(sb){
     async tareas(oid){if(!oid)return[];return ok(await sb.from('tareas').select('*').eq('obra_id',oid).order('creado'))},
     async lps(oid){if(!oid)return null;const r=ok(await sb.from('lps').select('doc').eq('obra_id',oid));return r&&r[0]?r[0].doc:null},
     async saveLps(oid,doc){ok(await sb.from('lps').upsert({obra_id:oid,doc,actualizado:new Date().toISOString()}))},
+    async rutina(sem){return ok(await sb.from('rutina_hecha').select('obra_id,semana,tipo').eq('semana',sem))},
+    async marcarRutina(oid,sem,tipo,on){if(on)ok(await sb.from('rutina_hecha').upsert({obra_id:oid,semana:sem,tipo}));else ok(await sb.from('rutina_hecha').delete().eq('obra_id',oid).eq('semana',sem).eq('tipo',tipo))},
     async otPersonas(oid){if(!oid)return[];return ok(await sb.from('ot_personas').select('*').eq('obra_id',oid).order('orden').order('creado'))},
     async saveOtPersona(p){ok(await sb.from('ot_personas').upsert({id:p.id,obra_id:p.obra_id,nombre:p.nombre,ci:p.ci||null,cargo:p.cargo||null}))},
     async delOtPersona(id){ok(await sb.from('ot_personas').delete().eq('id',id))},
@@ -1043,6 +1047,7 @@ window.CMB={comps:oid=>DB.comps(oid),saveComp:c=>DB.saveComp(c),delComp:(oid,id)
 const SEMILLA_COMP=[];
 window.APB={todas:()=>DB.aprobTodas(),list:oid=>DB.aprob(oid),pedir:r=>DB.pedirAprob(r),resolver:(id,e,c)=>DB.resolverAprob(id,e,c),quitar:(o,t,r)=>DB.quitarAprob(o,t,r)};
 window.LPB={get:oid=>DB.lps(oid),save:(oid,doc)=>DB.saveLps(oid,doc)};
+window.RUT={list:sem=>DB.rutina(sem),marcar:(oid,sem,tipo,on)=>DB.marcarRutina(oid,sem,tipo,on)};
 window.TDB={list:oid=>DB.tareas(oid),save:t=>DB.saveTarea(t),del:id=>DB.delTarea(id)};
 window.USR={list:()=>DB.perfiles(),asignar:v=>DB.asignarUsuario(v),quitar:id=>DB.quitarPerfil(id),nube:()=>NUBE,email:()=>S.email||''};
 const SEMILLA_PEDIDOS=[];
@@ -4864,7 +4869,7 @@ async function cargarTodas(forzar){if(!window.APB||!window.APB.todas||yo()==='cl
     try{if(window.Notification&&Notification.permission==='granted')new Notification('Control de Obras',{body:t+(nombreObra(x.obra_id)?' · '+nombreObra(x.obra_id):''),tag:x.id})}catch(e){}});
   campana();if(AP.bx.abierto)pintarBx();return AP.todas}
 const nombreObra=id=>((S.obras||[]).find(o=>o.id===id)||{}).nombre||'';
-function contar(){const L=AP.todas;if(yo()==='aprobador')return L.filter(x=>x.estado==='pendiente').length;if(yo()==='cliente')return 0;const v=visto();return L.filter(x=>x.estado!=='pendiente'&&(x.resuelto||'')>v).length+(window.LPS_AV||[]).length}
+function contar(){const L=AP.todas;if(yo()==='aprobador')return L.filter(x=>x.estado==='pendiente').length;if(yo()==='cliente')return 0;const v=visto();return L.filter(x=>x.estado!=='pendiente'&&(x.resuelto||'')>v).length+(window.LPS_AV||[]).length+(window.VIE_AV||[]).length}
 function campana(){if(yo()==='cliente'||!window.APB)return;const h=document.querySelector('header.top');if(!h)return;let b=h.querySelector('.apb-bell');
   if(!b){b=document.createElement('button');b.className='apb-bell';b.type='button';b.setAttribute('data-bx','abrir');const br=h.querySelector('.brand');(br||h.firstChild).after?br.after(b):h.prepend(b)}
   const n=contar();b.innerHTML=`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 20a2 2 0 004 0"/></svg><span class="apb-bl">${yo()==='aprobador'?'Por aprobar':'Notificaciones'}</span>${n?`<b class="apb-bn">${n>99?'99+':n}</b>`:''}`;
@@ -4889,6 +4894,7 @@ function pintarBx(){let el=document.getElementById('apb-bx');if(!AP.bx.abierto){
     <div class="rs-wh"><b>${ap?'Bandeja de aprobación':'Notificaciones'}</b><button class="rs-x" data-bx="cerrar" aria-label="Cerrar">✕</button></div>
     <div class="bx-f2">${F.map(([k,n])=>`<button class="chip-p" data-bx="filtro" data-f="${k}" aria-pressed="${AP.bx.filtro===k}">${n} <span class="sub">${cuenta(k)}</span></button>`).join('')}</div>
     ${!ap&&(window.LPS_AV||[]).length?`<div class="bx-lps"><b>Para planificar con tiempo</b>${window.LPS_AV.slice(0,8).map(x=>`<button class="bx-lpi ${x.g}" data-bx="lps" data-oid="${x.oid}" data-lps="${(x.go&&x.go.lps)||''}" data-s="${(x.go&&x.go.s)||''}"><span>${esc(x.t)}</span><span class="sub">${esc(x.obra||'')} · ${esc(x.d||'')}</span></button>`).join('')}</div>`:''}
+    ${!ap&&(window.VIE_AV||[]).length?`<div class="bx-lps"><b>Rutina del viernes</b>${window.VIE_AV.slice(0,12).map((x,k)=>`<div class="bx-vie"><button class="bx-lpi ${x.g}" data-bx="vie" data-k="${k}"><span>${esc(x.t)}</span><span class="sub">${esc(x.obra||'')} · ${esc(x.d||'')}</span></button><button class="btn sm" data-bx="viehecho" data-k="${k}" aria-label="Marcar hecho">✓</button></div>`).join('')}</div>`:''}
     ${notif?`<button class="bx-act" data-bx="permiso">🔔 Avisarme en este dispositivo cuando llegue algo nuevo</button>`:''}
     <div class="bx-l">${L.map(fila).join('')||`<p class="sub" style="text-align:center;padding:30px 0">${AP.bx.filtro==='pend'?(ap?'No tenés nada pendiente de aprobar. 👍':'Nada esperando respuesta.'):'Sin novedades.'}</p>`}</div>
     <p class="sub bx-pie">${ap?'Acá llega todo lo que la oficina te envía para aprobar, de todas tus obras.':'Acá ves las respuestas de la administración del cliente: aprobados y observados.'} Se actualiza solo cada minuto.</p></aside>`;
@@ -4896,6 +4902,8 @@ function pintarBx(){let el=document.getElementById('apb-bx');if(!AP.bx.abierto){
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-bx]');if(!b)return;const a=b.dataset.bx;const x=AP.todas.find(r=>r.id===b.dataset.id);
   if(a==='abrir'){AP.bx.v0=visto();AP.bx.abierto=true;AP.bx.filtro=null;pintarBx();await cargarTodas(true);pintarBx();if(yo()!=='aprobador'){try{localStorage.setItem(kVisto(),new Date().toISOString())}catch(err){}campana()}return}
   if(a==='cerrar'){AP.bx.abierto=false;AP.bx.obs=null;pintarBx();campana();return}
+  if(a==='vie'){const v=(window.VIE_AV||[])[+b.dataset.k];if(!v)return;AP.bx.abierto=false;pintarBx();if(typeof elegirObra==='function')elegirObra(v.oid);S.tab=v.go.tab;window.render();window.scrollTo(0,0);return}
+  if(a==='viehecho'){const v=(window.VIE_AV||[])[+b.dataset.k];if(!v)return;try{await window.RUT.marcar(v.oid,v.rut.sem,v.rut.k,true)}catch(err){return toast('No se pudo guardar')}window.VIE_AV=window.VIE_AV.filter(i=>i!==v);if(window.MIDIA)window.MIDIA.recargar();toast('Hecho ✓');campana();return pintarBx()}
   if(a==='lps'){AP.bx.abierto=false;pintarBx();if(typeof elegirObra==='function')elegirObra(b.dataset.oid);window.LPS_IR={lps:b.dataset.lps||'prep',s:+b.dataset.s||null};S.tab='planificacion';window.render();window.scrollTo(0,0);return}
   if(a==='filtro'){AP.bx.filtro=b.dataset.f;return pintarBx()}
   if(a==='ver'&&x)return ir(x);
@@ -4969,6 +4977,7 @@ async function cargar(){if(MD.cargando)return;MD.cargando=true;const h=hoyD();co
   const AP=window.APROB&&window.APROB.listaTodas?window.APROB.listaTodas():[];
   const apr=!!(window.CLI&&window.CLI.aprobador);
   const dow=new Date(h+'T12:00:00').getDay();const lun=sumar(h,dow===0?-6:1-dow);const vie=sumar(lun,4),sab=sumar(lun,5);
+  const back=(dow+2)%7;const vref=sumar(h,-back);const RH=(!window.CLI&&!window.COL&&window.RUT)?await t(()=>window.RUT.list(vref)):null;
   await Promise.all(S.obras.filter(o=>est(o)!=='terminada').map(async o=>{const on=corto(o.nombre);const C=cart[o.id]={o,v:0,s:0,cert:0,pres:0,prox:null};
     const pr=(puedeD('presupuesto')||puedeD('contratistas'))&&window.PDB?await t(()=>window.PDB.get(o.id)):null;
     if(pr&&pr.items){const ix=pr.indice||1;const P=Object.fromEntries(pr.items.map(i=>[i.id,((+i.mat||0)+(+i.mo||0))*ix]));C.pres=pr.items.reduce((s,i)=>s+(+i.cant||0)*P[i.id],0);
@@ -4980,9 +4989,9 @@ async function cargar(){if(MD.cargando)return;MD.cargando=true;const h=hoyD();co
           if(!pago&&m>0){items.push({g:fp<h?'v':fp<=sumar(h,7)?'s':'l',tipo:'Pagos',obra:on,oid:o.id,t:`Pago a ${corto(c.nombre)} · certificado N°${x.n} · ${gs(m)} Gs`,d:fp<h?`Correspondía el ${fd(fp)}`:fp===h?'Hoy':`Se paga el ${fd(fp)}`,a:'Registrar pago',go:{cert:{cid:c.id,n:x.n}},f:fp});
             if(fp>=lun&&fp<=sab)eventos.push({f:fp,c:'pago',t:`Pago ${corto(c.nombre).split(' ')[0]} · ${M(m)}`})}
           if(x.fecha||x.hasta)bit.push({f:x.fecha||x.hasta,obra:on,oid:o.id,t:`Certificado N°${x.n} de ${corto(c.nombre)}`,s:`${gs(m)} Gs${pago?' · pagado':''}`,go:{cert:{cid:c.id,n:x.n}}})});
-        const ult=cert.length?cert[cert.length-1]:null;
+        const ult=cert.length?cert[cert.length-1]:null;if((c.items||[]).length&&(!ult||(ult.hasta||'')<vref))C.certPend=(C.certPend||0)+1;
         if(est(o)==='activo'&&(c.items||[]).length&&(!ult||(ult.hasta||'')<vie)&&dow>=4)items.push({g:'s',tipo:'Certificados',obra:on,oid:o.id,t:`Cerrar certificado de la semana · ${corto(c.nombre)}`,d:`Período al ${fd(vie)}`,a:'Emitir',go:{cert:{cid:c.id,n:(ult?ult.n:0)+1}},f:vie})});
-      if(hayCon&&est(o)==='activo')eventos.push({f:vie,c:'cert',t:`Cierre de certificados · ${on}`})}
+      C.hayCon=hayCon;if(hayCon&&est(o)==='activo')eventos.push({f:vie,c:'cert',t:`Cierre de certificados · ${on}`})}
     if(puedeD('materiales')&&window.MDB){const ps=await t(()=>window.MDB.list(o.id))||[];
       ps.forEach(p=>{const its=p.items||[];const ok=its.filter(i=>i.rec&&(i.rec.cant==null||+i.rec.cant>=+i.cant)).length;
         if(!window.CLI&&its.length&&ok<its.length){const dias=p.fecha?Math.round((new Date(h)-new Date(p.fecha))/864e5):0;items.push({g:dias>10?'v':'s',tipo:'Pedidos',obra:on,oid:o.id,t:`Pedido N° ${p.numero}${p.ref?' · '+p.ref:''} · ${ok} de ${its.length} llegaron`,d:p.fecha?`Pedido el ${fd(p.fecha)}${dias>10?` · hace ${dias} días`:''}`:'',a:'Marcar llegada',go:{ped:p.id},f:p.fecha||''})}
@@ -5001,6 +5010,14 @@ async function cargar(){if(MD.cargando)return;MD.cargando=true;const h=hoyD();co
     if(x.estado!=='pendiente'&&x.resuelto)bit.push({f:x.resuelto.slice(0,10),obra:on,oid:x.obra_id,t:`${x.titulo}: ${x.estado}`,s:x.resuelto_por?'por '+x.resuelto_por:'',bx:1})});
   items.forEach(i=>{const C=cart[i.oid];if(!C)return;if(i.g==='v')C.v++;else if(i.g==='s')C.s++;if(i.f&&i.f!=='9'&&i.f>=h&&(!C.prox||i.f<C.prox.f))C.prox={f:i.f,t:i.tipo==='Pagos'?'Pago':i.tipo==='Certificados'?'Cierre de certificado':i.tipo==='Tareas'?'Tarea':i.tipo}});
   Object.values(cart).forEach(C=>{if(!C.prox&&C.o.inicio&&C.o.inicio>=h)C.prox={f:C.o.inicio,t:'Inicio de obra'}});
+  if(RH){const venc=back>2;
+    const RT=[['cert','Preparar certificados de contratistas',{tab:'contratistas'}],['inf','Informe de avance semanal',{tab:'obra'}],['pla','Planilla de personal',{tab:'planilla'}]];
+    Object.values(cart).filter(C=>est(C.o)==='activo').forEach(C=>{const on=corto(C.o.nombre);
+      RT.forEach(([k,tt,go])=>{if(RH.some(r=>r.obra_id===C.o.id&&r.tipo===k))return;
+        if(k==='cert'&&C.hayCon!==undefined&&(!C.hayCon||!C.certPend))return;
+        items.push({g:venc?'v':'s',tipo:'Viernes',obra:on,oid:C.o.id,t:tt,d:(venc?`Era para el viernes ${fd(vref)}`:back===0?'Hoy es viernes':`Del viernes ${fd(vref)}`)+(k==='cert'&&C.certPend?` · ${C.certPend} contratista${C.certPend>1?'s':''} sin cerrar`:''),a:'Hecho ✓',go,f:vref,rut:{k,sem:vref}})})})}
+  window.VIE_AV=items.filter(i=>i.tipo==='Viernes');
+  if(back===0&&window.VIE_AV.length){try{const kN='vie_notif';if(localStorage.getItem(kN)!==h&&window.Notification&&Notification.permission==='granted'){const no=new Set(window.VIE_AV.map(i=>i.oid)).size;new Notification('Control de Obras',{body:`Es viernes: certificados de contratistas, informe de avance y planilla de personal · ${no} obra${no>1?'s':''}`,tag:'viernes-'+h});localStorage.setItem(kN,h)}}catch(e){}}
   const ordG={v:0,s:1,l:2};items.sort((a,b)=>ordG[a.g]-ordG[b.g]||(a.f||'9').localeCompare(b.f||'9'));
   window.LPS_AV=items.filter(i=>i.tipo==='Planificación'&&(i.g==='v'||i.g==='s'));if(window.APROB&&window.APROB.campanaLps)window.APROB.campanaLps();
   MD.datos={items,eventos,bit:bit.filter(b=>b.f).sort((a,b)=>b.f.localeCompare(a.f)).slice(0,6),cart,lun,h};MD.cargando=false;MD.t=Date.now();if(window.INICIO)window.INICIO.mount()}
@@ -5013,7 +5030,7 @@ function html(){const D=MD.datos;if(!D){if(!MD.cargando)cargar();return `<div cl
   if(Date.now()-MD.t>90000&&!MD.cargando)cargar();
   const quien=(window.CLI&&window.CLI.nombre)||(window.COL&&window.COL.nombre)||(S.email?S.email.split('@')[0]:'');
   let fecha=new Date().toLocaleDateString('es-PY',{weekday:'long',day:'numeric',month:'long'});fecha=fecha.charAt(0).toUpperCase()+fecha.slice(1);
-  const TIP=['Todo',...['Pagos','Certificados','Aprobaciones','Pedidos','Planificación','Tareas'].filter(k=>D.items.some(i=>i.tipo===k))];if(!TIP.includes(MD.filtro))MD.filtro='Todo';
+  const TIP=['Todo',...['Viernes','Pagos','Certificados','Aprobaciones','Pedidos','Planificación','Tareas'].filter(k=>D.items.some(i=>i.tipo===k))];if(!TIP.includes(MD.filtro))MD.filtro='Todo';
   const vis=D.items.filter(i=>MD.filtro==='Todo'||i.tipo===MD.filtro);
   const G=[['v','Vencido'],['s','Esta semana'],['l','Más adelante / sin fecha']];
   const band=G.map(([g,n])=>{const L=vis.filter(i=>i.g===g);if(!L.length)return '';const ab=(MD.verMas||{})[g];const L2=ab?L:L.slice(0,g==='l'?4:6);
@@ -5053,6 +5070,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-md]'
   if(a==='bit'&&D){const x=D.bit[+b.dataset.k];if(!x)return;if(x.bx){const bb=document.createElement('button');bb.setAttribute('data-bx','abrir');document.body.appendChild(bb);bb.click();bb.remove();return}return ir(x.go||{},x.oid)}
   if((a==='ir'||a==='act')&&D){const x=D.items[+b.dataset.k];if(!x)return;
     if(x.bx){const bb=document.createElement('button');bb.setAttribute('data-bx','abrir');document.body.appendChild(bb);bb.click();bb.remove();return}
+    if(x.rut&&a==='act'){try{await window.RUT.marcar(x.oid,x.rut.sem,x.rut.k,true)}catch(err){return toast('No se pudo guardar. Revisá la conexión.')}toast('Hecho ✓');D.items.splice(D.items.indexOf(x),1);window.VIE_AV=(window.VIE_AV||[]).filter(i=>i!==x);if(window.APROB)window.APROB.campana();return window.INICIO.mount()}
     if(x.tarea&&a==='act'){x.tarea.hecha=true;x.tarea.hecha_el=hoyD();try{await window.TDB.save(x.tarea)}catch(err){return toast('No se pudo guardar la tarea')}toast('Tarea hecha ✓');D.items.splice(D.items.indexOf(x),1);return window.INICIO.mount()}
     if(x.tarea)return ir({tab:'tareas'},x.oid);
     return ir(x.go||{},x.oid)}});
@@ -7596,6 +7614,7 @@ const css=document.createElement('style');css.textContent=`
 .lps-paso{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:10px 12px;font:inherit;cursor:pointer}
 .lps-paso>span:nth-child(2){display:flex;flex-direction:column}
 .bx-lps{display:flex;flex-direction:column;gap:6px;padding:8px 16px 10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.bx-vie{display:flex;gap:6px;align-items:stretch}.bx-vie .bx-lpi{flex:1 1 auto;min-width:0}.bx-vie .btn{flex:0 0 auto}
 .bx-lpi{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:2px;border:1px solid var(--line);border-left:4px solid var(--warn,#c98a00);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit;font-size:14px;cursor:pointer}.bx-lpi.v{border-left-color:var(--bad)}
 .lps-n{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--chip,#eee);font-weight:700}.lps-paso.ok .lps-n{background:var(--ok);color:#fff}
 @media (max-width:760px){
